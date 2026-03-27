@@ -5,7 +5,7 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentInfo, AgentState, LogEntry } from "../shared/types.ts";
 import { generateOutfit } from "./outfit.ts";
-import { appendLog } from "./persistence.ts";
+import { appendLog, loadLog } from "./persistence.ts";
 import { resolve, join } from "path";
 import { homedir } from "os";
 import { writeFileSync, mkdirSync } from "fs";
@@ -118,7 +118,18 @@ function processMessage(agentId: string, msg: SDKMessage) {
       if (subtype === "init") {
         const sessionId = (msg as any).session_id;
         const managed = agents.get(agentId);
-        if (managed && sessionId) managed.sessionId = sessionId;
+        if (managed && sessionId) {
+          // Load prior log history if this session was seen before
+          if (!managed.sessionId && sessionId) {
+            const history = loadLog(agentId, sessionId);
+            if (history.length > 0) {
+              for (const entry of history) {
+                emit({ type: "log_entry", entry });
+              }
+            }
+          }
+          managed.sessionId = sessionId;
+        }
       }
       break;
     }

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import type { AgentInfo, LogEntry } from "../../shared/types.ts";
 import { StatusLight } from "../office/StatusLight.tsx";
 import { send } from "../ws.ts";
+import { LogEntryCard } from "./LogEntryCard.tsx";
 
 export function LogView({
   agent,
@@ -14,18 +15,26 @@ export function LogView({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
+  const [autoScroll, setAutoScroll] = useState(true);
 
   useEffect(() => {
-    if (scrollRef.current) {
+    if (autoScroll && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [logs]);
+  }, [logs, autoScroll]);
+
+  function handleScroll() {
+    if (!scrollRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    setAutoScroll(scrollHeight - scrollTop - clientHeight < 50);
+  }
 
   function handleSend() {
     const text = input.trim();
     if (!text) return;
     send({ type: "send_message", agentId: agent.id, text });
     setInput("");
+    setAutoScroll(true);
   }
 
   return (
@@ -89,52 +98,28 @@ export function LogView({
       {/* Messages */}
       <div
         ref={scrollRef}
+        onScroll={handleScroll}
         style={{
           flex: 1,
           overflowY: "auto",
           padding: "16px 24px",
-          fontFamily: "'JetBrains Mono',monospace",
-          fontSize: 13,
-          lineHeight: 1.7,
           color: "#c0c8d8",
         }}
       >
         {logs.length === 0 && (
-          <div style={{ color: "#3a4a6a", textAlign: "center", marginTop: 40 }}>
+          <div
+            style={{
+              color: "#3a4a6a",
+              textAlign: "center",
+              marginTop: 40,
+              fontFamily: "'DM Sans',sans-serif",
+            }}
+          >
             Send a message to start a conversation.
           </div>
         )}
         {logs.map((entry) => (
-          <div
-            key={entry.id}
-            style={{
-              marginBottom: 8,
-              padding: "6px 10px",
-              borderRadius: 6,
-              background:
-                entry.kind === "user_message"
-                  ? "rgba(126,184,255,0.06)"
-                  : entry.kind === "error"
-                    ? "rgba(232,93,117,0.08)"
-                    : "transparent",
-            }}
-          >
-            {entry.kind === "user_message" && (
-              <span style={{ color: "#7eb8ff", fontWeight: 600, fontSize: 11, marginRight: 8 }}>You:</span>
-            )}
-            <span
-              style={{
-                color:
-                  entry.kind === "error"
-                    ? "#E85D75"
-                    : entry.kind === "user_message"
-                      ? "#7eb8ff"
-                      : "#c0c8d8",
-              }}
-            >
-              {entry.content}
-            </span>
-          </div>
+          <LogEntryCard key={entry.id} entry={entry} />
         ))}
       </div>
 
