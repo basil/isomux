@@ -4,6 +4,19 @@ An isometric office for managing multiple concurrent Claude Code agents. Each ag
 
 ![Isomux office view](screenshot.png)
 
+## Prerequisites
+
+- [Bun](https://bun.sh/) (v1.2+)
+- [Claude Code](https://claude.ai/code) CLI installed and authenticated with a Claude Pro or Max subscription
+
+```bash
+# Install Bun (if not already installed)
+curl -fsSL https://bun.sh/install | bash
+
+# Verify Claude Code is installed and logged in
+claude --version
+```
+
 ## Setup
 
 ```bash
@@ -17,6 +30,10 @@ Then open http://localhost:4000.
 
 - Click an empty desk to spawn a new agent
 - Click an agent to open the conversation view
+- Send messages to give agents tasks
 - Right-click an agent for actions (new conversation, resume, kill)
-- Agents persist across restarts
-- Uses your Claude subscription via the Agent SDK
+- Agents persist across restarts with conversation history
+- Press Escape to return to the office view
+- Sound notification plays when an agent finishes and the tab is unfocused
+
+Agents use your Claude subscription via the Agent SDK — no API key or per-token billing required.
