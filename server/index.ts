@@ -1,10 +1,8 @@
 import type { ServerWebSocket } from "bun";
-import type { AgentInfo, ServerMessage, ClientCommand } from "../shared/types.ts";
-import { generateOutfit } from "./outfit.ts";
+import type { ServerMessage, ClientCommand } from "../shared/types.ts";
+import * as AgentManager from "./agent-manager.ts";
 import { join } from "path";
 
-// In-memory agent registry
-const agents = new Map<string, AgentInfo>();
 const browsers = new Set<ServerWebSocket<unknown>>();
 
 function broadcast(msg: ServerMessage) {
@@ -14,76 +12,29 @@ function broadcast(msg: ServerMessage) {
   }
 }
 
-function findFreeDesk(): number | null {
-  const taken = new Set([...agents.values()].map((a) => a.desk));
-  for (let i = 0; i < 8; i++) {
-    if (!taken.has(i)) return i;
-  }
-  return null;
-}
+// Wire AgentManager events to WebSocket broadcasts
+AgentManager.onEvent((event) => {
+  broadcast(event as ServerMessage);
+});
 
-function handleCommand(cmd: ClientCommand) {
+async function handleCommand(cmd: ClientCommand) {
   switch (cmd.type) {
-    case "spawn": {
-      const desk = findFreeDesk();
-      if (desk === null) return;
-      const id = `agent-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      const agent: AgentInfo = {
-        id,
-        name: cmd.name,
-        desk,
-        cwd: cmd.cwd,
-        outfit: generateOutfit(cmd.name),
-        permissionMode: cmd.permissionMode,
-        state: "idle",
-      };
-      agents.set(id, agent);
-      broadcast({ type: "agent_added", agent });
+    case "spawn":
+      await AgentManager.spawn(cmd.name, cmd.cwd, cmd.permissionMode);
       break;
-    }
-    case "kill": {
-      if (agents.delete(cmd.agentId)) {
-        broadcast({ type: "agent_removed", agentId: cmd.agentId });
-      }
+    case "kill":
+      await AgentManager.kill(cmd.agentId);
       break;
-    }
-    case "send_message": {
-      // Phase 2: forward to SDK session
-      // For now, just echo back as a log entry
-      const agent = agents.get(cmd.agentId);
-      if (!agent) return;
-      broadcast({
-        type: "log_entry",
-        entry: {
-          id: `log-${Date.now()}`,
-          agentId: cmd.agentId,
-          timestamp: Date.now(),
-          kind: "user_message",
-          content: cmd.text,
-        },
-      });
-      // Mock: transition to working, then back to idle
-      agents.set(cmd.agentId, { ...agent, state: "thinking" });
-      broadcast({ type: "agent_updated", agentId: cmd.agentId, changes: { state: "thinking" } });
-      setTimeout(() => {
-        const a = agents.get(cmd.agentId);
-        if (a) {
-          agents.set(cmd.agentId, { ...a, state: "idle" });
-          broadcast({ type: "agent_updated", agentId: cmd.agentId, changes: { state: "idle" } });
-          broadcast({
-            type: "log_entry",
-            entry: {
-              id: `log-${Date.now()}`,
-              agentId: cmd.agentId,
-              timestamp: Date.now(),
-              kind: "text",
-              content: `[Mock] I received your message: "${cmd.text}". SDK integration coming in phase 2.`,
-            },
-          });
-        }
-      }, 1500);
+    case "send_message":
+      // Don't await — let it stream in the background
+      AgentManager.sendMessage(cmd.agentId, cmd.text);
       break;
-    }
+    case "new_conversation":
+      await AgentManager.newConversation(cmd.agentId);
+      break;
+    case "resume":
+      await AgentManager.resume(cmd.agentId, cmd.sessionId);
+      break;
   }
 }
 
@@ -117,7 +68,7 @@ const server = Bun.serve({
       browsers.add(ws);
       const msg: ServerMessage = {
         type: "full_state",
-        agents: [...agents.values()],
+        agents: AgentManager.getAllAgents(),
       };
       ws.send(JSON.stringify(msg));
     },
