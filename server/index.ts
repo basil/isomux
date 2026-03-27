@@ -46,6 +46,14 @@ async function handleCommand(cmd: ClientCommand) {
       } as ServerMessage);
       break;
     }
+    case "restart_server": {
+      console.log("Restart requested via UI. Exiting with code 0...");
+      // Agents are already persisted in agents.json — just close sessions
+      AgentManager.closeAllSessions();
+      // Exit 0 signals the wrapper to restart
+      setTimeout(() => process.exit(0), 200);
+      break;
+    }
   }
 }
 
@@ -98,6 +106,17 @@ const server = Bun.serve({
     },
     close(ws) {
       browsers.delete(ws);
+      const remaining = browsers.size;
+      for (const agent of AgentManager.getAllAgents()) {
+        const entry: import("../shared/types.ts").LogEntry = {
+          id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          agentId: agent.id,
+          timestamp: Date.now(),
+          kind: "system",
+          content: `Browser disconnected (${remaining} browser${remaining === 1 ? "" : "s"} remaining)`,
+        };
+        broadcast({ type: "log_entry", entry });
+      }
     },
   },
 });
