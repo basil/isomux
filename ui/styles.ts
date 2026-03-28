@@ -199,6 +199,7 @@ export const CSS = `
   .md-content pre {
     background: var(--bg-code-block); border-radius: 8px; padding: 10px 14px;
     margin: 8px 0; overflow-x: auto; border: 1px solid var(--border-subtle);
+    position: relative;
   }
   .md-content pre code {
     background: transparent; padding: 0; font-size: 12px; line-height: 1.5; color: var(--text-dim);
@@ -216,4 +217,16 @@ export const CSS = `
     border: 1px solid var(--border); padding: 6px 10px; text-align: left; font-size: 12px;
   }
   .md-content th { background: var(--bg-subtle); color: var(--text-primary); font-weight: 600; }
+
+  /* Copy buttons */
+  .copy-btn:hover { color: var(--text-secondary) !important; border-color: var(--border-light) !important; background: var(--bg-hover) !important; }
+  .code-copy-btn {
+    position: absolute; top: 6px; right: 6px;
+    width: 24px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border-medium); border-radius: 6px;
+    background: var(--btn-surface); color: var(--text-faint);
+    cursor: pointer; padding: 0;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+  }
 `;

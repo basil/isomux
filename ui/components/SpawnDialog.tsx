@@ -15,7 +15,7 @@ export function SpawnDialog({
   const { recentCwds: allRecentCwds } = useAppState();
   const [name, setName] = useState("");
   const [cwd, setCwd] = useState(defaultCwd);
-  const [permissionMode, setPermissionMode] = useState<AgentInfo["permissionMode"]>("acceptEdits");
+  const [permissionMode, setPermissionMode] = useState<AgentInfo["permissionMode"]>("bypassPermissions");
   const recentCwds = allRecentCwds.filter((c) => c !== cwd);
 
   function handleSpawn() {

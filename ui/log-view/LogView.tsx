@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import type { AgentInfo, AgentState, LogEntry } from "../../shared/types.ts";
 import { StatusLight } from "../office/StatusLight.tsx";
 import { send } from "../ws.ts";
 import { useAppState, useDispatch } from "../store.tsx";
-import { LogEntryCard } from "./LogEntryCard.tsx";
+import { LogEntryCard, serializeEntries } from "./LogEntryCard.tsx";
+import { CopyButton } from "../components/CopyButton.tsx";
 
 const STATE_LABELS: Partial<Record<AgentState, string>> = {
   thinking: "Thinking",
@@ -108,6 +109,51 @@ export function LogView({
 
   const isBusy = agent.state === "thinking" || agent.state === "tool_executing" || agent.state === "starting";
 
+  // Compute agent turns: group entries between user_messages
+  // For each entry, determine if it's the last in its agent turn
+  const turnData = useMemo(() => {
+    const result: { isLastInTurn: boolean; turnEntries: LogEntry[] }[] = [];
+    // Identify turn boundaries (user_message entries start a new turn)
+    // Agent turn = all non-user entries after a user message, until the next user message
+    let currentTurn: { startIdx: number; entries: LogEntry[] } = { startIdx: 0, entries: [] };
+    const turns: { startIdx: number; entries: LogEntry[] }[] = [];
+
+    for (let i = 0; i < logs.length; i++) {
+      const entry = logs[i];
+      if (entry.kind === "user_message") {
+        // Close previous agent turn if it has entries
+        if (currentTurn.entries.length > 0) {
+          turns.push(currentTurn);
+        }
+        // User messages are their own "turn" (no grouping needed)
+        turns.push({ startIdx: i, entries: [entry] });
+        currentTurn = { startIdx: i + 1, entries: [] };
+      } else {
+        currentTurn.entries.push(entry);
+      }
+    }
+    if (currentTurn.entries.length > 0) {
+      turns.push(currentTurn);
+    }
+
+    // Build per-entry lookup
+    const entryMap = new Map<string, { isLastInTurn: boolean; turnEntries: LogEntry[] }>();
+    for (const turn of turns) {
+      if (turn.entries.length === 1 && turn.entries[0].kind === "user_message") {
+        entryMap.set(turn.entries[0].id, { isLastInTurn: false, turnEntries: [] });
+        continue;
+      }
+      for (let i = 0; i < turn.entries.length; i++) {
+        const isLast = i === turn.entries.length - 1;
+        entryMap.set(turn.entries[i].id, { isLastInTurn: isLast, turnEntries: turn.entries });
+      }
+    }
+
+    return entryMap;
+  }, [logs]);
+
+  const getConversationText = useCallback(() => serializeEntries(logs), [logs]);
+
   function autoResize(el: HTMLTextAreaElement) {
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 200) + "px";
@@ -188,7 +234,9 @@ export function LogView({
             {agent.cwd}
           </span>
         </div>
-        <div style={{ width: 100 }} />
+        <div style={{ width: 100, display: "flex", justifyContent: "flex-end" }}>
+          {logs.length > 0 && <CopyButton getText={getConversationText} />}
+        </div>
       </div>
 
       {/* Messages */}
@@ -214,9 +262,17 @@ export function LogView({
             Send a message to start a conversation.
           </div>
         )}
-        {logs.map((entry) => (
-          <LogEntryCard key={entry.id} entry={entry} />
-        ))}
+        {logs.map((entry) => {
+          const td = turnData.get(entry.id);
+          return (
+            <LogEntryCard
+              key={entry.id}
+              entry={entry}
+              isLastInTurn={td?.isLastInTurn}
+              turnEntries={td?.turnEntries}
+            />
+          );
+        })}
         <ActivityIndicator state={agent.state} />
       </div>
 

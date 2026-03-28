@@ -1,21 +1,78 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import type { LogEntry } from "../../shared/types.ts";
 import { Markdown } from "./Markdown.tsx";
+import { CopyButton } from "../components/CopyButton.tsx";
 
-export function LogEntryCard({ entry }: { entry: LogEntry }) {
+/** Serialize entries for clipboard (text + tool_call only) */
+export function serializeEntries(entries: LogEntry[]): string {
+  const parts: string[] = [];
+  for (const e of entries) {
+    if (e.kind === "user_message") {
+      parts.push(e.content);
+    } else if (e.kind === "text") {
+      parts.push(e.content);
+    } else if (e.kind === "tool_call") {
+      const input = e.metadata?.input;
+      const inputStr = typeof input === "string" ? input : JSON.stringify(input, null, 2);
+      parts.push(`**${e.content}**\n${inputStr}`);
+    }
+  }
+  return parts.join("\n\n");
+}
+
+export function LogEntryCard({
+  entry,
+  isLastInTurn,
+  turnEntries,
+}: {
+  entry: LogEntry;
+  isLastInTurn?: boolean;
+  turnEntries?: LogEntry[];
+}) {
   switch (entry.kind) {
     case "user_message":
       return <UserMessage content={entry.content} />;
     case "text":
-      return <AssistantText content={entry.content} />;
+      return (
+        <AssistantText
+          content={entry.content}
+          isLastInTurn={isLastInTurn}
+          turnEntries={turnEntries}
+        />
+      );
     case "thinking":
-      return <ThinkingBlock content={entry.content} />;
+      return (
+        <ThinkingBlock
+          content={entry.content}
+          isLastInTurn={isLastInTurn}
+          turnEntries={turnEntries}
+        />
+      );
     case "tool_call":
-      return <ToolCall name={entry.content} input={entry.metadata?.input} />;
+      return (
+        <ToolCall
+          name={entry.content}
+          input={entry.metadata?.input}
+          isLastInTurn={isLastInTurn}
+          turnEntries={turnEntries}
+        />
+      );
     case "tool_result":
-      return <ToolResult content={entry.content} />;
+      return (
+        <ToolResult
+          content={entry.content}
+          isLastInTurn={isLastInTurn}
+          turnEntries={turnEntries}
+        />
+      );
     case "error":
-      return <ErrorBlock content={entry.content} />;
+      return (
+        <ErrorBlock
+          content={entry.content}
+          isLastInTurn={isLastInTurn}
+          turnEntries={turnEntries}
+        />
+      );
     case "system":
       return <SystemMessage content={entry.content} />;
     default:
@@ -23,27 +80,45 @@ export function LogEntryCard({ entry }: { entry: LogEntry }) {
   }
 }
 
-function UserMessage({ content }: { content: string }) {
+function TurnCopyButton({ turnEntries }: { turnEntries?: LogEntry[] }) {
+  const getText = useCallback(
+    () => (turnEntries ? serializeEntries(turnEntries) : ""),
+    [turnEntries],
+  );
+  if (!turnEntries) return null;
   return (
-    <div style={{ margin: "12px 0", padding: "10px 14px", borderRadius: 10, background: "var(--user-msg-bg)", borderLeft: "3px solid var(--accent)" }}>
+    <div style={{ position: "absolute", top: 8, right: 8 }}>
+      <CopyButton getText={getText} />
+    </div>
+  );
+}
+
+function UserMessage({ content }: { content: string }) {
+  const getText = useCallback(() => content, [content]);
+  return (
+    <div style={{ margin: "12px 0", padding: "10px 14px", paddingRight: 40, borderRadius: 10, background: "var(--user-msg-bg)", borderLeft: "3px solid var(--accent)", position: "relative" }}>
       <div style={{ fontSize: 10, fontWeight: 600, color: "var(--accent)", marginBottom: 4, fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>You</div>
       <div style={{ color: "var(--text-secondary)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{content}</div>
+      <div style={{ position: "absolute", top: 8, right: 8 }}>
+        <CopyButton getText={getText} />
+      </div>
     </div>
   );
 }
 
-function AssistantText({ content }: { content: string }) {
+function AssistantText({ content, isLastInTurn, turnEntries }: { content: string; isLastInTurn?: boolean; turnEntries?: LogEntry[] }) {
   return (
-    <div style={{ margin: "8px 0", padding: "10px 14px", borderRadius: 10, background: "var(--bg-subtle)" }}>
+    <div style={{ margin: "8px 0", padding: "10px 14px", paddingRight: 40, borderRadius: 10, background: "var(--bg-subtle)", position: "relative" }}>
       <Markdown content={content} />
+      {isLastInTurn && <TurnCopyButton turnEntries={turnEntries} />}
     </div>
   );
 }
 
-function ThinkingBlock({ content }: { content: string }) {
+function ThinkingBlock({ content, isLastInTurn, turnEntries }: { content: string; isLastInTurn?: boolean; turnEntries?: LogEntry[] }) {
   const [open, setOpen] = useState(false);
   return (
-    <div style={{ margin: "4px 0" }}>
+    <div style={{ margin: "4px 0", position: "relative" }}>
       <button
         onClick={() => setOpen(!open)}
         style={{
@@ -67,23 +142,24 @@ function ThinkingBlock({ content }: { content: string }) {
           {content}
         </div>
       )}
+      {isLastInTurn && <TurnCopyButton turnEntries={turnEntries} />}
     </div>
   );
 }
 
-function ToolCall({ name, input }: { name: string; input: unknown }) {
+function ToolCall({ name, input, isLastInTurn, turnEntries }: { name: string; input: unknown; isLastInTurn?: boolean; turnEntries?: LogEntry[] }) {
   const [open, setOpen] = useState(false);
   const inputStr = typeof input === "string" ? input : JSON.stringify(input, null, 2);
-  // Extract a short summary from the input
   const summary = extractToolSummary(name, input);
 
   return (
-    <div style={{ margin: "4px 0" }}>
+    <div style={{ margin: "4px 0", position: "relative" }}>
       <button
         onClick={() => setOpen(!open)}
         style={{
           display: "flex", alignItems: "center", gap: 6,
-          padding: "5px 10px", border: "1px solid var(--green-border)",
+          padding: "5px 10px", paddingRight: isLastInTurn ? 40 : 10,
+          border: "1px solid var(--green-border)",
           borderRadius: 6, background: "var(--tool-call-bg)",
           color: "var(--green)", fontSize: 12, cursor: "pointer",
           fontFamily: "'JetBrains Mono',monospace", width: "100%", textAlign: "left",
@@ -104,11 +180,12 @@ function ToolCall({ name, input }: { name: string; input: unknown }) {
           {inputStr}
         </div>
       )}
+      {isLastInTurn && <TurnCopyButton turnEntries={turnEntries} />}
     </div>
   );
 }
 
-function ToolResult({ content }: { content: string }) {
+function ToolResult({ content, isLastInTurn, turnEntries }: { content: string; isLastInTurn?: boolean; turnEntries?: LogEntry[] }) {
   const [open, setOpen] = useState(false);
   const isLong = content.length > 200;
   const preview = isLong ? content.slice(0, 150) + "..." : content;
@@ -119,7 +196,7 @@ function ToolResult({ content }: { content: string }) {
       borderRadius: 6, background: "var(--tool-result-bg)",
       borderLeft: "2px solid var(--green-border)",
       fontSize: 11, fontFamily: "'JetBrains Mono',monospace",
-      color: "var(--text-dim)", lineHeight: 1.5,
+      color: "var(--text-dim)", lineHeight: 1.5, position: "relative",
     }}>
       <div style={{ whiteSpace: "pre-wrap" }}>{open ? content : preview}</div>
       {isLong && (
@@ -135,20 +212,22 @@ function ToolResult({ content }: { content: string }) {
           {open ? "Show less" : "Show more"}
         </button>
       )}
+      {isLastInTurn && <TurnCopyButton turnEntries={turnEntries} />}
     </div>
   );
 }
 
-function ErrorBlock({ content }: { content: string }) {
+function ErrorBlock({ content, isLastInTurn, turnEntries }: { content: string; isLastInTurn?: boolean; turnEntries?: LogEntry[] }) {
   return (
     <div style={{
       margin: "8px 0", padding: "10px 14px",
       borderRadius: 8, background: "var(--red-bg)",
       borderLeft: "3px solid var(--red)",
       color: "var(--red)", fontSize: 12, fontFamily: "'JetBrains Mono',monospace",
-      lineHeight: 1.5, whiteSpace: "pre-wrap",
+      lineHeight: 1.5, whiteSpace: "pre-wrap", position: "relative",
     }}>
       {content}
+      {isLastInTurn && <TurnCopyButton turnEntries={turnEntries} />}
     </div>
   );
 }
