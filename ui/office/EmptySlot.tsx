@@ -56,6 +56,30 @@ export function EmptySlot({
           style={{ opacity: dragOver ? 1 : hov ? 0.8 : 0.2, transition: "opacity 0.3s", pointerEvents: "none" }}
         />
       </svg>
+      {/* Desk number label — always visible */}
+      <div
+        style={{
+          position: "absolute",
+          top: 108,
+          left: "50%",
+          transform: "translateX(-50%)",
+          textAlign: "center",
+          pointerEvents: "none",
+        }}
+      >
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: "var(--text-muted)",
+            opacity: hov ? 0.6 : 0.25,
+            transition: "opacity 0.3s",
+            fontFamily: "'JetBrains Mono',monospace",
+          }}
+        >
+          {deskIndex + 1}
+        </span>
+      </div>
       {hov && (
         <div
           style={{

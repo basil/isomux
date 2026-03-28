@@ -129,7 +129,7 @@ export function DeskUnit({
         >
           <StatusLight state={agent.state} size={8} elapsedMs={elapsedMs} />
           <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>
-            {agent.name}
+            <span style={{ opacity: 0.5 }}>{agent.desk + 1} ·</span> {agent.name}
           </span>
         </div>
         {agent.topic && agent.topic !== "..." && (

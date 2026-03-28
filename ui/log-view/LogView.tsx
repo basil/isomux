@@ -287,7 +287,7 @@ export function LogView({
         </button>
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
           <StatusLight state={agent.state} size={8} />
-          <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{agent.name}</span>
+          <span style={{ fontWeight: 600, color: "var(--text-primary)" }}><span style={{ opacity: 0.5 }}>{agent.desk + 1} ·</span> {agent.name}</span>
           {STATE_LABELS[agent.state] && (
             <HeaderTimer state={agent.state} stateChangedAt={stateChangedAt.get(agent.id)} />
           )}
