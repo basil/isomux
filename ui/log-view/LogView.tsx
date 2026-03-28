@@ -214,8 +214,12 @@ export function LogView({
                 e.preventDefault();
                 handleSend();
               }
+              if (e.key === "c" && (e.ctrlKey || e.metaKey) && isBusy) {
+                e.preventDefault();
+                send({ type: "abort", agentId: agent.id });
+              }
             }}
-            placeholder={isBusy ? "Agent is busy — wait for the current task to finish..." : "Type a message to the agent..."}
+            placeholder={isBusy ? "Agent is busy — Ctrl+C to interrupt..." : "Type a message to the agent..."}
             autoFocus
             rows={1}
             style={{

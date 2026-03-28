@@ -35,6 +35,7 @@ interface ManagedAgent {
   session: ReturnType<typeof unstable_v2_createSession> | null;
   sessionId: string | null;
   streaming: boolean;
+  aborting: boolean;
   launcherPath: string;
 }
 
@@ -129,6 +130,7 @@ export async function restoreAgents() {
       session: null,
       sessionId: p.lastSessionId,
       streaming: false,
+      aborting: false,
       launcherPath,
     };
     agents.set(p.id, managed);
@@ -297,15 +299,18 @@ async function consumeStream(agentId: string, managed: ManagedAgent) {
   managed.streaming = true;
   try {
     for await (const msg of managed.session.stream()) {
-      if (!agents.has(agentId)) break;
+      if (!agents.has(agentId) || managed.aborting) break;
       processMessage(agentId, msg);
     }
   } catch (err: any) {
-    console.error(`Agent ${agentId} stream error:`, err.message);
-    addLogEntry(agentId, "error", `Stream error: ${err.message}`);
-    updateState(agentId, "error");
+    if (!managed.aborting) {
+      console.error(`Agent ${agentId} stream error:`, err.message);
+      addLogEntry(agentId, "error", `Stream error: ${err.message}`);
+      updateState(agentId, "error");
+    }
   } finally {
     managed.streaming = false;
+    managed.aborting = false;
   }
 }
 
@@ -410,6 +415,7 @@ export async function abort(agentId: string) {
   const managed = agents.get(agentId);
   if (!managed) return;
   if (!managed.streaming) return; // nothing to abort
+  managed.aborting = true;
   const sessionId = managed.sessionId;
   try { managed.session?.close(); } catch {}
   managed.streaming = false;
