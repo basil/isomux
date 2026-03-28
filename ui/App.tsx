@@ -32,6 +32,16 @@ export function App() {
           dispatch({ type: "focus", agentId: agent.id });
         }
       }
+      // Tab: cycle to next agent (Shift+Tab: previous) when viewing an agent
+      if (focusedAgentId && e.key === "Tab" && agents.length > 1) {
+        e.preventDefault();
+        const sorted = [...agents].sort((a, b) => a.desk - b.desk);
+        const idx = sorted.findIndex((a) => a.id === focusedAgentId);
+        const next = e.shiftKey
+          ? sorted[(idx - 1 + sorted.length) % sorted.length]
+          : sorted[(idx + 1) % sorted.length];
+        dispatch({ type: "focus", agentId: next.id });
+      }
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
