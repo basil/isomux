@@ -20,6 +20,28 @@ export function serializeEntries(entries: LogEntry[]): string {
   return parts.join("\n\n");
 }
 
+function formatDuration(ms: number): string {
+  const totalSec = ms / 1000;
+  if (totalSec < 60) return `${totalSec.toFixed(1)}s`;
+  const min = Math.floor(totalSec / 60);
+  const sec = Math.floor(totalSec % 60);
+  return `${min}:${sec.toString().padStart(2, "0")}`;
+}
+
+function DurationLabel({ ms }: { ms: number }) {
+  return (
+    <span style={{
+      marginLeft: "auto",
+      fontSize: 10,
+      fontFamily: "'JetBrains Mono',monospace",
+      color: "var(--text-ghost)",
+      flexShrink: 0,
+    }}>
+      {formatDuration(ms)}
+    </span>
+  );
+}
+
 export function LogEntryCard({
   entry,
   isLastInTurn,
@@ -40,23 +62,34 @@ export function LogEntryCard({
           turnEntries={turnEntries}
         />
       );
-    case "thinking":
+    case "thinking": {
+      const durationMs = entry.metadata?.duration_ms as number | undefined;
       return (
         <ThinkingBlock
           content={entry.content}
+          durationMs={durationMs}
           isLastInTurn={isLastInTurn}
           turnEntries={turnEntries}
         />
       );
-    case "tool_call":
+    }
+    case "tool_call": {
+      // Find matching tool_result to get duration
+      const toolId = entry.metadata?.toolId;
+      const matchingResult = turnEntries?.find(
+        (e) => e.kind === "tool_result" && e.metadata?.toolUseId === toolId
+      );
+      const durationMs = matchingResult?.metadata?.duration_ms as number | undefined;
       return (
         <ToolCall
           name={entry.content}
           input={entry.metadata?.input}
+          durationMs={durationMs}
           isLastInTurn={isLastInTurn}
           turnEntries={turnEntries}
         />
       );
+    }
     case "tool_result":
       return (
         <ToolResult
@@ -115,7 +148,7 @@ function AssistantText({ content, isLastInTurn, turnEntries }: { content: string
   );
 }
 
-function ThinkingBlock({ content, isLastInTurn, turnEntries }: { content: string; isLastInTurn?: boolean; turnEntries?: LogEntry[] }) {
+function ThinkingBlock({ content, durationMs, isLastInTurn, turnEntries }: { content: string; durationMs?: number; isLastInTurn?: boolean; turnEntries?: LogEntry[] }) {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ margin: "4px 0", position: "relative" }}>
@@ -125,11 +158,12 @@ function ThinkingBlock({ content, isLastInTurn, turnEntries }: { content: string
           display: "flex", alignItems: "center", gap: 6,
           padding: "4px 8px", border: "none", background: "transparent",
           color: "var(--text-faint)", fontSize: 11, cursor: "pointer",
-          fontFamily: "'DM Sans',sans-serif",
+          fontFamily: "'DM Sans',sans-serif", width: "100%", textAlign: "left",
         }}
       >
         <span style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s", display: "inline-block" }}>&#9654;</span>
         Thinking...
+        {durationMs != null && <DurationLabel ms={durationMs} />}
       </button>
       {open && (
         <div style={{
@@ -147,7 +181,7 @@ function ThinkingBlock({ content, isLastInTurn, turnEntries }: { content: string
   );
 }
 
-function ToolCall({ name, input, isLastInTurn, turnEntries }: { name: string; input: unknown; isLastInTurn?: boolean; turnEntries?: LogEntry[] }) {
+function ToolCall({ name, input, durationMs, isLastInTurn, turnEntries }: { name: string; input: unknown; durationMs?: number; isLastInTurn?: boolean; turnEntries?: LogEntry[] }) {
   const [open, setOpen] = useState(false);
   const inputStr = typeof input === "string" ? input : JSON.stringify(input, null, 2);
   const summary = extractToolSummary(name, input);
@@ -168,6 +202,7 @@ function ToolCall({ name, input, isLastInTurn, turnEntries }: { name: string; in
         <span style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s", display: "inline-block", fontSize: 8 }}>&#9654;</span>
         <span style={{ fontWeight: 600 }}>{name}</span>
         {summary && <span style={{ color: "var(--text-faint)", marginLeft: 4, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{summary}</span>}
+        {durationMs != null && <DurationLabel ms={durationMs} />}
       </button>
       {open && (
         <div style={{

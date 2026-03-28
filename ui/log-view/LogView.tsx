@@ -13,11 +13,39 @@ const STATE_LABELS: Partial<Record<AgentState, string>> = {
   waiting_permission: "Waiting for permission",
 };
 
-function ActivityIndicator({ state }: { state: AgentState }) {
+const ESCALATION_AMBER_MS = 2 * 60 * 1000; // 2 minutes
+const ESCALATION_RED_MS = 5 * 60 * 1000; // 5 minutes
+
+function formatElapsed(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  if (totalSec < 60) return `${totalSec}s`;
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return `${min}:${sec.toString().padStart(2, "0")}`;
+}
+
+function escalationColor(elapsedMs: number, baseColor: string): string {
+  if (elapsedMs >= ESCALATION_RED_MS) return "var(--red)";
+  if (elapsedMs >= ESCALATION_AMBER_MS) return "var(--orange)";
+  return baseColor;
+}
+
+function ActivityIndicator({ state, stateChangedAt, agentId }: { state: AgentState; stateChangedAt?: number; agentId: string }) {
   const label = STATE_LABELS[state];
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (!label) return;
+    const id = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(id);
+  }, [label]);
+
   if (!label) return null;
 
-  const color = state === "waiting_permission" ? "var(--orange)" : "var(--green)";
+  const elapsedMs = stateChangedAt ? now - stateChangedAt : 0;
+  const baseColor = state === "waiting_permission" ? "var(--orange)" : "var(--green)";
+  const color = escalationColor(elapsedMs, baseColor);
+  const showAbort = elapsedMs >= ESCALATION_AMBER_MS;
 
   return (
     <div
@@ -39,7 +67,48 @@ function ActivityIndicator({ state }: { state: AgentState }) {
         <span style={{ width: 4, height: 4, borderRadius: "50%", background: color, animation: "dotBounce 1.4s ease-in-out infinite", animationDelay: "0.4s" }} />
       </span>
       <span>{label}...</span>
+      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, opacity: 0.7 }}>
+        {formatElapsed(elapsedMs)}
+      </span>
+      {showAbort && (
+        <button
+          onClick={() => send({ type: "abort", agentId })}
+          style={{
+            marginLeft: 8,
+            padding: "2px 10px",
+            borderRadius: 4,
+            border: `1px solid ${color}`,
+            background: "transparent",
+            color,
+            fontSize: 11,
+            fontFamily: "'DM Sans',sans-serif",
+            cursor: "pointer",
+            opacity: 0.8,
+          }}
+        >
+          Abort
+        </button>
+      )}
     </div>
+  );
+}
+
+function HeaderTimer({ state, stateChangedAt }: { state: AgentState; stateChangedAt?: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(id);
+  }, []);
+  const elapsedMs = stateChangedAt ? now - stateChangedAt : 0;
+  const baseColor = state === "waiting_permission" ? "var(--orange)" : "var(--green)";
+  const color = escalationColor(elapsedMs, baseColor);
+  return (
+    <>
+      <span style={{ color: "var(--text-ghost)" }}>&middot;</span>
+      <span style={{ color, fontSize: 12, fontFamily: "'DM Sans',sans-serif" }}>
+        {STATE_LABELS[state]} {formatElapsed(elapsedMs)}
+      </span>
+    </>
   );
 }
 
@@ -54,7 +123,7 @@ export function LogView({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { drafts, slashCommands } = useAppState();
+  const { drafts, slashCommands, stateChangedAt } = useAppState();
   const dispatch = useDispatch();
   const input = drafts.get(agent.id) ?? "";
   const setInput = (text: string) => dispatch({ type: "set_draft", agentId: agent.id, text });
@@ -216,12 +285,7 @@ export function LogView({
           <StatusLight state={agent.state} size={8} />
           <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{agent.name}</span>
           {STATE_LABELS[agent.state] && (
-            <>
-              <span style={{ color: "var(--text-ghost)" }}>&middot;</span>
-              <span style={{ color: agent.state === "waiting_permission" ? "var(--orange)" : "var(--green)", fontSize: 12, fontFamily: "'DM Sans',sans-serif" }}>
-                {STATE_LABELS[agent.state]}
-              </span>
-            </>
+            <HeaderTimer state={agent.state} stateChangedAt={stateChangedAt.get(agent.id)} />
           )}
           <span style={{ color: "var(--text-ghost)" }}>&middot;</span>
           <span
@@ -273,7 +337,7 @@ export function LogView({
             />
           );
         })}
-        <ActivityIndicator state={agent.state} />
+        <ActivityIndicator state={agent.state} stateChangedAt={stateChangedAt.get(agent.id)} agentId={agent.id} />
       </div>
 
       {/* Input */}

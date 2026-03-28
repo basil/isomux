@@ -10,8 +10,16 @@ const COLORS: Record<string, string> = {
   stopped: "var(--text-muted)",
 };
 
-export function StatusLight({ state, size = 10 }: { state: AgentState; size?: number }) {
-  const c = COLORS[state] || "var(--text-muted)";
+const ESCALATION_AMBER_MS = 2 * 60 * 1000;
+const ESCALATION_RED_MS = 5 * 60 * 1000;
+
+export function StatusLight({ state, size = 10, elapsedMs }: { state: AgentState; size?: number; elapsedMs?: number }) {
+  let c = COLORS[state] || "var(--text-muted)";
+  // Apply escalation colors for active states
+  if (elapsedMs != null && (state === "thinking" || state === "tool_executing")) {
+    if (elapsedMs >= ESCALATION_RED_MS) c = "var(--red)";
+    else if (elapsedMs >= ESCALATION_AMBER_MS) c = "var(--orange)";
+  }
   const pulse = state !== "idle" && state !== "stopped";
   return (
     <span style={{ position: "relative", display: "inline-flex", width: size, height: size }}>

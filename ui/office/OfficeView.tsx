@@ -10,7 +10,7 @@ import { send } from "../ws.ts";
 import type { AgentInfo } from "../../shared/types.ts";
 
 export function OfficeView({ onSpawn, onContextMenu }: { onSpawn: (deskIndex: number) => void; onContextMenu: (x: number, y: number, agent: AgentInfo) => void }) {
-  const { agents, needsAttention, latestText } = useAppState();
+  const { agents, needsAttention, latestText, stateChangedAt } = useAppState();
   const dispatch = useDispatch();
   const { theme, toggleTheme } = useTheme();
 
@@ -158,6 +158,7 @@ export function OfficeView({ onSpawn, onContextMenu }: { onSpawn: (deskIndex: nu
                   needsAttention={needsAttention.has(agent.id)}
                   previewText={latestText.get(agent.id)}
                   onSwap={(a, b) => send({ type: "swap_desks", deskA: a, deskB: b })}
+                  stateChangedAt={stateChangedAt.get(agent.id)}
                 />
               );
             }

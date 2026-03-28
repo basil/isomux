@@ -14,6 +14,7 @@ export interface AppState {
   drafts: Map<string, string>; // agentId → unsent chat input
   recentCwds: string[]; // persisted recent working directories
   slashCommands: Map<string, { commands: string[]; skills: string[] }>; // agentId → available commands
+  stateChangedAt: Map<string, number>; // agentId → timestamp when agent state last changed
 }
 
 type Action =
@@ -59,6 +60,10 @@ function reducer(state: AppState, action: Action): AppState {
         a.id === action.agentId ? { ...a, ...action.changes } : a
       );
       const needsAttention = new Set(state.needsAttention);
+      // Track when state changes for elapsed time display
+      const stateChangedAt = action.changes.state
+        ? new Map(state.stateChangedAt).set(action.agentId, Date.now())
+        : state.stateChangedAt;
       // Mark as needing attention if state changed to an attention state
       // and the user is not currently viewing this agent
       if (action.changes.state && ATTENTION_STATES.has(action.changes.state)) {
@@ -73,9 +78,9 @@ function reducer(state: AppState, action: Action): AppState {
             needsAttention.add(action.agentId);
           }
         }
-        return { ...state, agents: newAgents, needsAttention, soundTrigger };
+        return { ...state, agents: newAgents, needsAttention, soundTrigger, stateChangedAt };
       }
-      return { ...state, agents: newAgents, needsAttention };
+      return { ...state, agents: newAgents, needsAttention, stateChangedAt };
     }
     case "log_entry": {
       const logs = new Map(state.logs);
@@ -140,6 +145,7 @@ const initialState: AppState = {
   drafts: new Map(),
   recentCwds: [],
   slashCommands: new Map(),
+  stateChangedAt: new Map(),
 };
 
 const StateCtx = createContext<AppState>(initialState);

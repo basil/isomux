@@ -85,6 +85,9 @@ interface ManagedAgent {
   launcherPath: string;
   slashCommands: string[];
   skills: string[];
+  // Timing: track when phases start for duration_ms computation
+  thinkingStartedAt: number;
+  toolCallTimestamps: Map<string, number>; // toolUseId → start timestamp
 }
 
 type AgentEvent =
@@ -208,6 +211,8 @@ export async function restoreAgents() {
       launcherPath,
       slashCommands: [...BUILTIN_COMMANDS],
       skills: [...discoverUserSkills(), ...discoverProjectSkills(p.cwd)],
+      thinkingStartedAt: 0,
+      toolCallTimestamps: new Map(),
     };
     agents.set(p.id, managed);
 
@@ -245,6 +250,9 @@ function emit(event: AgentEvent) {
 function updateState(agentId: string, state: AgentState) {
   const managed = agents.get(agentId);
   if (!managed) return;
+  if (state === "thinking" && managed.info.state !== "thinking") {
+    managed.thinkingStartedAt = Date.now();
+  }
   managed.info = { ...managed.info, state };
   emit({ type: "agent_updated", agentId, changes: { state } });
 }
@@ -357,12 +365,20 @@ function processMessage(agentId: string, msg: SDKMessage) {
         if (block.type === "text" && block.text) {
           addLogEntry(agentId, "text", block.text);
         } else if (block.type === "tool_use") {
+          const managed = agents.get(agentId);
+          if (managed) {
+            managed.toolCallTimestamps.set(block.id, Date.now());
+          }
           addLogEntry(agentId, "tool_call", block.name, {
             toolId: block.id,
             input: block.input,
           });
         } else if (block.type === "thinking" && block.thinking) {
-          addLogEntry(agentId, "thinking", block.thinking);
+          const managed = agents.get(agentId);
+          const duration_ms = managed?.thinkingStartedAt
+            ? Date.now() - managed.thinkingStartedAt
+            : undefined;
+          addLogEntry(agentId, "thinking", block.thinking, duration_ms != null ? { duration_ms } : undefined);
         }
       }
       break;
@@ -381,8 +397,15 @@ function processMessage(agentId: string, msg: SDKMessage) {
                     .map((c: any) => c.text)
                     .join("\n")
                 : JSON.stringify(block.content);
+          const managed = agents.get(agentId);
+          const callStart = managed?.toolCallTimestamps.get(block.tool_use_id);
+          const duration_ms = callStart ? Date.now() - callStart : undefined;
+          if (managed && callStart) {
+            managed.toolCallTimestamps.delete(block.tool_use_id);
+          }
           addLogEntry(agentId, "tool_result", resultText.slice(0, 2000), {
             toolUseId: block.tool_use_id,
+            ...(duration_ms != null ? { duration_ms } : {}),
           });
         }
       }
@@ -483,6 +506,8 @@ export async function spawn(name: string, cwd: string, permissionMode: AgentInfo
     launcherPath,
     slashCommands: [...BUILTIN_COMMANDS],
     skills: [...discoverUserSkills(), ...discoverProjectSkills(resolvedCwd)],
+    thinkingStartedAt: 0,
+    toolCallTimestamps: new Map(),
   };
   agents.set(id, managed);
   emit({ type: "agent_added", agent: info });

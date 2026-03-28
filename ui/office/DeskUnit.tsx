@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { AgentInfo } from "../../shared/types.ts";
 import { DeskSprite } from "./DeskSprite.tsx";
 import { Character } from "./Character.tsx";
@@ -12,6 +12,7 @@ export function DeskUnit({
   needsAttention,
   previewText,
   onSwap,
+  stateChangedAt,
 }: {
   agent: AgentInfo;
   onClick: () => void;
@@ -19,9 +20,18 @@ export function DeskUnit({
   needsAttention?: boolean;
   previewText?: string;
   onSwap?: (sourceDesk: number, targetDesk: number) => void;
+  stateChangedAt?: number;
 }) {
   const [hov, setHov] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const isActive = agent.state === "thinking" || agent.state === "tool_executing";
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!isActive) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [isActive]);
+  const elapsedMs = isActive && stateChangedAt ? now - stateChangedAt : undefined;
   const pos = DESK_SLOTS[agent.desk];
   const { left: pxLeft, top: pxTop } = deskPixelPos(pos.row, pos.col);
   const z = (pos.row * 2 + pos.col + 1) * 10;
@@ -116,7 +126,7 @@ export function DeskUnit({
             animation: needsAttention ? "dotPulse 2s ease-in-out infinite" : undefined,
           }}
         >
-          <StatusLight state={agent.state} size={8} />
+          <StatusLight state={agent.state} size={8} elapsedMs={elapsedMs} />
           <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>
             {agent.name}
           </span>
