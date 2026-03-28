@@ -6,7 +6,7 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentInfo, AgentState, LogEntry } from "../shared/types.ts";
 import { generateOutfit } from "./outfit.ts";
-import { appendLog, loadLog, loadAgents, saveAgents, listAgentSessions, type PersistedAgent } from "./persistence.ts";
+import { appendLog, loadLog, loadAgents, saveAgents, listAgentSessions, writeManifest, type PersistedAgent } from "./persistence.ts";
 import { resolve, join } from "path";
 import { homedir } from "os";
 import { writeFileSync, mkdirSync, readdirSync, existsSync, readFileSync } from "fs";
@@ -64,9 +64,12 @@ function discoverProjectSkills(cwd: string): string[] {
 }
 
 // Create a launcher script that sets cwd and injects system prompt before running the CLI
-function createLauncher(agentId: string, cwd: string, agentName: string): string {
+function createLauncher(agentId: string, cwd: string, agentName: string, customInstructions?: string | null): string {
   const launcherPath = join(LAUNCHERS_DIR, `${agentId}.mjs`);
-  const systemPrompt = `Your name is ${agentName}. When asked who you are, introduce yourself as ${agentName}. You are one of several agents in an isometric office managed by Isomux.`;
+  let systemPrompt = `You are ${agentName}, one of the agents in the Isomux office. Your goal is to help the office boss, who talks to you in this chat.\n\nTo discover other office agents and their conversation logs, read ~/.isomux/agents-summary.json.`;
+  if (customInstructions) {
+    systemPrompt += `\n\n${customInstructions}`;
+  }
   writeFileSync(
     launcherPath,
     `process.chdir(${JSON.stringify(cwd)});\n` +
@@ -127,7 +130,7 @@ export function listSessions(agentId: string) {
   return listAgentSessions(agentId);
 }
 
-export function editAgent(agentId: string, changes: { name?: string; cwd?: string; outfit?: AgentInfo["outfit"] }) {
+export function editAgent(agentId: string, changes: { name?: string; cwd?: string; outfit?: AgentInfo["outfit"]; customInstructions?: string }) {
   const managed = agents.get(agentId);
   if (!managed) return;
 
@@ -145,12 +148,16 @@ export function editAgent(agentId: string, changes: { name?: string; cwd?: strin
     managed.info.outfit = changes.outfit;
     updated.outfit = changes.outfit;
   }
+  if (changes.customInstructions !== undefined && changes.customInstructions !== managed.info.customInstructions) {
+    managed.info.customInstructions = changes.customInstructions || null;
+    updated.customInstructions = managed.info.customInstructions;
+  }
 
   if (Object.keys(updated).length === 0) return;
 
-  // Regenerate launcher if name or cwd changed (takes effect on next conversation)
-  if (updated.name || updated.cwd) {
-    managed.launcherPath = createLauncher(agentId, managed.info.cwd, managed.info.name);
+  // Regenerate launcher if name, cwd, or customInstructions changed (takes effect on next conversation)
+  if (updated.name !== undefined || updated.cwd !== undefined || updated.customInstructions !== undefined) {
+    managed.launcherPath = createLauncher(agentId, managed.info.cwd, managed.info.name, managed.info.customInstructions);
   }
 
   persistAll();
@@ -179,6 +186,16 @@ export function getAllAgents(): AgentInfo[] {
   return [...agents.values()].map((a) => a.info);
 }
 
+function updateManifest() {
+  writeManifest([...agents.values()].map((a) => ({
+    id: a.info.id,
+    name: a.info.name,
+    desk: a.info.desk,
+    topic: a.info.topic,
+    cwd: a.info.cwd,
+  })));
+}
+
 function persistAll() {
   const persisted: PersistedAgent[] = [...agents.values()].map((a) => ({
     id: a.info.id,
@@ -189,15 +206,17 @@ function persistAll() {
     permissionMode: a.info.permissionMode,
     lastSessionId: a.sessionId,
     topic: a.info.topic,
+    customInstructions: a.info.customInstructions,
   }));
   saveAgents(persisted);
+  updateManifest();
 }
 
 // Restore agents from disk on startup. Creates sessions and loads log history.
 export async function restoreAgents() {
   const persisted = loadAgents();
   for (const p of persisted) {
-    const launcherPath = createLauncher(p.id, p.cwd, p.name);
+    const launcherPath = createLauncher(p.id, p.cwd, p.name, p.customInstructions);
     const info: AgentInfo = {
       id: p.id,
       name: p.name,
@@ -208,6 +227,7 @@ export async function restoreAgents() {
       state: "idle",
       topic: p.topic ?? null,
       topicStale: false,
+      customInstructions: p.customInstructions ?? null,
     };
     const managed: ManagedAgent = {
       info,
@@ -547,7 +567,7 @@ function createSession(managed: ManagedAgent, resumeSessionId?: string) {
     : unstable_v2_createSession(opts);
 }
 
-export async function spawn(name: string, cwd: string, permissionMode: AgentInfo["permissionMode"], desk?: number): Promise<AgentInfo | null> {
+export async function spawn(name: string, cwd: string, permissionMode: AgentInfo["permissionMode"], desk?: number, customInstructions?: string): Promise<AgentInfo | null> {
   const taken = new Set([...agents.values()].map((a) => a.info.desk));
   if (desk !== undefined && !taken.has(desk)) {
     // Use the requested desk
@@ -562,7 +582,7 @@ export async function spawn(name: string, cwd: string, permissionMode: AgentInfo
 
   const resolvedCwd = resolveCwd(cwd);
   const id = `agent-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-  const launcherPath = createLauncher(id, resolvedCwd, name);
+  const launcherPath = createLauncher(id, resolvedCwd, name, customInstructions);
 
   const info: AgentInfo = {
     id,
@@ -574,6 +594,7 @@ export async function spawn(name: string, cwd: string, permissionMode: AgentInfo
     state: "idle",
     topic: null,
     topicStale: false,
+    customInstructions: customInstructions || null,
   };
 
   const managed: ManagedAgent = {
@@ -826,7 +847,8 @@ export function setTopic(agentId: string, topic: string) {
   const textCount = (logCache.get(agentId) ?? []).filter(e => e.kind === "user_message" || e.kind === "text").length;
   managed.topicMessageCount = textCount;
   emit({ type: "agent_updated", agentId, changes: { topic, topicStale: false } });
-  // Manual edits are not persisted (ephemeral per design)
+  // Manual edits are not persisted (ephemeral per design), but update manifest for discoverability
+  updateManifest();
 }
 
 export function resetTopic(agentId: string) {

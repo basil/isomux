@@ -16,6 +16,7 @@ export function EditAgentDialog({
   const [name, setName] = useState(agent.name);
   const [cwd, setCwd] = useState(agent.cwd);
   const [outfit, setOutfit] = useState<AgentOutfit>({ ...agent.outfit });
+  const [customInstructions, setCustomInstructions] = useState(agent.customInstructions ?? "");
   const recentCwds = allRecentCwds.filter((c) => c !== cwd);
 
   function randomizeOutfit() {
@@ -32,7 +33,9 @@ export function EditAgentDialog({
     if (name.trim() && name.trim() !== agent.name) cmd.name = name.trim();
     if (cwd.trim() && cwd.trim() !== agent.cwd) cmd.cwd = cwd.trim();
     if (JSON.stringify(outfit) !== JSON.stringify(agent.outfit)) cmd.outfit = outfit;
-    if (cmd.name || cmd.cwd || cmd.outfit) send(cmd);
+    const trimmedInstructions = customInstructions.trim();
+    if (trimmedInstructions !== (agent.customInstructions ?? "")) cmd.customInstructions = trimmedInstructions;
+    if (cmd.name || cmd.cwd || cmd.outfit || cmd.customInstructions !== undefined) send(cmd);
     onClose();
   }
 
@@ -161,6 +164,16 @@ export function EditAgentDialog({
             </select>
           </div>
         </div>
+
+        <label style={{ ...labelStyle, marginTop: 14 }}>Custom Instructions <span style={{ fontWeight: 400, color: "var(--text-ghost)" }}>(optional)</span></label>
+        <textarea
+          value={customInstructions}
+          onChange={(e) => setCustomInstructions(e.target.value)}
+          placeholder='e.g. "You are a backend specialist. Always write tests."'
+          rows={3}
+          style={{ ...inputStyle, resize: "vertical" }}
+        />
+        <p style={{ fontSize: 10, color: "var(--text-ghost)", margin: "3px 0 0" }}>Changes take effect on next conversation.</p>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
           <button onClick={onClose} style={cancelBtnStyle}>Cancel</button>

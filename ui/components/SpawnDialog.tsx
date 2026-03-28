@@ -16,6 +16,7 @@ export function SpawnDialog({
   const [name, setName] = useState("");
   const [cwd, setCwd] = useState(defaultCwd);
   const [permissionMode, setPermissionMode] = useState<AgentInfo["permissionMode"]>("bypassPermissions");
+  const [customInstructions, setCustomInstructions] = useState("");
   const recentCwds = allRecentCwds.filter((c) => c !== cwd);
 
   function handleSpawn() {
@@ -25,6 +26,7 @@ export function SpawnDialog({
       cwd,
       permissionMode,
       desk: deskIndex,
+      customInstructions: customInstructions.trim() || undefined,
     });
     onClose();
   }
@@ -113,6 +115,19 @@ export function SpawnDialog({
           <option value="acceptEdits" disabled>Accept Edits (auto-approve file changes) — not supported yet</option>
           <option value="bypassPermissions">Bypass (auto-approve all)</option>
         </select>
+
+        <label
+          style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", marginBottom: 5, marginTop: 12 }}
+        >
+          Custom Instructions
+        </label>
+        <textarea
+          value={customInstructions}
+          onChange={(e) => setCustomInstructions(e.target.value)}
+          placeholder='e.g. "You are a backend specialist. Always write tests."'
+          rows={3}
+          style={{ ...inputStyle, resize: "vertical" }}
+        />
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
           <button onClick={onClose} style={cancelBtnStyle}>

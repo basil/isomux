@@ -83,6 +83,7 @@ export interface PersistedAgent {
   permissionMode: AgentInfo["permissionMode"];
   lastSessionId: string | null;
   topic: string | null;
+  customInstructions: string | null;
 }
 
 export function loadAgents(): PersistedAgent[] {
@@ -100,6 +101,25 @@ export function saveAgents(agents: PersistedAgent[]) {
     writeFileSync(AGENTS_FILE, JSON.stringify(agents, null, 2));
   } catch (err) {
     console.error("Failed to save agents:", err);
+  }
+}
+
+// Agent manifest for discovery by other agents
+const MANIFEST_FILE = join(ISOMUX_DIR, "agents-summary.json");
+
+export function writeManifest(agents: { id: string; name: string; desk: number; topic: string | null; cwd: string }[]) {
+  try {
+    const manifest = agents.map((a) => ({
+      id: a.id,
+      name: a.name,
+      desk: a.desk,
+      topic: a.topic,
+      cwd: a.cwd,
+      logDir: join(LOGS_DIR, a.id),
+    }));
+    writeFileSync(MANIFEST_FILE, JSON.stringify(manifest, null, 2));
+  } catch (err) {
+    console.error("Failed to write manifest:", err);
   }
 }
 

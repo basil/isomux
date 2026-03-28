@@ -27,6 +27,7 @@ export interface AgentInfo {
   state: AgentState;
   topic: string | null;
   topicStale: boolean;
+  customInstructions: string | null;
 }
 
 // Log entry in the conversation view
@@ -58,14 +59,14 @@ export type ServerMessage =
 
 // Browser → Server commands
 export type ClientCommand =
-  | { type: "spawn"; name: string; cwd: string; permissionMode: AgentInfo["permissionMode"]; desk: number }
+  | { type: "spawn"; name: string; cwd: string; permissionMode: AgentInfo["permissionMode"]; desk: number; customInstructions?: string }
   | { type: "kill"; agentId: string }
   | { type: "abort"; agentId: string }
   | { type: "send_message"; agentId: string; text: string }
   | { type: "new_conversation"; agentId: string }
   | { type: "resume"; agentId: string; sessionId: string }
   | { type: "list_sessions"; agentId: string }
-  | { type: "edit_agent"; agentId: string; name?: string; cwd?: string; outfit?: AgentOutfit }
+  | { type: "edit_agent"; agentId: string; name?: string; cwd?: string; outfit?: AgentOutfit; customInstructions?: string }
   | { type: "swap_desks"; deskA: number; deskB: number }
   | { type: "set_topic"; agentId: string; topic: string }
   | { type: "reset_topic"; agentId: string };
