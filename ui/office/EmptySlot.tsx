@@ -53,7 +53,7 @@ export function EmptySlot({
           stroke={dragOver ? "var(--accent)" : hov ? "var(--accent)" : "var(--text-muted)"}
           strokeWidth={dragOver ? "2" : "1"}
           strokeDasharray={dragOver ? "none" : "6 4"}
-          style={{ opacity: dragOver ? 1 : hov ? 0.8 : 0.2, transition: "opacity 0.3s", pointerEvents: "none" }}
+          style={{ opacity: dragOver ? 1 : hov ? 0.85 : 0.55, transition: "opacity 0.3s", pointerEvents: "none" }}
         />
       </svg>
       {/* Desk number label — always visible */}
@@ -72,7 +72,7 @@ export function EmptySlot({
             fontSize: 11,
             fontWeight: 600,
             color: "var(--text-muted)",
-            opacity: hov ? 0.6 : 0.25,
+            opacity: hov ? 0.75 : 0.6,
             transition: "opacity 0.3s",
             fontFamily: "'JetBrains Mono',monospace",
           }}
