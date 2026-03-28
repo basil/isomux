@@ -1,5 +1,5 @@
 // Isometric grid layout for 8 desks (2 columns x 4 rows)
-// All coordinates are in SVG space (viewBox: -360 -60 900 600)
+// All coordinates are in SVG space (viewBox: -450 -100 1100 700)
 
 export const DESK_SLOTS = [
   { row: 0, col: 0 },
@@ -13,20 +13,22 @@ export const DESK_SLOTS = [
 ];
 
 // Scene container dimensions and viewBox
-export const SCENE_W = 900, SCENE_H = 600;
-export const VB_X = -360, VB_Y = -60;
+export const SCENE_W = 1100, SCENE_H = 700;
+export const VB_X = -450, VB_Y = -100;
 
 // Returns the SVG-space floor coordinate for a desk slot
 export function isoXY(row: number, col: number) {
   // 2:1 isometric ratio matching walls and floor tiles.
-  // 2.5 floor tiles per desk step: (100, 50).
+  // 3.5 floor tiles per desk step: (140, 70).
+  // Extra gap between the two columns so right-column desks aren't hidden behind left-column ones.
+  const colGap = col >= 1 ? 60 : 0;
   return {
-    x: (col - row) * 100 + 220,
-    y: (col + row) * 50 + 120,
+    x: (col - row) * 120 + 220 + colGap,
+    y: (col + row) * 60 + 120 + colGap,
   };
 }
 
-// Convert SVG coordinate to pixel position within the 900×600 scene container.
+// Convert SVG coordinate to pixel position within the 1100×700 scene container.
 // The desk sprite's ground contact (chair legs) is at ~(90, 116) in the 180×140 sprite.
 export function deskPixelPos(row: number, col: number) {
   const { x, y } = isoXY(row, col);

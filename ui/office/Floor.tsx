@@ -11,7 +11,7 @@ export function Floor() {
   const backX = 120, backY = 40;
   const rowDx = -47.5, rowDy = 23.75;
   const colDx = 47.5, colDy = 23.75;
-  const N = 8;
+  const N = 10;
 
   const tiles = [];
   for (let r = 0; r < N; r++) {
@@ -41,9 +41,9 @@ export function Walls() {
   return (
     <svg style={SVG_STYLE} width={SCENE_W} height={SCENE_H} viewBox={VB} overflow="visible">
       {/* Left wall (2:1 iso ratio) */}
-      <path d="M-260 230 L-260 -10 L120 -200 L120 40 Z" fill="#111825" stroke="rgba(255,255,255,0.025)" strokeWidth="0.5" />
+      <path d="M-355 277.5 L-355 37.5 L120 -200 L120 40 Z" fill="#111825" stroke="rgba(255,255,255,0.025)" strokeWidth="0.5" />
       {/* Right wall (2:1 iso ratio) */}
-      <path d="M120 -200 L120 40 L500 230 L500 -10 Z" fill="#0f1520" stroke="rgba(255,255,255,0.025)" strokeWidth="0.5" />
+      <path d="M120 -200 L120 40 L595 277.5 L595 37.5 Z" fill="#0f1520" stroke="rgba(255,255,255,0.025)" strokeWidth="0.5" />
       {/* Whiteboard on left wall */}
       <path d="M-100 30 L40 -40 L40 -110 L-100 -40 Z" fill="#1a2236" stroke="rgba(255,255,255,0.05)" strokeWidth="0.8" />
       <path d="M-90 25 L30 -40 L30 -100 L-90 -35 Z" fill="#1e2840" />
