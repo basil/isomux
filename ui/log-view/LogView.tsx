@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import type { AgentInfo, LogEntry } from "../../shared/types.ts";
 import { StatusLight } from "../office/StatusLight.tsx";
 import { send } from "../ws.ts";
+import { useAppState, useDispatch } from "../store.tsx";
 import { LogEntryCard } from "./LogEntryCard.tsx";
 
 export function LogView({
@@ -14,7 +15,10 @@ export function LogView({
   onBack: () => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [input, setInput] = useState("");
+  const { drafts } = useAppState();
+  const dispatch = useDispatch();
+  const input = drafts.get(agent.id) ?? "";
+  const setInput = (text: string) => dispatch({ type: "set_draft", agentId: agent.id, text });
   const [autoScroll, setAutoScroll] = useState(true);
 
   useEffect(() => {

@@ -11,6 +11,7 @@ export interface AppState {
   latestText: Map<string, string>; // agentId → last text snippet (for monitor preview)
   sessionsList: Map<string, SessionInfo[]>; // agentId → available sessions
   soundTrigger: number; // increments when any agent finishes work (for sound regardless of focus)
+  drafts: Map<string, string>; // agentId → unsent chat input
 }
 
 type Action =
@@ -21,7 +22,8 @@ type Action =
   | { type: "log_entry"; entry: LogEntry }
   | { type: "focus"; agentId: string | null }
   | { type: "connected" }
-  | { type: "sessions_list"; agentId: string; sessions: SessionInfo[] };
+  | { type: "sessions_list"; agentId: string; sessions: SessionInfo[] }
+  | { type: "set_draft"; agentId: string; text: string };
 
 // States that warrant attention
 const ATTENTION_STATES = new Set(["idle", "error", "waiting_permission"]);
@@ -96,6 +98,15 @@ function reducer(state: AppState, action: Action): AppState {
       sessionsList.set(action.agentId, action.sessions);
       return { ...state, sessionsList };
     }
+    case "set_draft": {
+      const drafts = new Map(state.drafts);
+      if (action.text) {
+        drafts.set(action.agentId, action.text);
+      } else {
+        drafts.delete(action.agentId);
+      }
+      return { ...state, drafts };
+    }
     default:
       return state;
   }
@@ -110,6 +121,7 @@ const initialState: AppState = {
   latestText: new Map(),
   sessionsList: new Map(),
   soundTrigger: 0,
+  drafts: new Map(),
 };
 
 const StateCtx = createContext<AppState>(initialState);
