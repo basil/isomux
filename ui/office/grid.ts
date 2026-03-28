@@ -12,10 +12,11 @@ export const DESK_SLOTS = [
 ];
 
 export function isoXY(row: number, col: number) {
-  const tw = 240,
-    th = 140;
+  // 2:1 isometric ratio matching walls and floor tiles.
+  // 2.5 floor tiles per desk step: (100, 50).
+  // Offset centers grid on the floor diamond.
   return {
-    x: (col - row) * (tw / 2),
-    y: (col + row) * (th / 2),
+    x: (col - row) * 100 + 120,
+    y: (col + row) * 50 + 50,
   };
 }

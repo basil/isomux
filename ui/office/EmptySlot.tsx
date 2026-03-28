@@ -14,7 +14,7 @@ export function EmptySlot({ deskIndex, onClick }: { deskIndex: number; onClick: 
       style={{
         position: "absolute",
         left: `calc(50% + ${x}px - 90px)`,
-        top: `${y + 95}px`,
+        top: `calc(52% + ${y}px - 290px)`,
         width: 180,
         height: 140,
         cursor: "pointer",

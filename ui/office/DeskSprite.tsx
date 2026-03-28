@@ -23,6 +23,9 @@ export function DeskSprite({ state }: { state: AgentState }) {
 
   return (
     <svg width="180" height="140" viewBox="0 0 180 140" overflow="visible">
+      {/* Shadow under desk */}
+      <ellipse cx="90" cy="126" rx="55" ry="10" fill="rgba(0,0,0,0.15)" />
+
       {/* Chair */}
       <path d="M56 95 L90 110 L124 95 L90 80 Z" fill="#2a2a3a" />
       <path d="M56 95 L56 72 L90 57 L90 80 Z" fill="#333345" stroke="#2a2a3a" strokeWidth="0.5" />
@@ -90,9 +93,6 @@ export function DeskSprite({ state }: { state: AgentState }) {
         <path d="M0 -2 Q4 -10 8 -12" stroke="#4a8a4a" fill="none" strokeWidth="1.2" />
         <path d="M0 -1 Q-3 -6 1 -10" stroke="#3a7a3a" fill="none" strokeWidth="1" />
       </g>
-
-      {/* Shadow under desk */}
-      <ellipse cx="90" cy="108" rx="60" ry="12" fill="rgba(0,0,0,0.15)" />
     </svg>
   );
 }
