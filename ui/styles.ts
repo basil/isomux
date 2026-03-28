@@ -12,6 +12,8 @@ export const CSS = `
   @keyframes termEnter { from{opacity:0} to{opacity:1} }
   @keyframes hudIn { from{opacity:0;transform:translateY(4px) scale(0.97)} to{opacity:1;transform:translateY(0) scale(1)} }
   @keyframes toastSlide { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes dotBounce { 0%,80%,100%{opacity:0.3;transform:scale(0.8)} 40%{opacity:1;transform:scale(1.2)} }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
 
   /* Markdown content styles */
   .md-content { font-family: 'DM Sans', sans-serif; font-size: 13px; line-height: 1.7; color: #c0c8d8; }
