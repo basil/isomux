@@ -112,8 +112,8 @@ See `plans/isomux.md` for full phase details. See `TODO.md` for backlog.
 
 ### Build and test cycle
 1. Make changes to server (`server/`) or UI (`ui/`)
-2. Kill old server: `pkill -f "bun run server/index.ts"`
-3. Rebuild and restart: `bun run build:ui && bun run server/index.ts` (run in background)
+2. For UI-only changes: `bun run build:ui`, then hard-refresh the browser. No restart needed.
+3. For server changes: the service runs under systemd as a user service (`systemctl --user restart isomux`). **You cannot restart it yourself** — doing so kills your own process. Ask the user to restart.
 4. Tell user to refresh http://localhost:4000
 5. User tests and reports back
 6. Read agent conversation logs at `~/.isomux/logs/<agentId>/<sessionId>.jsonl` to debug — don't ask the user to copy-paste conversations

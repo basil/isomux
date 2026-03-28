@@ -4,6 +4,7 @@ import { OfficeView } from "./office/OfficeView.tsx";
 import { LogView } from "./log-view/LogView.tsx";
 import { SpawnDialog } from "./components/SpawnDialog.tsx";
 import { ContextMenu } from "./components/ContextMenu.tsx";
+import { EditAgentDialog } from "./components/EditAgentDialog.tsx";
 import { CSS } from "./styles.ts";
 import type { AgentInfo } from "../shared/types.ts";
 
@@ -12,6 +13,7 @@ export function App() {
   const dispatch = useDispatch();
   const [spawnDesk, setSpawnDesk] = useState<number | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; agent: AgentInfo } | null>(null);
+  const [editAgent, setEditAgent] = useState<AgentInfo | null>(null);
 
   const focusedAgent = focusedAgentId ? agents.find((a) => a.id === focusedAgentId) : null;
 
@@ -22,6 +24,7 @@ export function App() {
         dispatch({ type: "focus", agentId: null });
         setSpawnDesk(null);
         setCtxMenu(null);
+        setEditAgent(null);
       }
       // Number keys 1-8: focus agent at that desk (only from office view)
       if (!focusedAgentId && e.key >= "1" && e.key <= "8" && !e.metaKey && !e.ctrlKey && !e.altKey) {
@@ -75,6 +78,13 @@ export function App() {
           y={ctxMenu.y}
           agent={ctxMenu.agent}
           onClose={() => setCtxMenu(null)}
+          onEdit={(agent) => { setEditAgent(agent); setCtxMenu(null); }}
+        />
+      )}
+      {editAgent && (
+        <EditAgentDialog
+          agent={editAgent}
+          onClose={() => setEditAgent(null)}
         />
       )}
     </>

@@ -25,6 +25,9 @@ async function handleCommand(cmd: ClientCommand) {
     case "kill":
       await AgentManager.kill(cmd.agentId);
       break;
+    case "abort":
+      await AgentManager.abort(cmd.agentId);
+      break;
     case "send_message":
       // Don't await — let it stream in the background
       AgentManager.sendMessage(cmd.agentId, cmd.text);
@@ -34,6 +37,9 @@ async function handleCommand(cmd: ClientCommand) {
       break;
     case "resume":
       await AgentManager.resume(cmd.agentId, cmd.sessionId);
+      break;
+    case "edit_agent":
+      AgentManager.editAgent(cmd.agentId, { name: cmd.name, cwd: cmd.cwd, outfit: cmd.outfit });
       break;
     case "list_sessions": {
       const sessions = AgentManager.listSessions(cmd.agentId);

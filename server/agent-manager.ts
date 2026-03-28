@@ -63,6 +63,36 @@ export function listSessions(agentId: string) {
   return listAgentSessions(agentId);
 }
 
+export function editAgent(agentId: string, changes: { name?: string; cwd?: string; outfit?: AgentInfo["outfit"] }) {
+  const managed = agents.get(agentId);
+  if (!managed) return;
+
+  const updated: Partial<AgentInfo> = {};
+
+  if (changes.name && changes.name !== managed.info.name) {
+    managed.info.name = changes.name;
+    updated.name = changes.name;
+  }
+  if (changes.cwd && changes.cwd !== managed.info.cwd) {
+    managed.info.cwd = resolveCwd(changes.cwd);
+    updated.cwd = managed.info.cwd;
+  }
+  if (changes.outfit) {
+    managed.info.outfit = changes.outfit;
+    updated.outfit = changes.outfit;
+  }
+
+  if (Object.keys(updated).length === 0) return;
+
+  // Regenerate launcher if name or cwd changed (takes effect on next conversation)
+  if (updated.name || updated.cwd) {
+    managed.launcherPath = createLauncher(agentId, managed.info.cwd, managed.info.name);
+  }
+
+  persistAll();
+  eventHandler({ type: "agent_updated", agentId, changes: updated });
+}
+
 export function getAllAgents(): AgentInfo[] {
   return [...agents.values()].map((a) => a.info);
 }
@@ -372,6 +402,29 @@ export async function sendMessage(agentId: string, text: string) {
   } catch (err: any) {
     console.error(`Agent ${agentId} send error:`, err.message);
     addLogEntry(agentId, "error", `Error: ${err.message}`);
+    updateState(agentId, "error");
+  }
+}
+
+export async function abort(agentId: string) {
+  const managed = agents.get(agentId);
+  if (!managed) return;
+  if (!managed.streaming) return; // nothing to abort
+  const sessionId = managed.sessionId;
+  try { managed.session?.close(); } catch {}
+  managed.streaming = false;
+
+  try {
+    if (sessionId) {
+      managed.session = createSession(managed, sessionId);
+      managed.sessionId = sessionId;
+    } else {
+      managed.session = createSession(managed);
+    }
+    updateState(agentId, "idle");
+    addLogEntry(agentId, "system", "Agent interrupted.");
+  } catch (err: any) {
+    addLogEntry(agentId, "error", `Failed to resume after interrupt: ${err.message}`);
     updateState(agentId, "error");
   }
 }

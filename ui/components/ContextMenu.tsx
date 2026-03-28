@@ -8,9 +8,10 @@ interface ContextMenuProps {
   y: number;
   agent: AgentInfo;
   onClose: () => void;
+  onEdit: (agent: AgentInfo) => void;
 }
 
-export function ContextMenu({ x, y, agent, onClose }: ContextMenuProps) {
+export function ContextMenu({ x, y, agent, onClose, onEdit }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const { sessionsList } = useAppState();
   const sessions = sessionsList.get(agent.id) ?? [];
@@ -75,6 +76,7 @@ export function ContextMenu({ x, y, agent, onClose }: ContextMenuProps) {
       >
         {agent.name}
       </div>
+      <MenuItem label="Edit Agent..." onClick={() => { onEdit(agent); onClose(); }} />
       <MenuItem label="New Conversation" onClick={() => handleAction("new_conversation")} />
 
       {sessions.length > 1 && (
