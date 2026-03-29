@@ -56,6 +56,7 @@ export function App() {
       <style>{CSS}</style>
       {focusedAgent ? (
         <LogView
+          key={focusedAgent.id}
           agent={focusedAgent}
           logs={logs.get(focusedAgent.id) ?? []}
           onBack={() => dispatch({ type: "focus", agentId: null })}
