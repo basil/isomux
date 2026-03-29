@@ -7,6 +7,7 @@ import {
 import type { AgentInfo, AgentState, LogEntry } from "../shared/types.ts";
 import { generateOutfit } from "./outfit.ts";
 import { appendLog, loadLog, loadAgents, saveAgents, listAgentSessions, writeManifest, type PersistedAgent } from "./persistence.ts";
+import { createSafetyHooks } from "./safety-hooks.ts";
 import { resolve, join } from "path";
 import { homedir } from "os";
 import { writeFileSync, mkdirSync, readdirSync, existsSync, readFileSync } from "fs";
@@ -558,6 +559,7 @@ function createSession(managed: ManagedAgent, resumeSessionId?: string) {
     model: "claude-opus-4-6",
     permissionMode: sdkPermissionMode(managed.info.permissionMode),
     pathToClaudeCodeExecutable: managed.launcherPath,
+    hooks: createSafetyHooks(),
   };
   if (resumeSessionId) {
     opts.resume = resumeSessionId;
