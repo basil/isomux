@@ -10,8 +10,7 @@ import { TerminalPanel } from "./TerminalPanel.tsx";
 const STATE_LABELS: Partial<Record<AgentState, string>> = {
   thinking: "Thinking",
   tool_executing: "Running tool",
-  starting: "Starting",
-  waiting_permission: "Waiting for permission",
+  active: "Active",
 };
 
 const ESCALATION_AMBER_MS = 2 * 60 * 1000; // 2 minutes
@@ -44,7 +43,7 @@ function ActivityIndicator({ state, stateChangedAt, agentId }: { state: AgentSta
   if (!label) return null;
 
   const elapsedMs = stateChangedAt ? now - stateChangedAt : 0;
-  const baseColor = state === "waiting_permission" ? "var(--orange)" : "var(--green)";
+  const baseColor = state === "active" ? "var(--purple)" : "var(--green)";
   const color = escalationColor(elapsedMs, baseColor);
   const showAbort = elapsedMs >= ESCALATION_AMBER_MS;
 
@@ -101,7 +100,7 @@ function HeaderTimer({ state, stateChangedAt }: { state: AgentState; stateChange
     return () => clearInterval(id);
   }, []);
   const elapsedMs = stateChangedAt ? now - stateChangedAt : 0;
-  const baseColor = state === "waiting_permission" ? "var(--orange)" : "var(--green)";
+  const baseColor = state === "active" ? "var(--purple)" : "var(--green)";
   const color = escalationColor(elapsedMs, baseColor);
   return (
     <>
@@ -199,7 +198,7 @@ export function LogView({
     setAutoScroll(scrollHeight - scrollTop - clientHeight < 50);
   }
 
-  const isBusy = agent.state === "thinking" || agent.state === "tool_executing" || agent.state === "starting";
+  const isBusy = agent.state === "thinking" || agent.state === "tool_executing";
 
   // Compute agent turns: group entries between user_messages
   // For each entry, determine if it's the last in its agent turn

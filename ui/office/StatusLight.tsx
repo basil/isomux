@@ -3,10 +3,9 @@ import type { AgentState } from "../../shared/types.ts";
 const COLORS: Record<string, string> = {
   thinking: "var(--green)",
   tool_executing: "var(--green)",
-  waiting_permission: "var(--orange)",
+  active: "var(--purple)",
   idle: "var(--text-muted)",
   error: "var(--red)",
-  starting: "var(--purple)",
   stopped: "var(--text-muted)",
 };
 

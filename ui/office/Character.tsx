@@ -1,14 +1,13 @@
 import type { AgentState, AgentOutfit } from "../../shared/types.ts";
 
 // Map our states to visual poses
-function visualState(state: AgentState): "working" | "waiting" | "error" | "idle" {
+function visualState(state: AgentState): "working" | "active" | "error" | "idle" {
   switch (state) {
     case "thinking":
     case "tool_executing":
-    case "starting":
       return "working";
-    case "waiting_permission":
-      return "waiting";
+    case "active":
+      return "active";
     case "error":
       return "error";
     default:
@@ -94,7 +93,7 @@ export function Character({ state, outfit }: { state: AgentState; outfit: AgentO
     );
   }
 
-  if (vs === "waiting") {
+  if (vs === "active") {
     return wrap(
       <>
         <rect x="16" y="36" width="20" height="16" fill={bc} rx="3" />
@@ -135,14 +134,6 @@ export function Character({ state, outfit }: { state: AgentState; outfit: AgentO
         <circle cx="22.5" cy="25.5" r="0.6" fill="white" />
         <circle cx="30.5" cy="25.5" r="0.6" fill="white" />
         <path d="M23 30 Q26 32 29 30" stroke="#333" fill="none" strokeWidth="0.8" />
-        <g>
-          <rect x="0" y="4" width="14" height="13" rx="5" fill="#F5A623" opacity="0.9">
-            <animate attributeName="opacity" values="0.9;0.55;0.9" dur="2s" repeatCount="indefinite" />
-          </rect>
-          <text x="4" y="14" fontSize="10" fill="white" fontWeight="bold">
-            ?
-          </text>
-        </g>
         <rect x="18" y="52" width="6" height="10" fill="#444" rx="2" />
         <rect x="28" y="52" width="6" height="10" fill="#444" rx="2" />
       </>,

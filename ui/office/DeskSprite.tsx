@@ -1,14 +1,13 @@
 import type { AgentState } from "../../shared/types.ts";
 
 // Map our states to visual categories
-function visualState(state: AgentState): "working" | "waiting" | "error" | "idle" {
+function visualState(state: AgentState): "working" | "active" | "error" | "idle" {
   switch (state) {
     case "thinking":
     case "tool_executing":
-    case "starting":
       return "working";
-    case "waiting_permission":
-      return "waiting";
+    case "active":
+      return "active";
     case "error":
       return "error";
     default:
@@ -46,7 +45,7 @@ const DESKS_WITHOUT_MUG = new Set([2, 5, 7]);
 
 export function DeskSprite({ state, deskIndex = 0 }: { state: AgentState; deskIndex?: number }) {
   const vs = visualState(state);
-  const glow = { working: "#50B86C", waiting: "#F5A623", error: "#E85D75", idle: "#223" }[vs];
+  const glow = { working: "#50B86C", active: "#9B59B6", error: "#E85D75", idle: "#223" }[vs];
   const on = vs !== "idle";
   const hasPlant = !DESKS_WITHOUT_PLANT.has(deskIndex);
   const hasMug = !DESKS_WITHOUT_MUG.has(deskIndex);

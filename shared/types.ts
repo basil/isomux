@@ -1,10 +1,9 @@
 // Agent states derived from SDK stream events
 export type AgentState =
   | "idle"
-  | "starting"
   | "thinking"
   | "tool_executing"
-  | "waiting_permission"
+  | "active"
   | "error"
   | "stopped";
 
