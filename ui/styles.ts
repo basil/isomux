@@ -180,6 +180,11 @@ export const CSS = `
     color-scheme: light;
   }
 
+  [data-theme="light"] .lamp-glow { display: none; }
+  [data-theme="light"] .window-night { display: none; }
+  :root .window-day, [data-theme="dark"] .window-day { display: none; }
+  [data-theme="light"] .window-day { display: block; }
+
   body { background: var(--bg-base); overflow:hidden; }
   html, body { max-width: 100vw; overflow-x: hidden; }
 

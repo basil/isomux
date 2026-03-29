@@ -53,8 +53,18 @@ export function DeskSprite({ state, deskIndex = 0 }: { state: AgentState; deskIn
   const leaves = PLANT_VARIANTS[deskIndex % PLANT_VARIANTS.length];
   const [mugBody, mugSide, mugRim, mugLiquid] = MUG_VARIANTS[deskIndex % MUG_VARIANTS.length];
 
+  const lampId = `lamp-glow-${deskIndex}`;
+
   return (
     <svg width="180" height="140" viewBox="0 0 180 140" overflow="visible">
+      <defs>
+        <radialGradient id={lampId} cx="50%" cy="40%" r="50%">
+          <stop offset="0%" stopColor="#F5D090" stopOpacity="0.45" />
+          <stop offset="50%" stopColor="#F5C060" stopOpacity="0.2" />
+          <stop offset="100%" stopColor="#F5C060" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+
       {/* Shadow under desk */}
       <ellipse cx="90" cy="126" rx="55" ry="10" fill="rgba(0,0,0,0.15)" />
 
@@ -173,6 +183,21 @@ export function DeskSprite({ state, deskIndex = 0 }: { state: AgentState; deskIn
           ))}
         </g>
       )}
+
+      {/* Desk lamp — south corner */}
+      <g transform="translate(72, 78)">
+        {/* Light pool on desk surface (dark mode only) */}
+        <ellipse cx="0" cy="2" rx="22" ry="12" fill={`url(#${lampId})`} className="lamp-glow" />
+        {/* Base — small iso diamond */}
+        <path d="M-4 4 L0 2 L4 4 L0 6 Z" fill="#2a2a2a" />
+        {/* Arm — straight up */}
+        <line x1="0" y1="3" x2="0" y2="-12" stroke="#333" strokeWidth="1.5" strokeLinecap="round" />
+        {/* Shade — small cone/trapezoid */}
+        <path d="M-5 -10 L5 -10 L3 -14 L-3 -14 Z" fill="#C8A050" />
+        <path d="M-5 -10 L-3 -14 L-3 -12 L-5 -9 Z" fill="#B08830" />
+        {/* Bulb glow under shade (dark mode only) */}
+        <ellipse cx="0" cy="-9" rx="3" ry="1.5" fill="#F5D090" opacity="0.6" className="lamp-glow" />
+      </g>
     </svg>
   );
 }

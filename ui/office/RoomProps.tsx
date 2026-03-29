@@ -9,8 +9,8 @@ export function RoomProps() {
       viewBox={`${VB_X} ${VB_Y} ${SCENE_W} ${SCENE_H}`}
       overflow="visible"
     >
-      {/* Potted plant — near left wall inside office */}
-      <g transform="translate(-100, 150)">
+      {/* Potted plant — west corner of office */}
+      <g transform="translate(-260, 230) scale(1.5)">
         <rect x="-8" y="0" width="16" height="20" rx="3" fill="#5a4a35" />
         <ellipse cx="0" cy="0" rx="10" ry="4" fill="#6a5a45" />
         <path d="M0 0 Q-10 -20 -4 -30" stroke="#3a8a3a" fill="none" strokeWidth="2" />
@@ -22,12 +22,16 @@ export function RoomProps() {
       </g>
 
       {/* Water cooler — near right wall inside office */}
-      <g transform="translate(350, 140)">
+      <g transform="translate(540, 225) scale(1.5)">
+        {/* Water jug (behind body) */}
+        <rect x="-5" y="-12" width="10" height="14" rx="2" fill="var(--room-prop-accent)" />
+        <ellipse cx="0" cy="-12" rx="6" ry="2" fill="var(--room-prop-accent)" opacity="0.8" />
+        {/* Body */}
         <rect x="-9" y="0" width="18" height="30" rx="2" fill="var(--room-prop-body)" stroke="var(--border-subtle)" strokeWidth="0.5" />
-        <rect x="-5" y="-12" width="10" height="14" rx="2" fill="var(--room-prop-accent)" opacity="0.6" />
-        <ellipse cx="0" cy="-12" rx="6" ry="2" fill="var(--room-prop-accent)" opacity="0.5" />
-        <circle cx="-3" cy="18" r="2" fill="#4a90d9" opacity="0.4" />
-        <circle cx="3" cy="18" r="2" fill="#e85d75" opacity="0.4" />
+        {/* Tap buttons */}
+        <circle cx="-3" cy="18" r="2" fill="#5a9ada" />
+        <circle cx="3" cy="18" r="2" fill="#e87090" />
+        {/* Base */}
         <rect x="-7" y="30" width="14" height="4" rx="1" fill="var(--room-prop-base)" />
       </g>
     </svg>
