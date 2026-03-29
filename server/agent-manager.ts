@@ -10,7 +10,7 @@ import { appendLog, loadLog, loadAgents, saveAgents, listAgentSessions, writeMan
 import { createSafetyHooks } from "./safety-hooks.ts";
 import { resolve, join } from "path";
 import { homedir } from "os";
-import { writeFileSync, mkdirSync, readdirSync, existsSync, readFileSync, rmSync, unlinkSync } from "fs";
+import { writeFileSync, mkdirSync, readdirSync, existsSync, readFileSync, rmSync } from "fs";
 
 // Directory for per-agent launcher scripts
 const LAUNCHERS_DIR = join(homedir(), ".isomux", "launchers");

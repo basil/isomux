@@ -156,6 +156,19 @@ These are passed to the SDK via `pathToClaudeCodeExecutable` in `SDKSessionOptio
 - The SDK has an internal `initConfig` (with `appendSystemPrompt`, `systemPrompt`, `agents`, etc.) that feeds the `SDKControlInitializeRequest`, but it's set internally — `unstable_v2_createSession` takes a single `SDKSessionOptions` argument with no way to pass `initConfig`.
 - Extra properties on the options object are silently stripped (likely Zod validation).
 
+### Why the V2 path doesn't wire these through
+
+Source inspection of `sdk.mjs` confirms: the V1 `query()` path constructs an `initConfig` with `systemPrompt`/`appendSystemPrompt` and passes it as the 8th argument to the internal `lX` class. The V2 `unstable_v2_createSession` path skips this entirely — it passes `false` and no `initConfig`. This is a V2 API gap, not a validation issue.
+
+### Ephemeral launcher alternatives explored (2026-03-29)
+
+Also tested whether launchers could be made ephemeral (write to `/dev/shm`, delete after `system:init` event):
+- **Write to `/dev/shm` + delete after init**: Works for single sessions and multi-turn. But resume spawns a new process and needs the file again, so you're writing just as many files — just to RAM instead of disk.
+- **Delete immediately after spawn**: Fails — subprocess hasn't read the file yet (race condition).
+- **`/dev/shm` is Linux-only**: No macOS support without fallback to `os.tmpdir()`.
+
+**Decision**: Keep persistent launchers in `~/.isomux/launchers/`. Solve stale file accumulation with startup pruning (wipe dir before regenerating) and cleanup on agent destroy. Launchers are fully derived from persisted agent config, so there's zero information loss.
+
 ### Conclusion
 
 The launcher script approach is the only working mechanism to customize agent identity and working directory in the V2 SDK. This will remain necessary until Anthropic exposes `appendSystemPrompt` and `cwd` in `SDKSessionOptions` (or adds a public `initConfig` parameter).

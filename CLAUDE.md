@@ -40,5 +40,5 @@ See [isomux.com](https://isomux.com) for a full feature overview and setup instr
 
 - `~/.isomux/agents.json` — persisted agent configs
 - `~/.isomux/logs/` — agent conversation logs
-- `~/.isomux/launchers/` — launcher scripts (cwd workaround for SDK)
+- `~/.isomux/launchers/` — launcher scripts (cwd workaround for SDK - details in docs/sdk-investigation.md)
 - `ui/dist/` — UI build output (gitignored)
