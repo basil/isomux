@@ -5,6 +5,7 @@ import { send } from "../ws.ts";
 import { useAppState, useDispatch } from "../store.tsx";
 import { LogEntryCard, serializeEntries } from "./LogEntryCard.tsx";
 import { CopyButton } from "../components/CopyButton.tsx";
+import { TerminalPanel } from "./TerminalPanel.tsx";
 
 const STATE_LABELS: Partial<Record<AgentState, string>> = {
   thinking: "Thinking",
@@ -135,6 +136,7 @@ export function LogView({
   const [topicDraft, setTopicDraft] = useState("");
   const topicInputRef = useRef<HTMLInputElement>(null);
   const topicSavedRef = useRef(false);
+  const [terminalOpen, setTerminalOpen] = useState(false);
 
   // Build merged command list for autocomplete
   const agentCmds = slashCommands.get(agent.id);
@@ -174,6 +176,18 @@ export function LogView({
     if (textareaRef.current && input) {
       autoResize(textareaRef.current);
     }
+  }, []);
+
+  // Ctrl+` to toggle terminal panel
+  useEffect(() => {
+    function handleTerminalShortcut(e: KeyboardEvent) {
+      if (e.key === "`" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        setTerminalOpen((prev) => !prev);
+      }
+    }
+    window.addEventListener("keydown", handleTerminalShortcut);
+    return () => window.removeEventListener("keydown", handleTerminalShortcut);
   }, []);
 
   function handleScroll() {
@@ -251,9 +265,17 @@ export function LogView({
       style={{
         height: "100vh",
         display: "flex",
-        flexDirection: "column",
+        flexDirection: "row",
         background: "var(--bg-base)",
         animation: "termEnter 0.3s ease-out",
+      }}
+    >
+    <div
+      style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        minWidth: 0,
       }}
     >
       {/* Header */}
@@ -396,8 +418,28 @@ export function LogView({
             {agent.cwd}
           </span>
         </div>
-        <div style={{ width: 100, display: "flex", justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
           {logs.length > 0 && <CopyButton getText={getConversationText} />}
+          <button
+            onClick={() => setTerminalOpen((prev) => !prev)}
+            title={terminalOpen ? "Close terminal (Ctrl+`)" : "Open terminal (Ctrl+`)"}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "4px 10px",
+              borderRadius: 6,
+              border: `1px solid ${terminalOpen ? "var(--green-border)" : "var(--border-medium)"}`,
+              background: terminalOpen ? "var(--green-bg)" : "var(--btn-surface)",
+              color: terminalOpen ? "var(--green)" : "var(--text-muted)",
+              fontFamily: "'DM Sans',sans-serif",
+              fontSize: 12,
+              cursor: "pointer",
+              transition: "all 0.15s",
+            }}
+          >
+            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11 }}>&gt;_</span>
+          </button>
         </div>
       </div>
 
@@ -587,6 +629,12 @@ export function LogView({
           </div>
         </div>
       </div>
+    </div>
+    {terminalOpen && (
+      <div style={{ width: "40%", minWidth: 300, maxWidth: 600, flexShrink: 0 }}>
+        <TerminalPanel agentId={agent.id} onClose={() => setTerminalOpen(false)} />
+      </div>
+    )}
     </div>
   );
 }

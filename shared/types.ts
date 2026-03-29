@@ -55,7 +55,9 @@ export type ServerMessage =
   | { type: "log_entry"; entry: LogEntry }
   | { type: "sessions_list"; agentId: string; sessions: SessionInfo[] }
   | { type: "slash_commands"; agentId: string; commands: string[]; skills: string[] }
-  | { type: "clear_logs"; agentId: string };
+  | { type: "clear_logs"; agentId: string }
+  | { type: "terminal_output"; agentId: string; data: string }
+  | { type: "terminal_exit"; agentId: string; exitCode: number };
 
 // Browser → Server commands
 export type ClientCommand =
@@ -69,4 +71,8 @@ export type ClientCommand =
   | { type: "edit_agent"; agentId: string; name?: string; cwd?: string; outfit?: AgentOutfit; customInstructions?: string }
   | { type: "swap_desks"; deskA: number; deskB: number }
   | { type: "set_topic"; agentId: string; topic: string }
-  | { type: "reset_topic"; agentId: string };
+  | { type: "reset_topic"; agentId: string }
+  | { type: "terminal_open"; agentId: string }
+  | { type: "terminal_input"; agentId: string; data: string }
+  | { type: "terminal_resize"; agentId: string; cols: number; rows: number }
+  | { type: "terminal_close"; agentId: string };

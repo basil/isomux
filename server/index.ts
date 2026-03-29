@@ -64,6 +64,26 @@ async function handleCommand(cmd: ClientCommand) {
       } as ServerMessage);
       break;
     }
+    case "terminal_open": {
+      const opened = AgentManager.openTerminal(cmd.agentId);
+      if (opened) {
+        // Replay buffered output so the browser catches up
+        const buffer = AgentManager.getTerminalBuffer(cmd.agentId);
+        if (buffer) {
+          broadcast({ type: "terminal_output", agentId: cmd.agentId, data: buffer } as ServerMessage);
+        }
+      }
+      break;
+    }
+    case "terminal_input":
+      AgentManager.terminalInput(cmd.agentId, cmd.data);
+      break;
+    case "terminal_resize":
+      AgentManager.terminalResize(cmd.agentId, cmd.cols, cmd.rows);
+      break;
+    case "terminal_close":
+      AgentManager.closeTerminal(cmd.agentId);
+      break;
   }
 }
 
