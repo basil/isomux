@@ -78,11 +78,25 @@
       font-family: "Space Grotesk", -apple-system, sans-serif;
       font-size: 1.15rem;
       color: var(--text-dim);
-      margin-bottom: 24px;
+      margin-bottom: 16px;
     }
 
     .hero .tagline em {
       font-style: italic;
+    }
+
+    .hero .free-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(80, 184, 108, 0.1);
+      border: 1px solid rgba(80, 184, 108, 0.3);
+      border-radius: 20px;
+      padding: 6px 18px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 22px;
     }
 
     .hero-img {
@@ -280,6 +294,7 @@
   <div class="hero">
     <h1>Isomux</h1>
     <p class="tagline">Friction going from 1 Claude Code to 4+? Isomux is your agent office. <em>Cute in a useful way.</em></p>
+    <div class="free-badge">free &amp; open source &middot; works with your Claude subscription &middot; runs locally; no cloud, no account</div>
     <img class="hero-img" src="screenshot.png" alt="Isomux office view showing multiple AI agents at their desks">
     <div class="cta-row">
       <a href="#setup" class="btn btn-primary">Get Started</a>
