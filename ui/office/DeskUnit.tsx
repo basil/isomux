@@ -152,43 +152,6 @@ export function DeskUnit({
         )}
       </div>
 
-      {/* Tooltip on hover */}
-      {hov && (
-        <div
-          style={{
-            position: "absolute",
-            top: -90,
-            left: "50%",
-            transform: "translateX(-50%)",
-            padding: "8px 12px",
-            background: "var(--bg-tooltip)",
-            backdropFilter: "blur(14px)",
-            borderRadius: 12,
-            border: "1px solid var(--border-light)",
-            whiteSpace: "nowrap",
-            zIndex: 200,
-            animation: "hudIn 0.12s ease-out",
-            boxShadow: "0 8px 24px var(--shadow)",
-          }}
-        >
-          <div style={{ fontSize: 10, color: "var(--text-dim)", fontFamily: "'JetBrains Mono',monospace" }}>
-            {agent.cwd}
-          </div>
-          <div
-            style={{
-              position: "absolute",
-              bottom: -5,
-              left: "50%",
-              transform: "translateX(-50%) rotate(45deg)",
-              width: 10,
-              height: 10,
-              background: "var(--bg-tooltip)",
-              borderRight: "1px solid var(--border-light)",
-              borderBottom: "1px solid var(--border-light)",
-            }}
-          />
-        </div>
-      )}
     </div>
   );
 }
