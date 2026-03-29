@@ -124,33 +124,3 @@ result (success)          → idle
 result (error)            → error
 ```
 
----
-
-## Recommended Approach for isomux
-
-**Use the Agent SDK with V2 sessions.** One `SDKSession` per agent, managed in-process by the Bun server.
-
-### Agent lifecycle
-1. User spawns agent → `unstable_v2_createSession({ model, permissionMode, canUseTool })`
-2. User sends message → `session.send(message)` then `for await (msg of session.stream())`
-3. Stream events → derive state + relay to browser via WebSocket
-4. Permission request → `canUseTool` callback sends request to browser, resolves when user responds
-5. Agent idle → session stays alive, waiting for next `send()`
-6. User kills agent → `session.close()`
-7. Server restart → `unstable_v2_resumeSession(sessionId, options)` to restore
-
-### Permission handling
-
-Use the `canUseTool` callback directly. It's async and blocks the agent until resolved — perfect for the interactive permission cards in the UI. The callback receives tool name, input, and context; we relay this to the browser via WebSocket and resolve the Promise when the user clicks allow/deny.
-
-### Cost tracking
-
-`total_cost_usd` on `SDKResultMessage` gives per-turn cost. Accumulate across turns for the cost badge.
-
----
-
-## Open Questions
-
-1. **V2 stability**: The API is marked `@alpha`. If it breaks, fall back to V1 `query()` with `resume: sessionId`.
-2. **Concurrent sessions**: 8 agents × 1 SDK session each. The SDK spawns a CLI subprocess per session — is this fine? (Likely yes — they're mostly idle, waiting on API.)
-3. **Session resume after crash**: If the Bun process dies, can we resume all sessions? Need to persist session IDs (in log files or a simple JSON file).
