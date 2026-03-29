@@ -82,6 +82,7 @@ export const CSS = `
     --wall-decor: #1a2236;
     --wall-decor-inner: #151d2c;
     --wall-decor-stroke: rgba(255,255,255,0.06);
+    --clock-hand: rgba(255,255,255,0.4);
     --room-prop-body: #2a3548;
     --room-prop-accent: #3a5070;
     --room-prop-base: #222d3a;
@@ -164,6 +165,7 @@ export const CSS = `
     --wall-decor: #e0e4ee;
     --wall-decor-inner: #eaecf4;
     --wall-decor-stroke: rgba(0,0,0,0.08);
+    --clock-hand: rgba(0,0,0,0.5);
     --room-prop-body: #c8d0e0;
     --room-prop-accent: #a0b0c8;
     --room-prop-base: #b8c0d0;
