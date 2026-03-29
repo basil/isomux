@@ -14,6 +14,9 @@ import { writeFileSync, mkdirSync, readdirSync, existsSync, readFileSync } from 
 
 // Directory for per-agent launcher scripts
 const LAUNCHERS_DIR = join(homedir(), ".isomux", "launchers");
+
+// Skills bundled with isomux itself (available to all users regardless of their config)
+const BUNDLED_SKILLS_DIR = join(import.meta.dir, "..", "skills");
 mkdirSync(LAUNCHERS_DIR, { recursive: true });
 
 const CLI_PATH = join(import.meta.dir, "..", "node_modules", "@anthropic-ai", "claude-agent-sdk", "cli.js");
@@ -41,6 +44,19 @@ function discoverUserSkills(): string[] {
         if (entry.isFile() && entry.name.endsWith(".md")) {
           skills.push(entry.name.replace(/\.md$/, ""));
         }
+      }
+    } catch {}
+  }
+  return skills;
+}
+
+// Scan skills bundled with isomux
+function discoverBundledSkills(): string[] {
+  const skills: string[] = [];
+  if (existsSync(BUNDLED_SKILLS_DIR)) {
+    try {
+      for (const entry of readdirSync(BUNDLED_SKILLS_DIR, { withFileTypes: true })) {
+        if (entry.isDirectory()) skills.push(entry.name);
       }
     } catch {}
   }
@@ -241,7 +257,7 @@ export async function restoreAgents() {
       aborting: false,
       launcherPath,
       slashCommands: [...BUILTIN_COMMANDS],
-      skills: [...discoverUserSkills(), ...discoverProjectSkills(p.cwd)],
+      skills: [...discoverBundledSkills(), ...discoverUserSkills(), ...discoverProjectSkills(p.cwd)],
       thinkingStartedAt: 0,
       toolCallTimestamps: new Map(),
       topicGenerating: false,
@@ -440,7 +456,7 @@ function processMessage(agentId: string, msg: SDKMessage) {
         // Filter out MCP internal command names (mcp__...) — they clutter autocomplete
         const filteredSdkCommands = sdkCommands.filter((c) => !c.startsWith("mcp__"));
         // Merge built-in, SDK-reported, and user-defined skills
-        const userSkills = managed ? [...discoverUserSkills(), ...discoverProjectSkills(managed.info.cwd)] : [];
+        const userSkills = managed ? [...discoverBundledSkills(), ...discoverUserSkills(), ...discoverProjectSkills(managed.info.cwd)] : [];
         const allSkills = [...new Set([...sdkSkills, ...userSkills])];
         const allCommands = [...new Set([...BUILTIN_COMMANDS, ...filteredSdkCommands])];
         if (managed) {
@@ -612,7 +628,7 @@ export async function spawn(name: string, cwd: string, permissionMode: AgentInfo
     aborting: false,
     launcherPath,
     slashCommands: [...BUILTIN_COMMANDS],
-    skills: [...discoverUserSkills(), ...discoverProjectSkills(resolvedCwd)],
+    skills: [...discoverBundledSkills(), ...discoverUserSkills(), ...discoverProjectSkills(resolvedCwd)],
     thinkingStartedAt: 0,
     toolCallTimestamps: new Map(),
     topicGenerating: false,
@@ -746,10 +762,12 @@ async function handleSlashCommand(agentId: string, managed: ManagedAgent, cmd: s
 // Resolve a skill name to its prompt text, checking user and project skill dirs
 function resolveSkillPrompt(name: string, cwd: string): string | null {
   const candidates = [
-    join(homedir(), ".claude", "skills", name, "SKILL.md"),
+    // Project and user skills take priority over bundled
     join(cwd, ".claude", "skills", name, "SKILL.md"),
-    join(homedir(), ".claude", "commands", `${name}.md`),
     join(cwd, ".claude", "commands", `${name}.md`),
+    join(homedir(), ".claude", "skills", name, "SKILL.md"),
+    join(homedir(), ".claude", "commands", `${name}.md`),
+    join(BUNDLED_SKILLS_DIR, name, "SKILL.md"),
   ];
   for (const path of candidates) {
     if (existsSync(path)) {
