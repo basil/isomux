@@ -7,6 +7,14 @@ marked.setOptions({
   gfm: true,
 });
 
+// Override link renderer to always open in new tab
+const renderer = new marked.Renderer();
+renderer.link = ({ href, title, text }) => {
+  const titleAttr = title ? ` title="${title}"` : "";
+  return `<a href="${href}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
+};
+marked.use({ renderer });
+
 export function Markdown({ content }: { content: string }) {
   const ref = useRef<HTMLDivElement>(null);
 
