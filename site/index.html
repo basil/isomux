@@ -312,12 +312,12 @@
     <div class="feature-group">
       <h3>Office View</h3>
       <ul>
-        <li><strong>Isometric 2D office with 8 desks</strong> arranged in a 2&times;4 grid</li>
-        <li><strong>Unique character per agent</strong> &mdash; fully customizable outfit (hat, shirt color, accessory)</li>
-        <li><strong>Animated character poses</strong> per state: idle, working, waiting, error</li>
-        <li>Desk monitors <strong>glow based on agent state</strong> (green / amber / red)</li>
-        <li>Status light with <strong>escalating warnings</strong>: amber at 2min, red at 5min, inline abort button</li>
-        <li><strong>Monitor preview</strong> showing latest agent output</li>
+        <li><strong>Isometric office with 8 desks</strong> &mdash; see all your agents at a glance</li>
+        <li><strong>Name your agents</strong> &mdash; each gets a nametag on their desk</li>
+        <li><strong>Unique character per agent</strong> &mdash; customize hat, shirt, hair, accessory, or randomize</li>
+        <li><strong>Animated characters</strong> &mdash; sleeping when idle, typing when working, waving when waiting for you</li>
+        <li>Desk monitors <strong>glow based on agent state</strong> (green / purple / red)</li>
+        <li>Status light with <strong>escalating warnings</strong>: amber at 2 min, red at 5 min</li>
         <li>Auto-generated <strong>conversation topic</strong> below nametag</li>
         <li><strong>Drag agents between desks</strong> to rearrange</li>
         <li>Light / dark theme toggle</li>
@@ -328,7 +328,7 @@
       <h3>Agent Creation &amp; Editing</h3>
       <ul>
         <li><strong>Click empty desk to spawn</strong> &mdash; name, working directory, permission mode, custom instructions</li>
-        <li>Working directory <strong>autocomplete + browse</strong> + recent CWD suggestions</li>
+        <li>Working directory input with <strong>recent CWD suggestions</strong></li>
         <li><strong>Outfit customization</strong>: color swatches, hat, accessory, randomize with live preview</li>
         <li><strong>Custom instructions</strong> per agent, editable at spawn and later</li>
       </ul>
@@ -337,12 +337,13 @@
     <div class="feature-group">
       <h3>Conversation View</h3>
       <ul>
-        <li><strong>Input drafts persisted</strong> when navigating away</li>
+        <li><strong>Input drafts preserved</strong> when switching between agents</li>
         <li><strong>Markdown rendering</strong> for agent output</li>
-        <li><strong>Collapsible thinking blocks and tool call cards</strong> with duration</li>
+        <li><strong>Collapsible thinking and tool-call cards</strong> with timing for each step</li>
         <li><strong>Copy buttons</strong> on code blocks, user messages, full agent turns, and entire conversations</li>
-        <li>Messages blocked while agent busy to prevent loss</li>
+        <li><strong>Send disabled while agent is busy</strong> &mdash; type ahead freely, send when ready</li>
         <li><strong>Embedded terminal</strong> for direct shell access per agent</li>
+        <li><strong>Right-click context menu</strong> &mdash; resume past sessions, edit agent, kill</li>
       </ul>
     </div>
 
@@ -352,7 +353,7 @@
         <li><strong>Number keys 1&ndash;8</strong> jump to agents from office view</li>
         <li><strong>Tab / Shift+Tab</strong> cycle between agents in chat view</li>
         <li>Escape returns to office</li>
-        <li><strong>Ctrl+C</strong> interrupts busy agent (clean abort + resume)</li>
+        <li><strong>Ctrl+C to interrupt</strong> &mdash; cleanly aborts and lets you resume</li>
       </ul>
     </div>
 
@@ -400,11 +401,12 @@
     <div class="feature-group">
       <h3>System &amp; Backend</h3>
       <ul>
-        <li><strong>WebSocket-only</strong> communication &mdash; full state snapshot + incremental updates</li>
-        <li><strong>Single Bun process</strong>, no Vite, no database</li>
+        <li><strong>Real-time sync via WebSocket</strong> &mdash; every connected device stays in lockstep</li>
+        <li><strong>Single Bun process</strong> &mdash; no bundler, no database, minimal deps</li>
         <li>Uses <strong>Claude subscription via CLI auth</strong> &mdash; no API key needed</li>
         <li>Global Claude skills and <strong>MCP servers inherited</strong> automatically</li>
-        <li>Safety hooks to protect config and block destructive commands</li>
+        <li><strong>Built-in safety hooks</strong> &mdash; blocks <code>rm -rf</code>, <code>git reset --hard</code>, and other footguns out of the box</li>
+        <li><strong>Works on a headless server</strong> &mdash; run on a Mac Mini or Linux box, access from anywhere via Tailscale</li>
       </ul>
     </div>
   </section>
