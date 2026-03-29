@@ -10,7 +10,7 @@ import { appendLog, loadLog, loadAgents, saveAgents, listAgentSessions, writeMan
 import { createSafetyHooks } from "./safety-hooks.ts";
 import { resolve, join } from "path";
 import { homedir } from "os";
-import { writeFileSync, mkdirSync, readdirSync, existsSync, readFileSync } from "fs";
+import { writeFileSync, mkdirSync, readdirSync, existsSync, readFileSync, rmSync, unlinkSync } from "fs";
 
 // Directory for per-agent launcher scripts
 const LAUNCHERS_DIR = join(homedir(), ".isomux", "launchers");
@@ -241,6 +241,10 @@ function persistAll() {
 
 // Restore agents from disk on startup. Creates sessions and loads log history.
 export async function restoreAgents() {
+  // Wipe stale launchers from previous runs — they're fully regenerated below
+  rmSync(LAUNCHERS_DIR, { recursive: true, force: true });
+  mkdirSync(LAUNCHERS_DIR, { recursive: true });
+
   const persisted = loadAgents();
   for (const p of persisted) {
     const launcherPath = createLauncher(p.id, p.cwd, p.name, p.customInstructions);
@@ -348,7 +352,10 @@ function addLogEntry(agentId: string, kind: LogEntry["kind"], content: string, m
   }
 }
 
-// Emit a log entry to the UI only (not persisted to disk) — for ephemeral messages like /resume
+// Emit a log entry to the UI only (not persisted to disk) — for ephemeral messages like /resume.
+// Note: entries are still added to logCache for UI display. If sessionId is null when this is
+// called, the backfill logic in processMessage (system/init) would write them to disk. In practice
+// this doesn't happen because /resume requires existing sessions (sessionId already set).
 function emitEphemeralLog(agentId: string, kind: LogEntry["kind"], content: string, metadata?: Record<string, unknown>) {
   const entry: LogEntry = {
     id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -1031,7 +1038,7 @@ export function setTopic(agentId: string, topic: string) {
   managed.info.topicStale = false;
   const textCount = (logCache.get(agentId) ?? []).filter(e => e.kind === "user_message" || e.kind === "text").length;
   managed.topicMessageCount = textCount;
-  emit({ type: "agent_updated", agentId, changes: { topic, topicStale: false } });
+  emit({ type: "agent_updated", agentId, changes: { topic: managed.info.topic, topicStale: false } });
   // Persist to sessions.json so resume list shows the manual topic
   if (managed.sessionId) {
     persistSessionTopic(agentId, managed.sessionId, managed.info.topic);
