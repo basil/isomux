@@ -2,7 +2,7 @@
 
 An isometric office for managing multiple concurrent Claude Code agents. Each agent sits at a desk, has a unique outfit, and visually reflects its current state.
 
-![Isomux office view](screenshot.png)
+![Isomux office view](site/screenshot.png)
 
 ## Prerequisites
 
