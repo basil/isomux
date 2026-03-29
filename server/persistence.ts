@@ -38,17 +38,52 @@ export function loadLog(agentId: string, sessionId: string): LogEntry[] {
   }
 }
 
-// List all sessions for an agent (sorted by most recent first)
-export function listAgentSessions(agentId: string): { sessionId: string; lastModified: number }[] {
+// Per-session topic storage: ~/.isomux/logs/<agentId>/sessions.json
+type SessionsMap = Record<string, { topic: string | null; lastModified: number }>;
+
+export function loadSessionsMap(agentId: string): SessionsMap {
+  try {
+    const filePath = join(LOGS_DIR, agentId, "sessions.json");
+    if (!existsSync(filePath)) return {};
+    return JSON.parse(readFileSync(filePath, "utf-8")) as SessionsMap;
+  } catch {
+    return {};
+  }
+}
+
+function saveSessionsMap(agentId: string, map: SessionsMap) {
+  try {
+    const agentDir = join(LOGS_DIR, agentId);
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, "sessions.json"), JSON.stringify(map, null, 2));
+  } catch (err) {
+    console.error("Failed to save sessions map:", err);
+  }
+}
+
+export function persistSessionTopic(agentId: string, sessionId: string, topic: string | null) {
+  const map = loadSessionsMap(agentId);
+  map[sessionId] = { topic, lastModified: Date.now() };
+  saveSessionsMap(agentId, map);
+}
+
+// List all sessions for an agent (sorted by most recent first), with topics from sessions.json
+export function listAgentSessions(agentId: string): { sessionId: string; lastModified: number; topic: string | null }[] {
   try {
     const agentDir = join(LOGS_DIR, agentId);
     if (!existsSync(agentDir)) return [];
+    const sessionsMap = loadSessionsMap(agentId);
     return readdirSync(agentDir)
       .filter((f) => f.endsWith(".jsonl"))
-      .map((f) => ({
-        sessionId: f.replace(".jsonl", ""),
-        lastModified: Bun.file(join(agentDir, f)).lastModified,
-      }))
+      .map((f) => {
+        const sid = f.replace(".jsonl", "");
+        const entry = sessionsMap[sid];
+        return {
+          sessionId: sid,
+          lastModified: entry?.lastModified ?? Bun.file(join(agentDir, f)).lastModified,
+          topic: entry?.topic ?? null,
+        };
+      })
       .sort((a, b) => b.lastModified - a.lastModified);
   } catch {
     return [];

@@ -9,7 +9,7 @@ export interface AppState {
   connected: boolean;
   isMobile: boolean;
   needsAttention: Set<string>; // agentIds with unread state changes
-  sessionsList: Map<string, SessionInfo[]>; // agentId → available sessions
+  sessionsList: Map<string, { sessions: SessionInfo[]; currentSessionId: string | null }>; // agentId → available sessions
   soundTrigger: number; // increments when any agent finishes work (for sound regardless of focus)
   drafts: Map<string, string>; // agentId → unsent chat input
   recentCwds: string[]; // persisted recent working directories
@@ -25,7 +25,7 @@ type Action =
   | { type: "log_entry"; entry: LogEntry }
   | { type: "focus"; agentId: string | null }
   | { type: "connected" }
-  | { type: "sessions_list"; agentId: string; sessions: SessionInfo[] }
+  | { type: "sessions_list"; agentId: string; sessions: SessionInfo[]; currentSessionId: string | null }
   | { type: "set_draft"; agentId: string; text: string }
   | { type: "slash_commands"; agentId: string; commands: string[]; skills: string[] }
   | { type: "clear_logs"; agentId: string }
@@ -105,7 +105,7 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, connected: true };
     case "sessions_list": {
       const sessionsList = new Map(state.sessionsList);
-      sessionsList.set(action.agentId, action.sessions);
+      sessionsList.set(action.agentId, { sessions: action.sessions, currentSessionId: action.currentSessionId });
       return { ...state, sessionsList };
     }
     case "set_draft": {

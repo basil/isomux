@@ -6,7 +6,7 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentInfo, AgentState, LogEntry } from "../shared/types.ts";
 import { generateOutfit } from "./outfit.ts";
-import { appendLog, loadLog, loadAgents, saveAgents, listAgentSessions, writeManifest, type PersistedAgent } from "./persistence.ts";
+import { appendLog, loadLog, loadAgents, saveAgents, listAgentSessions, writeManifest, persistSessionTopic, type PersistedAgent } from "./persistence.ts";
 import { createSafetyHooks } from "./safety-hooks.ts";
 import { resolve, join } from "path";
 import { homedir } from "os";
@@ -22,7 +22,7 @@ mkdirSync(LAUNCHERS_DIR, { recursive: true });
 const CLI_PATH = join(import.meta.dir, "..", "node_modules", "@anthropic-ai", "claude-agent-sdk", "cli.js");
 
 // Built-in CLI commands that the SDK doesn't report in slash_commands
-const BUILTIN_COMMANDS = ["clear", "compact", "cost", "context", "help", "init", "login", "logout", "memory", "review", "status", "fast"];
+const BUILTIN_COMMANDS = ["clear", "compact", "cost", "context", "help", "init", "login", "logout", "memory", "resume", "review", "status", "fast"];
 
 // Scan disk for user-defined skills and commands that the SDK doesn't report
 function discoverUserSkills(): string[] {
@@ -112,6 +112,9 @@ interface ManagedAgent {
   // Topic generation
   topicGenerating: boolean;
   topicMessageCount: number; // text entry count when topic was last generated
+  // /resume two-step state
+  pendingResume: boolean;
+  pendingResumeSessions: { sessionId: string; lastModified: number; topic: string | null }[];
   // Terminal PTY sidecar (spawned on demand via Node.js)
   ptySidecar: import("bun").Subprocess | null;
   ptyBuffer: string; // buffered output for reconnecting browsers
@@ -148,6 +151,10 @@ export function getAgentCommands(agentId: string): { commands: string[]; skills:
 
 export function listSessions(agentId: string) {
   return listAgentSessions(agentId);
+}
+
+export function getCurrentSessionId(agentId: string): string | null {
+  return agents.get(agentId)?.sessionId ?? null;
 }
 
 export function editAgent(agentId: string, changes: { name?: string; cwd?: string; outfit?: AgentInfo["outfit"]; customInstructions?: string }) {
@@ -262,6 +269,8 @@ export async function restoreAgents() {
       toolCallTimestamps: new Map(),
       topicGenerating: false,
       topicMessageCount: 0,
+      pendingResume: false,
+      pendingResumeSessions: [],
       ptySidecar: null,
       ptyBuffer: "",
     };
@@ -339,6 +348,22 @@ function addLogEntry(agentId: string, kind: LogEntry["kind"], content: string, m
   }
 }
 
+// Emit a log entry to the UI only (not persisted to disk) — for ephemeral messages like /resume
+function emitEphemeralLog(agentId: string, kind: LogEntry["kind"], content: string, metadata?: Record<string, unknown>) {
+  const entry: LogEntry = {
+    id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    agentId,
+    timestamp: Date.now(),
+    kind,
+    content,
+    metadata,
+  };
+  const cached = logCache.get(agentId) ?? [];
+  cached.push(entry);
+  logCache.set(agentId, cached);
+  emit({ type: "log_entry", entry });
+}
+
 // Generate a short topic description for an agent's conversation
 async function generateTopic(agentId: string) {
   const managed = agents.get(agentId);
@@ -385,6 +410,10 @@ async function generateTopic(agentId: string) {
       managed.topicMessageCount = textEntries.length;
       emit({ type: "agent_updated", agentId, changes: { topic, topicStale: false } });
       persistAll();
+      // Persist topic to sessions.json for resume list
+      if (managed.sessionId) {
+        persistSessionTopic(agentId, managed.sessionId, topic);
+      }
     }
   } catch (err: any) {
     console.error(`Topic generation failed for ${agentId}:`, err.message);
@@ -448,6 +477,13 @@ function processMessage(agentId: string, msg: SDKMessage) {
             addLogEntry(agentId, "system", "Conversation cleared.");
           }
           managed.sessionId = sessionId;
+          // Backfill: write any cached log entries that were created before sessionId was known
+          if (!hadPreviousSession) {
+            const cached = logCache.get(agentId) ?? [];
+            for (const entry of cached) {
+              appendLog(agentId, sessionId, entry);
+            }
+          }
           persistAll();
         }
         // Capture available slash commands and skills from init
@@ -633,6 +669,8 @@ export async function spawn(name: string, cwd: string, permissionMode: AgentInfo
     toolCallTimestamps: new Map(),
     topicGenerating: false,
     topicMessageCount: 0,
+    pendingResume: false,
+    pendingResumeSessions: [],
     ptySidecar: null,
     ptyBuffer: "",
   };
@@ -665,6 +703,56 @@ export async function sendMessage(agentId: string, text: string, username?: stri
   const managed = agents.get(agentId);
   if (!managed?.session) return;
 
+  // Handle /resume two-step: if pendingResume, check if input is a number pick
+  if (managed.pendingResume) {
+    managed.pendingResume = false;
+    const trimmed = text.trim();
+    const num = parseInt(trimmed, 10);
+    if (!isNaN(num) && num >= 1 && num <= managed.pendingResumeSessions.length) {
+      const picked = managed.pendingResumeSessions[num - 1];
+      managed.pendingResumeSessions = [];
+      // Persist current session topic before switching
+      persistCurrentSessionTopic(agentId, managed);
+      // Perform the resume
+      try { managed.session?.close(); } catch {}
+      try {
+        managed.session = createSession(managed, picked.sessionId);
+        managed.sessionId = picked.sessionId;
+        managed.streaming = false;
+        managed.topicGenerating = false;
+        managed.topicMessageCount = 0;
+        // Clear and replay resumed session's logs
+        const history = loadLog(agentId, picked.sessionId);
+        logCache.set(agentId, []);
+        emit({ type: "clear_logs", agentId } as any);
+        if (history.length > 0) {
+          logCache.set(agentId, [...history]);
+          for (const entry of history) {
+            emit({ type: "log_entry", entry });
+          }
+        }
+        // Restore topic
+        managed.info.topic = picked.topic;
+        managed.info.topicStale = false;
+        emit({ type: "agent_updated", agentId, changes: { topic: picked.topic, topicStale: false } });
+        emitEphemeralLog(agentId, "system", `Resumed session: ${picked.topic || picked.sessionId.slice(0, 8) + "..."}`);
+        updateState(agentId, "idle");
+        persistAll();
+        if (!picked.topic) {
+          generateTopic(agentId);
+        }
+      } catch (err: any) {
+        emitEphemeralLog(agentId, "error", `Failed to resume: ${err.message}`);
+        updateState(agentId, "error");
+      }
+      return;
+    } else {
+      // Not a valid number — cancel pendingResume, process as normal
+      managed.pendingResumeSessions = [];
+      emitEphemeralLog(agentId, "system", "Resume cancelled.");
+    }
+  }
+
   // Intercept slash commands that are handled locally, not by the LLM
   if (text.startsWith("/")) {
     const [cmd, ...args] = text.slice(1).trim().split(/\s+/);
@@ -691,11 +779,20 @@ export async function sendMessage(agentId: string, text: string, username?: stri
   }
 }
 
+function persistCurrentSessionTopic(agentId: string, managed: ManagedAgent) {
+  if (managed.sessionId && managed.info.topic && managed.info.topic !== "...") {
+    persistSessionTopic(agentId, managed.sessionId, managed.info.topic);
+  }
+}
+
 async function handleSlashCommand(agentId: string, managed: ManagedAgent, cmd: string, args: string[], rawText: string, username?: string): Promise<boolean> {
   const userMeta = username ? { username } : undefined;
   switch (cmd) {
     case "clear": {
       addLogEntry(agentId, "user_message", rawText, userMeta);
+      managed.pendingResume = false;
+      managed.pendingResumeSessions = [];
+      persistCurrentSessionTopic(agentId, managed);
       try { managed.session?.close(); } catch {}
       managed.session = createSession(managed);
       managed.sessionId = null;
@@ -730,6 +827,41 @@ async function handleSlashCommand(agentId: string, managed: ManagedAgent, cmd: s
         ? "\n\nSkills:\n" + managed.skills.map((s) => `  /${s}`).join("\n")
         : "";
       addLogEntry(agentId, "system", `Available commands:\n${commands}${skills}`);
+      updateState(agentId, "idle");
+      return true;
+    }
+    case "resume": {
+      emitEphemeralLog(agentId, "user_message", rawText, userMeta);
+      const sessions = listAgentSessions(agentId);
+      if (sessions.length === 0) {
+        emitEphemeralLog(agentId, "system", "No previous sessions found.");
+        updateState(agentId, "idle");
+        return true;
+      }
+      const lines: string[] = ["Resume a past conversation:\n"];
+      let num = 1;
+      const pickable: typeof sessions = [];
+      for (const s of sessions.slice(0, 20)) {
+        const date = new Date(s.lastModified);
+        const dateStr = date.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+        const label = s.topic || s.sessionId.slice(0, 8) + "...";
+        if (s.sessionId === managed.sessionId) {
+          lines.push(`  ● ${label}  ${dateStr}  (current)`);
+        } else {
+          lines.push(`  ${num}. ${label}  ${dateStr}`);
+          pickable.push(s);
+          num++;
+        }
+      }
+      if (pickable.length === 0) {
+        emitEphemeralLog(agentId, "system", "No other sessions to resume.");
+        updateState(agentId, "idle");
+        return true;
+      }
+      lines.push("\nReply with a number to resume, or anything else to cancel.");
+      emitEphemeralLog(agentId, "system", lines.join("\n"));
+      managed.pendingResume = true;
+      managed.pendingResumeSessions = pickable;
       updateState(agentId, "idle");
       return true;
     }
@@ -822,6 +954,9 @@ export async function kill(agentId: string) {
 export async function newConversation(agentId: string) {
   const managed = agents.get(agentId);
   if (!managed) return;
+  managed.pendingResume = false;
+  managed.pendingResumeSessions = [];
+  persistCurrentSessionTopic(agentId, managed);
   try { managed.session?.close(); } catch {}
 
   try {
@@ -845,25 +980,44 @@ export async function newConversation(agentId: string) {
 export async function resume(agentId: string, sessionId: string) {
   const managed = agents.get(agentId);
   if (!managed) return;
+  managed.pendingResume = false;
+  managed.pendingResumeSessions = [];
+  persistCurrentSessionTopic(agentId, managed);
   try { managed.session?.close(); } catch {}
 
   try {
     managed.session = createSession(managed, sessionId);
     managed.sessionId = sessionId;
     managed.streaming = false;
-    managed.info.topic = null;
-    managed.info.topicStale = false;
+    managed.topicGenerating = false;
     managed.topicMessageCount = 0;
-    // Pre-load resumed session's logs into cache so generateTopic can read them
+
+    // Clear and replay resumed session's logs
     const history = loadLog(agentId, sessionId);
+    logCache.set(agentId, []);
+    emit({ type: "clear_logs", agentId } as any);
     if (history.length > 0) {
       logCache.set(agentId, [...history]);
+      for (const entry of history) {
+        emit({ type: "log_entry", entry });
+      }
     }
+
+    // Restore topic from sessions.json
+    const sessions = listAgentSessions(agentId);
+    const sessionEntry = sessions.find(s => s.sessionId === sessionId);
+    managed.info.topic = sessionEntry?.topic ?? null;
+    managed.info.topicStale = false;
+    emit({ type: "agent_updated", agentId, changes: { topic: managed.info.topic, topicStale: false } });
+
     updateState(agentId, "idle");
-    addLogEntry(agentId, "system", `Resumed session ${sessionId.slice(0, 8)}...`);
+    addLogEntry(agentId, "system", `Resumed session: ${managed.info.topic || sessionId.slice(0, 8) + "..."}`);
     persistAll();
-    // Regenerate topic from resumed session's logs
-    generateTopic(agentId); // fire-and-forget
+
+    // If no topic, regenerate from session logs
+    if (!managed.info.topic) {
+      generateTopic(agentId);
+    }
   } catch (err: any) {
     addLogEntry(agentId, "error", `Failed to resume: ${err.message}`);
     updateState(agentId, "error");
@@ -878,7 +1032,10 @@ export function setTopic(agentId: string, topic: string) {
   const textCount = (logCache.get(agentId) ?? []).filter(e => e.kind === "user_message" || e.kind === "text").length;
   managed.topicMessageCount = textCount;
   emit({ type: "agent_updated", agentId, changes: { topic, topicStale: false } });
-  // Manual edits are not persisted (ephemeral per design), but update manifest for discoverability
+  // Persist to sessions.json so resume list shows the manual topic
+  if (managed.sessionId) {
+    persistSessionTopic(agentId, managed.sessionId, managed.info.topic);
+  }
   updateManifest();
 }
 

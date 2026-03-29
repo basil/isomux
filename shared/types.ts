@@ -44,6 +44,7 @@ export interface LogEntry {
 export interface SessionInfo {
   sessionId: string;
   lastModified: number;
+  topic: string | null;
 }
 
 // Server → Browser messages
@@ -53,7 +54,7 @@ export type ServerMessage =
   | { type: "agent_removed"; agentId: string }
   | { type: "agent_updated"; agentId: string; changes: Partial<AgentInfo> }
   | { type: "log_entry"; entry: LogEntry }
-  | { type: "sessions_list"; agentId: string; sessions: SessionInfo[] }
+  | { type: "sessions_list"; agentId: string; sessions: SessionInfo[]; currentSessionId: string | null }
   | { type: "slash_commands"; agentId: string; commands: string[]; skills: string[] }
   | { type: "clear_logs"; agentId: string }
   | { type: "terminal_output"; agentId: string; data: string }

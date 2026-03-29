@@ -14,7 +14,9 @@ interface ContextMenuProps {
 export function ContextMenu({ x, y, agent, onClose, onEdit }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const { sessionsList } = useAppState();
-  const sessions = sessionsList.get(agent.id) ?? [];
+  const sessionsData = sessionsList.get(agent.id);
+  const sessions = sessionsData?.sessions ?? [];
+  const currentSessionId = sessionsData?.currentSessionId ?? null;
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -85,14 +87,22 @@ export function ContextMenu({ x, y, agent, onClose, onEdit }: ContextMenuProps) 
           <div style={{ padding: "4px 10px", fontSize: 9, color: "var(--text-ghost)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
             Resume
           </div>
-          {sessions.slice(0, 5).map((s) => (
-            <MenuItem
-              key={s.sessionId}
-              label={`${s.sessionId.slice(0, 8)}... ${formatTime(s.lastModified)}`}
-              small
-              onClick={() => handleAction("resume", s.sessionId)}
-            />
-          ))}
+          {sessions.slice(0, 5).map((s) => {
+            const isCurrent = s.sessionId === currentSessionId;
+            const label = s.topic || s.sessionId.slice(0, 8) + "...";
+            const displayLabel = isCurrent
+              ? `● ${label}  ${formatTime(s.lastModified)}  (current)`
+              : `${label}  ${formatTime(s.lastModified)}`;
+            return (
+              <MenuItem
+                key={s.sessionId}
+                label={displayLabel}
+                small
+                disabled={isCurrent}
+                onClick={() => !isCurrent && handleAction("resume", s.sessionId)}
+              />
+            );
+          })}
         </>
       )}
 
@@ -106,19 +116,21 @@ function MenuItem({
   label,
   danger,
   small,
+  disabled,
   onClick,
 }: {
   label: string;
   danger?: boolean;
   small?: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
-      onClick={onClick}
-      onMouseEnter={(e) =>
-        (e.currentTarget.style.background = danger ? "rgba(232,93,117,0.08)" : "rgba(255,255,255,0.04)")
-      }
+      onClick={disabled ? undefined : onClick}
+      onMouseEnter={(e) => {
+        if (!disabled) e.currentTarget.style.background = danger ? "rgba(232,93,117,0.08)" : "rgba(255,255,255,0.04)";
+      }}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
       style={{
         display: "flex",
@@ -132,8 +144,9 @@ function MenuItem({
         fontFamily: small ? "'JetBrains Mono',monospace" : "'DM Sans',sans-serif",
         fontSize: small ? 11 : 13,
         borderRadius: 6,
-        cursor: "pointer",
+        cursor: disabled ? "default" : "pointer",
         textAlign: "left",
+        opacity: disabled ? 0.5 : 1,
       }}
     >
       {label}
@@ -144,8 +157,9 @@ function MenuItem({
 function formatTime(timestamp: number): string {
   const d = new Date(timestamp);
   const now = new Date();
+  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   if (d.toDateString() === now.toDateString()) {
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return time;
   }
-  return d.toLocaleDateString([], { month: "short", day: "numeric" });
+  return `${d.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
 }

@@ -55,12 +55,12 @@ async function handleCommand(cmd: ClientCommand) {
       break;
     case "list_sessions": {
       const sessions = AgentManager.listSessions(cmd.agentId);
-      // Send back to the requesting browser only
-      // For simplicity, broadcast (only the UI that requested will use it)
+      const currentSessionId = AgentManager.getCurrentSessionId(cmd.agentId);
       broadcast({
         type: "sessions_list",
         agentId: cmd.agentId,
         sessions,
+        currentSessionId,
       } as ServerMessage);
       break;
     }

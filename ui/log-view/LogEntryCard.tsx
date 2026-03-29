@@ -277,11 +277,16 @@ function ErrorBlock({ content, isLastInTurn, turnEntries, isMobile }: { content:
 }
 
 function SystemMessage({ content, isMobile }: { content: string; isMobile?: boolean }) {
+  const isMultiline = content.includes("\n");
   return (
     <div style={{
       margin: "8px 0", padding: "6px 0",
-      textAlign: "center", color: "var(--text-ghost)", fontSize: isMobile ? 13 : 11,
-      fontFamily: "'DM Sans',sans-serif", fontStyle: "italic",
+      textAlign: isMultiline ? "left" : "center",
+      color: isMultiline ? "var(--text-dim)" : "var(--text-ghost)",
+      fontSize: isMultiline ? (isMobile ? 15 : 13) : (isMobile ? 13 : 11),
+      fontFamily: isMultiline ? "'JetBrains Mono',monospace" : "'DM Sans',sans-serif",
+      fontStyle: isMultiline ? "normal" : "italic",
+      whiteSpace: "pre-wrap",
     }}>
       {content}
     </div>
