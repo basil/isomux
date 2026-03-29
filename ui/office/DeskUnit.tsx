@@ -95,7 +95,7 @@ export function DeskUnit({
 
       {/* Desk */}
       <div style={{ position: "relative", zIndex: 2 }}>
-        <DeskSprite state={agent.state} deskIndex={agent.desk} />
+        <DeskSprite state={agent.state} deskIndex={agent.desk} cwd={agent.cwd} />
       </div>
 
       {/* Floating nametag — outer div handles positioning, inner handles animation */}

@@ -43,7 +43,11 @@ const DESKS_WITHOUT_PLANT = new Set([1, 3, 6]);
 // Desks 0,1,3,4,6 get mugs; 2,5,7 don't (~37% empty, different set than plants)
 const DESKS_WITHOUT_MUG = new Set([2, 5, 7]);
 
-export function DeskSprite({ state, deskIndex = 0 }: { state: AgentState; deskIndex?: number }) {
+function shortenCwd(cwd: string): string {
+  return cwd.replace(/^\/home\/[^/]+/, "~");
+}
+
+export function DeskSprite({ state, deskIndex = 0, cwd }: { state: AgentState; deskIndex?: number; cwd?: string }) {
   const vs = visualState(state);
   const glow = { working: "#50B86C", active: "#9B59B6", error: "#E85D75", idle: "#223" }[vs];
   const on = vs !== "idle";
@@ -53,10 +57,15 @@ export function DeskSprite({ state, deskIndex = 0 }: { state: AgentState; deskIn
   const [mugBody, mugSide, mugRim, mugLiquid] = MUG_VARIANTS[deskIndex % MUG_VARIANTS.length];
 
   const lampId = `lamp-glow-${deskIndex}`;
+  const screenClipId = `screen-clip-${deskIndex}`;
+  const shortCwd = cwd ? shortenCwd(cwd) : "";
 
   return (
     <svg width="180" height="140" viewBox="0 0 180 140" overflow="visible">
       <defs>
+        <clipPath id={screenClipId}>
+          <path d="M66 18 L108 37 L108 60 L66 41 Z" />
+        </clipPath>
         <radialGradient id={lampId} cx="50%" cy="40%" r="50%">
           <stop offset="0%" stopColor="#F5D090" stopOpacity="0.45" />
           <stop offset="50%" stopColor="#F5C060" stopOpacity="0.2" />
@@ -141,6 +150,22 @@ export function DeskSprite({ state, deskIndex = 0 }: { state: AgentState; deskIn
             repeatCount="indefinite"
           />
         </path>
+      )}
+      {/* CWD text on monitor */}
+      {shortCwd && (
+        <g clipPath={`url(#${screenClipId})`}>
+          <text
+            x="70"
+            y="38"
+            fill={on ? "rgba(180,220,255,0.5)" : "rgba(120,140,160,0.3)"}
+            fontSize="5"
+            fontFamily="monospace"
+            transform="skewY(24)"
+            style={{ transformOrigin: "70px 38px" }}
+          >
+            {shortCwd}
+          </text>
+        </g>
       )}
 
       {/* Coffee mug — solid ceramic */}
