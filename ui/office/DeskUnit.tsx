@@ -88,8 +88,8 @@ export function DeskUnit({
         }}
       />
 
-      {/* Character behind desk */}
-      <div style={{ position: "absolute", left: 64, top: -28, zIndex: 1 }}>
+      {/* Character behind desk — idle agents sit back a bit */}
+      <div style={{ position: "absolute", left: agent.state === "idle" || agent.state === "stopped" ? 84 : 78, top: agent.state === "idle" || agent.state === "stopped" ? -16 : -20, zIndex: 1 }}>
         <Character state={agent.state} outfit={agent.outfit} />
       </div>
 

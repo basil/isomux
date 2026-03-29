@@ -36,19 +36,24 @@ export function Character({ state, outfit }: { state: AgentState; outfit: AgentO
   if (vs === "idle") {
     return wrap(
       <>
-        <ellipse cx="26" cy="44" rx="11" ry="7" fill={bc} />
+        <ellipse cx="26" cy="50" rx="11" ry="10" fill={bc} />
         <ellipse cx="26" cy="37" rx="10" ry="9" fill={skin} />
         <ellipse cx="26" cy="31" rx="10" ry="5.5" fill={hair} />
         {outfit.accessory === "glasses" && <rect x="18" y="37" width="5" height="3" rx="1" fill="#555" opacity="0.5" />}
         <g>
-          <text x="38" y="28" fontSize="10" fill="rgba(200,220,255,0.35)" fontFamily="monospace">
-            <animate attributeName="y" values="28;23;28" dur="2s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="0.3;0.7;0.3" dur="2s" repeatCount="indefinite" />
+          <text x="36" y="28" fontSize="14" fill="rgba(200,220,255,0.7)" fontFamily="monospace" fontWeight="bold">
+            <animate attributeName="y" values="28;22;28" dur="2s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0.5;0.9;0.5" dur="2s" repeatCount="indefinite" />
             z
           </text>
-          <text x="43" y="20" fontSize="8" fill="rgba(200,220,255,0.25)" fontFamily="monospace">
-            <animate attributeName="y" values="20;15;20" dur="2.5s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="0.2;0.5;0.2" dur="2.5s" repeatCount="indefinite" />
+          <text x="44" y="18" fontSize="12" fill="rgba(200,220,255,0.6)" fontFamily="monospace" fontWeight="bold">
+            <animate attributeName="y" values="18;12;18" dur="2.5s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0.4;0.8;0.4" dur="2.5s" repeatCount="indefinite" />
+            z
+          </text>
+          <text x="50" y="10" fontSize="10" fill="rgba(200,220,255,0.5)" fontFamily="monospace" fontWeight="bold">
+            <animate attributeName="y" values="10;4;10" dur="3s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0.3;0.7;0.3" dur="3s" repeatCount="indefinite" />
             z
           </text>
         </g>
