@@ -184,6 +184,27 @@ export const CSS = `
   [data-theme="light"] .window-night { display: none; }
   :root .window-day, [data-theme="dark"] .window-day { display: none; }
   [data-theme="light"] .window-day { display: block; }
+  .neon-sign-on { display: none; }
+  .neon-sign-off { display: block; }
+  [data-theme="dark"] .neon-sign-on { display: block; }
+  [data-theme="dark"] .neon-sign-off { display: none; }
+
+  @keyframes neonFlicker {
+    0%, 100% { opacity: 1; }
+    4% { opacity: 0.85; }
+    6% { opacity: 1; }
+    40% { opacity: 1; }
+    42% { opacity: 0.7; }
+    43% { opacity: 1; }
+    80% { opacity: 1; }
+    82% { opacity: 0.9; }
+    83% { opacity: 1; }
+  }
+
+  @keyframes neonGlow {
+    0%, 100% { filter: drop-shadow(0 0 4px #ff6ec7) drop-shadow(0 0 12px #ff6ec7); }
+    50% { filter: drop-shadow(0 0 6px #ff6ec7) drop-shadow(0 0 18px #ff6ec7); }
+  }
 
   body { background: var(--bg-base); overflow:hidden; }
   html, body { max-width: 100vw; overflow-x: hidden; }
