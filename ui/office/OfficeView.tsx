@@ -7,6 +7,7 @@ import { EmptySlot } from "./EmptySlot.tsx";
 import { StatusLight } from "./StatusLight.tsx";
 import { SCENE_W, SCENE_H } from "./grid.ts";
 import { send } from "../ws.ts";
+import { TodoButton } from "../components/TodoPanel.tsx";
 import type { AgentInfo } from "../../shared/types.ts";
 
 export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, onEditOfficePrompt }: { onSpawn: (deskIndex: number) => void; onContextMenu: (x: number, y: number, agent: AgentInfo) => void; username: string; onEditUsername: () => void; onEditOfficePrompt: () => void }) {
@@ -120,6 +121,7 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
           >
             {username.toUpperCase()}
           </span>
+          <TodoButton username={username} />
           <button
             onClick={onEditOfficePrompt}
             style={{

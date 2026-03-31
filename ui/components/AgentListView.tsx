@@ -1,6 +1,7 @@
 import { useAppState } from "../store.tsx";
 import { useTheme } from "../store.tsx";
 import { StatusLight } from "../office/StatusLight.tsx";
+import { TodoButton } from "./TodoPanel.tsx";
 import type { AgentInfo } from "../../shared/types.ts";
 
 export function AgentListView({
@@ -84,6 +85,7 @@ export function AgentListView({
           >
             {username.toUpperCase()}
           </span>
+          <TodoButton username={username} isMobile />
           <button
             onClick={onEditOfficePrompt}
             style={{

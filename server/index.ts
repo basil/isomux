@@ -1,10 +1,12 @@
 import type { ServerWebSocket } from "bun";
 import type { ServerMessage, ClientCommand } from "../shared/types.ts";
 import * as AgentManager from "./agent-manager.ts";
-import { loadRecentCwds, saveRecentCwd } from "./persistence.ts";
+import { loadRecentCwds, saveRecentCwd, loadTodos, saveTodos } from "./persistence.ts";
+import type { TodoItem } from "../shared/types.ts";
 import { join } from "path";
 
 const browsers = new Set<ServerWebSocket<unknown>>();
+let todos: TodoItem[] = loadTodos();
 
 function broadcast(msg: ServerMessage) {
   const data = JSON.stringify(msg);
@@ -88,6 +90,24 @@ async function handleCommand(cmd: ClientCommand) {
       AgentManager.setOfficePrompt(cmd.text);
       broadcast({ type: "office_prompt", text: cmd.text.trim() } as ServerMessage);
       break;
+    case "add_todo": {
+      const todo: TodoItem = {
+        id: crypto.randomUUID(),
+        text: cmd.text.trim(),
+        createdBy: cmd.username,
+        createdAt: Date.now(),
+      };
+      todos.push(todo);
+      saveTodos(todos);
+      broadcast({ type: "todos", todos } as ServerMessage);
+      break;
+    }
+    case "delete_todo": {
+      todos = todos.filter((t) => t.id !== cmd.id);
+      saveTodos(todos);
+      broadcast({ type: "todos", todos } as ServerMessage);
+      break;
+    }
   }
 }
 
@@ -125,6 +145,8 @@ const server = Bun.serve({
       ws.send(JSON.stringify({ type: "full_state", agents, recentCwds } as ServerMessage));
       // Send office prompt
       ws.send(JSON.stringify({ type: "office_prompt", text: AgentManager.getOfficePrompt() } as ServerMessage));
+      // Send todos
+      ws.send(JSON.stringify({ type: "todos", todos } as ServerMessage));
       // Send cached log history and slash commands for each agent
       for (const agent of agents) {
         const logs = AgentManager.getAgentLogs(agent.id);

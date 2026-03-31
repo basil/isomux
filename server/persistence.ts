@@ -1,12 +1,13 @@
 import { join } from "path";
 import { homedir } from "os";
 import { mkdirSync, appendFileSync, readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync } from "fs";
-import type { AgentInfo, LogEntry } from "../shared/types.ts";
+import type { AgentInfo, LogEntry, TodoItem } from "../shared/types.ts";
 
 const ISOMUX_DIR = join(homedir(), ".isomux");
 const LOGS_DIR = join(ISOMUX_DIR, "logs");
 const AGENTS_FILE = join(ISOMUX_DIR, "agents.json");
 const OFFICE_PROMPT_FILE = join(ISOMUX_DIR, "office-prompt.md");
+const TODOS_FILE = join(ISOMUX_DIR, "todos.json");
 
 // Ensure directories exist
 try {
@@ -202,5 +203,23 @@ export function saveOfficePrompt(text: string) {
     }
   } catch (err) {
     console.error("Failed to save office prompt:", err);
+  }
+}
+
+// Todos
+export function loadTodos(): TodoItem[] {
+  try {
+    if (!existsSync(TODOS_FILE)) return [];
+    return JSON.parse(readFileSync(TODOS_FILE, "utf-8")) as TodoItem[];
+  } catch {
+    return [];
+  }
+}
+
+export function saveTodos(todos: TodoItem[]) {
+  try {
+    writeFileSync(TODOS_FILE, JSON.stringify(todos, null, 2));
+  } catch (err) {
+    console.error("Failed to save todos:", err);
   }
 }

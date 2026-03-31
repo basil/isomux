@@ -39,6 +39,14 @@ export interface LogEntry {
   metadata?: Record<string, unknown>;
 }
 
+// Todo item
+export interface TodoItem {
+  id: string;
+  text: string;
+  createdBy: string;
+  createdAt: number;
+}
+
 // Session info for resume feature
 export interface SessionInfo {
   sessionId: string;
@@ -58,7 +66,8 @@ export type ServerMessage =
   | { type: "clear_logs"; agentId: string }
   | { type: "terminal_output"; agentId: string; data: string }
   | { type: "terminal_exit"; agentId: string; exitCode: number }
-  | { type: "office_prompt"; text: string };
+  | { type: "office_prompt"; text: string }
+  | { type: "todos"; todos: TodoItem[] };
 
 // Browser → Server commands
 export type ClientCommand =
@@ -77,4 +86,6 @@ export type ClientCommand =
   | { type: "terminal_input"; agentId: string; data: string }
   | { type: "terminal_resize"; agentId: string; cols: number; rows: number }
   | { type: "terminal_close"; agentId: string }
-  | { type: "set_office_prompt"; text: string };
+  | { type: "set_office_prompt"; text: string }
+  | { type: "add_todo"; text: string; username: string }
+  | { type: "delete_todo"; id: string };

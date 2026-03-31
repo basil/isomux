@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, useEffect, useRef, useState, useCallback, type ReactNode, type Dispatch } from "react";
-import type { AgentInfo, LogEntry, SessionInfo, ServerMessage } from "../shared/types.ts";
+import type { AgentInfo, LogEntry, SessionInfo, ServerMessage, TodoItem } from "../shared/types.ts";
 import { connect } from "./ws.ts";
 
 export interface AppState {
@@ -16,6 +16,7 @@ export interface AppState {
   slashCommands: Map<string, { commands: string[]; skills: string[] }>; // agentId → available commands
   stateChangedAt: Map<string, number>; // agentId → timestamp when agent state last changed
   officePrompt: string;
+  todos: TodoItem[];
 }
 
 type Action =
@@ -31,7 +32,8 @@ type Action =
   | { type: "slash_commands"; agentId: string; commands: string[]; skills: string[] }
   | { type: "clear_logs"; agentId: string }
   | { type: "set_mobile"; isMobile: boolean }
-  | { type: "office_prompt"; text: string };
+  | { type: "office_prompt"; text: string }
+  | { type: "todos"; todos: TodoItem[] };
 
 // States that warrant attention
 const ATTENTION_STATES = new Set(["idle", "error", "waiting_for_response"]);
@@ -133,6 +135,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, isMobile: action.isMobile };
     case "office_prompt":
       return { ...state, officePrompt: action.text };
+    case "todos":
+      return { ...state, todos: action.todos };
     default:
       return state;
   }
@@ -152,6 +156,7 @@ const initialState: AppState = {
   slashCommands: new Map(),
   stateChangedAt: new Map(),
   officePrompt: "",
+  todos: [],
 };
 
 const StateCtx = createContext<AppState>(initialState);
