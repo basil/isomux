@@ -38,7 +38,7 @@ export function Floor() {
   );
 }
 
-export function Walls({ onToggleTheme, onEditOfficePrompt, hasOfficePrompt }: { onToggleTheme?: () => void; onEditOfficePrompt?: () => void; hasOfficePrompt?: boolean }) {
+export function Walls({ onToggleTheme, onEditOfficePrompt, hasOfficePrompt, onOpenTodos, todoCount = 0 }: { onToggleTheme?: () => void; onEditOfficePrompt?: () => void; hasOfficePrompt?: boolean; onOpenTodos?: () => void; todoCount?: number }) {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30_000);
@@ -146,7 +146,7 @@ export function Walls({ onToggleTheme, onEditOfficePrompt, hasOfficePrompt }: { 
       <path d="M-295 75 L-155 5" stroke="var(--wall-decor)" strokeWidth="2" fill="none" />
 
       {/* Corkboard on left wall — casual, mutable feel */}
-      <g transform="translate(-55, -30) skewY(-27)">
+      <g transform="translate(-55, -30) skewY(-27)" onClick={onOpenTodos} style={{ cursor: "pointer", pointerEvents: "auto" }}>
         {/* Board frame */}
         <rect x="-50" y="-40" width="95" height="70" rx="2" fill="#5a4430" stroke="#4a3620" strokeWidth="1" />
         {/* Cork surface */}
@@ -162,15 +162,13 @@ export function Walls({ onToggleTheme, onEditOfficePrompt, hasOfficePrompt }: { 
         {/* Index card 1 — slightly tilted, top-left */}
         <g transform="translate(-32, -22) rotate(-3)">
           <rect x="0" y="0" width="28" height="20" rx="1" fill="#f5f0e0" stroke="#e0d8c4" strokeWidth="0.3" />
-          {/* Ruled lines */}
-          <line x1="3" y1="6" x2="25" y2="6" stroke="#ccc" strokeWidth="0.3" />
-          <line x1="3" y1="10" x2="22" y2="10" stroke="#ccc" strokeWidth="0.3" />
-          <line x1="3" y1="14" x2="18" y2="14" stroke="#ccc" strokeWidth="0.3" />
-          {/* Scribble text */}
-          <line x1="4" y1="6" x2="20" y2="6" stroke="#555" strokeWidth="0.6" opacity="0.3" />
-          <line x1="4" y1="10" x2="17" y2="10" stroke="#555" strokeWidth="0.6" opacity="0.25" />
-          {/* Checkmark */}
-          <path d="M22 12 L24 15 L28 9" stroke="#4a9a4a" strokeWidth="1" fill="none" strokeLinecap="round" />
+          {todoCount >= 1 && (
+            <>
+              <line x1="3" y1="6" x2="25" y2="6" stroke="#ccc" strokeWidth="0.3" />
+              <line x1="3" y1="10" x2="22" y2="10" stroke="#ccc" strokeWidth="0.3" />
+              <line x1="3" y1="14" x2="18" y2="14" stroke="#ccc" strokeWidth="0.3" />
+            </>
+          )}
           {/* Red pushpin */}
           <circle cx="14" cy="2" r="2.5" fill="#e04040" />
           <circle cx="14" cy="2" r="1.2" fill="#c03030" />
@@ -179,14 +177,14 @@ export function Walls({ onToggleTheme, onEditOfficePrompt, hasOfficePrompt }: { 
         {/* Index card 2 — slightly tilted other way, center-right */}
         <g transform="translate(5, -18) rotate(2)">
           <rect x="0" y="0" width="30" height="22" rx="1" fill="#eef4ff" stroke="#d0d8e8" strokeWidth="0.3" />
-          <line x1="3" y1="6" x2="27" y2="6" stroke="#bbc" strokeWidth="0.3" />
-          <line x1="3" y1="10" x2="25" y2="10" stroke="#bbc" strokeWidth="0.3" />
-          <line x1="3" y1="14" x2="20" y2="14" stroke="#bbc" strokeWidth="0.3" />
-          <line x1="3" y1="18" x2="15" y2="18" stroke="#bbc" strokeWidth="0.3" />
-          {/* Scribble */}
-          <line x1="4" y1="6" x2="22" y2="6" stroke="#445" strokeWidth="0.6" opacity="0.25" />
-          <line x1="4" y1="10" x2="19" y2="10" stroke="#445" strokeWidth="0.6" opacity="0.2" />
-          <line x1="4" y1="14" x2="16" y2="14" stroke="#445" strokeWidth="0.6" opacity="0.2" />
+          {todoCount >= 2 && (
+            <>
+              <line x1="3" y1="6" x2="27" y2="6" stroke="#bbc" strokeWidth="0.3" />
+              <line x1="3" y1="10" x2="25" y2="10" stroke="#bbc" strokeWidth="0.3" />
+              <line x1="3" y1="14" x2="20" y2="14" stroke="#bbc" strokeWidth="0.3" />
+              <line x1="3" y1="18" x2="15" y2="18" stroke="#bbc" strokeWidth="0.3" />
+            </>
+          )}
           {/* Blue pushpin */}
           <circle cx="15" cy="2" r="2.5" fill="#4080d0" />
           <circle cx="15" cy="2" r="1.2" fill="#3060b0" />
@@ -195,13 +193,13 @@ export function Walls({ onToggleTheme, onEditOfficePrompt, hasOfficePrompt }: { 
         {/* Index card 3 — bottom left, slight tilt */}
         <g transform="translate(-28, 4) rotate(1.5)">
           <rect x="0" y="0" width="26" height="18" rx="1" fill="#fff8e0" stroke="#e8dcc0" strokeWidth="0.3" />
-          <line x1="3" y1="5" x2="23" y2="5" stroke="#dda" strokeWidth="0.3" />
-          <line x1="3" y1="9" x2="20" y2="9" stroke="#dda" strokeWidth="0.3" />
-          <line x1="3" y1="13" x2="16" y2="13" stroke="#dda" strokeWidth="0.3" />
-          <line x1="4" y1="5" x2="18" y2="5" stroke="#555" strokeWidth="0.6" opacity="0.25" />
-          <line x1="4" y1="9" x2="14" y2="9" stroke="#555" strokeWidth="0.6" opacity="0.2" />
-          {/* Checkmark */}
-          <path d="M20 8 L22 11 L26 5" stroke="#4a9a4a" strokeWidth="1" fill="none" strokeLinecap="round" />
+          {todoCount >= 3 && (
+            <>
+              <line x1="3" y1="5" x2="23" y2="5" stroke="#dda" strokeWidth="0.3" />
+              <line x1="3" y1="9" x2="20" y2="9" stroke="#dda" strokeWidth="0.3" />
+              <line x1="3" y1="13" x2="16" y2="13" stroke="#dda" strokeWidth="0.3" />
+            </>
+          )}
           {/* Yellow pushpin */}
           <circle cx="13" cy="1" r="2.5" fill="#e8c020" />
           <circle cx="13" cy="1" r="1.2" fill="#c8a010" />

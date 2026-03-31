@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useAppState, useDispatch, useTheme } from "../store.tsx";
 import { Floor, Walls } from "./Floor.tsx";
 import { RoomProps } from "./RoomProps.tsx";
@@ -10,8 +9,8 @@ import { send } from "../ws.ts";
 import { TodoButton } from "../components/TodoPanel.tsx";
 import type { AgentInfo } from "../../shared/types.ts";
 
-export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, onEditOfficePrompt }: { onSpawn: (deskIndex: number) => void; onContextMenu: (x: number, y: number, agent: AgentInfo) => void; username: string; onEditUsername: () => void; onEditOfficePrompt: () => void }) {
-  const { agents, needsAttention, stateChangedAt, officePrompt } = useAppState();
+export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, onEditOfficePrompt, onOpenTodos }: { onSpawn: (deskIndex: number) => void; onContextMenu: (x: number, y: number, agent: AgentInfo) => void; username: string; onEditUsername: () => void; onEditOfficePrompt: () => void; onOpenTodos: () => void }) {
+  const { agents, needsAttention, stateChangedAt, officePrompt, todos } = useAppState();
   const dispatch = useDispatch();
   const { theme, toggleTheme } = useTheme();
 
@@ -121,7 +120,7 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
           >
             {username.toUpperCase()}
           </span>
-          <TodoButton username={username} />
+          <TodoButton onOpen={onOpenTodos} />
           <button
             onClick={onEditOfficePrompt}
             style={{
@@ -178,7 +177,7 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
             height: SCENE_H,
           }}
         >
-          <Walls onToggleTheme={toggleTheme} onEditOfficePrompt={onEditOfficePrompt} hasOfficePrompt={!!officePrompt} />
+          <Walls onToggleTheme={toggleTheme} onEditOfficePrompt={onEditOfficePrompt} hasOfficePrompt={!!officePrompt} onOpenTodos={onOpenTodos} todoCount={todos.length} />
           <Floor />
           <RoomProps />
           {Array.from({ length: 8 }, (_, i) => {

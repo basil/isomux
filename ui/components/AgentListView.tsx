@@ -11,6 +11,7 @@ export function AgentListView({
   username,
   onEditUsername,
   onEditOfficePrompt,
+  onOpenTodos,
 }: {
   onFocus: (agentId: string) => void;
   onSpawn: () => void;
@@ -18,6 +19,7 @@ export function AgentListView({
   username: string;
   onEditUsername: () => void;
   onEditOfficePrompt: () => void;
+  onOpenTodos: () => void;
 }) {
   const { agents, connected } = useAppState();
   const { theme, toggleTheme } = useTheme();
@@ -85,7 +87,7 @@ export function AgentListView({
           >
             {username.toUpperCase()}
           </span>
-          <TodoButton username={username} isMobile />
+          <TodoButton isMobile onOpen={onOpenTodos} />
           <button
             onClick={onEditOfficePrompt}
             style={{
