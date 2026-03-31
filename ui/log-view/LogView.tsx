@@ -6,6 +6,7 @@ import { useAppState, useDispatch } from "../store.tsx";
 import { LogEntryCard, serializeEntries } from "./LogEntryCard.tsx";
 import { CopyButton } from "../components/CopyButton.tsx";
 import { TerminalPanel } from "./TerminalPanel.tsx";
+import { useSwipeBack } from "../hooks/useSwipeBack.ts";
 
 const STATE_LABELS: Partial<Record<AgentState, string>> = {
   thinking: "Thinking",
@@ -137,6 +138,7 @@ export function LogView({
   const topicInputRef = useRef<HTMLInputElement>(null);
   const topicSavedRef = useRef(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
+  const { offsetX: swipeX, phase: swipePhase, onTransitionEnd: swipeTransitionEnd } = useSwipeBack(onBack, isMobile);
 
   // Build merged command list for autocomplete, with origin labels for skills
   const agentCmds = slashCommands.get(agent.id);
@@ -280,12 +282,15 @@ export function LogView({
 
   return (
     <div
+      onTransitionEnd={swipeTransitionEnd}
       style={{
         height: isMobile ? "100dvh" : "100vh",
         display: "flex",
         flexDirection: "row",
         background: "var(--bg-base)",
-        animation: "termEnter 0.3s ease-out",
+        animation: swipePhase === "idle" && swipeX === 0 ? "termEnter 0.3s ease-out" : undefined,
+        transform: swipeX > 0 ? `translateX(${swipeX}px)` : undefined,
+        transition: swipePhase === "settling" || swipePhase === "exiting" ? "transform 0.25s ease-out" : undefined,
       }}
     >
     <div
