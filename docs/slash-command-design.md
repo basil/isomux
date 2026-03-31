@@ -21,7 +21,7 @@ There are 5 sources of slash commands, in resolution priority order:
 Claude Code's own categories (see `docs/skills-investigation.md` for full list):
 - **Hardcoded commands** — fixed logic, not prompt-based (`/clear`, `/compact`, `/fast`, `/model`, etc.)
 - **Bundled skills** — prompt-based, overridable (`/review`, `/simplify`, `/debug`, `/claude-api`)
-- **Hybrid** — prompt + CLI runtime machinery (`/batch`, `/loop`)
+- **Bundled skills** also include `/batch`, `/loop`, `/schedule` — these are prompt-based skills that instruct the model to call specific tools (e.g. CronCreate)
 
 ## Config File: `server/commands.ts`
 
@@ -31,7 +31,7 @@ A single declarative registry of every known Claude Code command and bundled ski
 
 ```typescript
 type CommandConfig = {
-  type: "hardcoded" | "bundled-skill" | "hybrid";  // Claude Code's category
+  type: "hardcoded" | "bundled-skill";  // Claude Code's category
   supported: boolean;       // does Isomux handle this?
   autocomplete: boolean;    // show in autocomplete?
   overridable: boolean;     // can skills shadow this?
@@ -41,7 +41,7 @@ type CommandConfig = {
 ```
 
 - `type` documents what the command is in Claude Code. It does not drive runtime behavior.
-- `overridable: false` for all hardcoded commands. `overridable: true` for bundled-skill and hybrid types.
+- `overridable: false` for all hardcoded commands. `overridable: true` for bundled-skill types.
 - `handler` is a string key into a handler registry, providing compile-time enforcement that every `supported: true` entry has a matching handler.
 - `message` is optional. Unsupported commands without a custom message get a default: "`/<name>` is not available in Isomux."
 
@@ -104,4 +104,4 @@ Everything listed in `docs/skills-investigation.md` that isn't in the supported 
 ### Notable
 - `/compact` — previously assumed to work as SDK pass-through, but `session.send("[Username] /compact")` likely does not trigger SDK compaction. Marked unsupported until verified or reimplemented.
 - `/review`, `/simplify`, `/debug`, `/claude-api` — Claude bundled skills. Overridable. Users can provide their own skill files to make these work.
-- `/batch`, `/loop` — hybrid commands requiring runtime machinery. Deferred.
+- `/batch`, `/loop`, `/schedule` — bundled skills that instruct the model to call specific tools (CronCreate, etc.). Overridable.

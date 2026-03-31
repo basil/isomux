@@ -53,22 +53,25 @@
 
 ## 2. Bundled Skills (prompt-based, overridable, ship with Claude Code)
 
-### Pure prompt-based (safe to override)
-- /review [PR#|URL] — code review (bugs, logic, edge cases)
-- /simplify [focus] — 3 parallel agents for code cleanup/reuse
-- /debug [desc] — diagnose session/tool issues from debug log
-- /claude-api — load API/SDK reference for detected language
+All bundled skills are pure prompt-based. Some instruct the model to call
+specific tools (e.g. `/loop` tells the model to call CronCreate), but the
+skill itself is just a prompt — no CLI runtime machinery is involved.
 
-### Hybrid: prompt + CLI runtime support (override with caution)
 - /batch [desc] — decompose into 5-30 parallel worktree agents
-- /loop [interval] [prompt] — recurring prompt on a schedule
-
-These two have CLI-level machinery (worktree management, interval
-timers) that a pure prompt-based skill cannot replicate. Overriding
-them with a custom skill of the same name will likely shadow the
-bundled prompt but lose the runtime orchestration, effectively
-downgrading them to a one-shot prompt skill. This is not explicitly
-documented — test before relying on overrides for these two.
+- /claude-api — load API/SDK reference for detected language
+- /claude-in-chrome — automate Chrome browser interactions
+- /debug [desc] — diagnose session/tool issues from debug log
+- /keybindings-help — customize keyboard shortcuts
+- /loop [interval] [prompt] — recurring prompt on a schedule (via CronCreate tool)
+- /lorem-ipsum — generate placeholder text
+- /review [PR#|URL] — code review (bugs, logic, edge cases)
+- /schedule — create cron-scheduled remote agents
+- /security-review — security review
+- /simplify [focus] — 3 parallel agents for code cleanup/reuse
+- /skillify — capture processes as reusable skills
+- /stuck — diagnose frozen/slow sessions
+- /ultrareview — ultra PR review
+- /update-config — configure settings.json
 
 ---
 
@@ -77,7 +80,7 @@ documented — test before relying on overrides for these two.
 1. Enterprise (org-provisioned, admin-pushed)
 2. Personal: ~/.claude/skills/name/SKILL.md
 3. Project: .claude/skills/name/SKILL.md
-4. Bundled (the 6 above)
+4. Bundled (the 15 above)
 
 Legacy compat: .claude/commands/*.md still works.
 Conflict rule: skill wins over old-style command if same name.
