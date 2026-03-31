@@ -857,6 +857,69 @@ async function handleSlashCommand(agentId: string, managed: ManagedAgent, cmd: s
       // The SDK/CLI handles it internally
       return false;
     }
+    case "context": {
+      emitEphemeralLog(agentId, "user_message", rawText, userMeta);
+      if (!managed.session) {
+        emitEphemeralLog(agentId, "system", "No active session.");
+        return true;
+      }
+      try {
+        // getContextUsage() lives on the internal query object, not on the v2 session surface
+        const query = (managed.session as any).query;
+        if (!query?.getContextUsage) {
+          emitEphemeralLog(agentId, "system", "Context usage not available for this session.");
+          return true;
+        }
+        const ctx = await query.getContextUsage();
+        const lines: string[] = [];
+
+        // Header with model and usage bar
+        const pct = Math.round(ctx.percentage);
+        const barLen = 30;
+        const filled = Math.round(barLen * ctx.percentage / 100);
+        const bar = "█".repeat(filled) + "░".repeat(barLen - filled);
+        lines.push(`**${ctx.model}** — ${ctx.totalTokens.toLocaleString()} / ${ctx.maxTokens.toLocaleString()} tokens (${pct}%)`);
+        lines.push(`\`${bar}\``);
+
+        // Category breakdown
+        if (ctx.categories?.length > 0) {
+          lines.push("");
+          for (const cat of ctx.categories) {
+            if (cat.tokens > 0) {
+              const catPct = ((cat.tokens / ctx.maxTokens) * 100).toFixed(1);
+              lines.push(`  ${cat.name}: ${cat.tokens.toLocaleString()} tokens (${catPct}%)`);
+            }
+          }
+        }
+
+        // Memory files
+        if (ctx.memoryFiles?.length > 0) {
+          lines.push("\n**Memory files:**");
+          for (const f of ctx.memoryFiles) {
+            lines.push(`  ${f.path} (${f.tokens.toLocaleString()} tokens)`);
+          }
+        }
+
+        // System prompt sections
+        if (ctx.systemPromptSections?.length > 0) {
+          lines.push("\n**System prompt:**");
+          for (const s of ctx.systemPromptSections) {
+            lines.push(`  ${s.name}: ${s.tokens.toLocaleString()} tokens`);
+          }
+        }
+
+        // Auto-compact info
+        if (ctx.isAutoCompactEnabled && ctx.autoCompactThreshold) {
+          const compactPct = Math.round((ctx.autoCompactThreshold / ctx.maxTokens) * 100);
+          lines.push(`\nAuto-compact at ${compactPct}% (${ctx.autoCompactThreshold.toLocaleString()} tokens)`);
+        }
+
+        emitEphemeralLog(agentId, "system", lines.join("\n"));
+      } catch (err: any) {
+        emitEphemeralLog(agentId, "system", `Failed to get context usage: ${err.message}`);
+      }
+      return true;
+    }
     case "cost": {
       addLogEntry(agentId, "user_message", rawText, userMeta);
       addLogEntry(agentId, "system", "Cost tracking is not yet available in Isomux.");
