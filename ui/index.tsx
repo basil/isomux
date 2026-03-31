@@ -1,4 +1,5 @@
 import { createRoot } from "react-dom/client";
+import { Analytics } from "@vercel/analytics/react";
 import { StoreProvider, ThemeProvider } from "./store.tsx";
 import { App } from "./App.tsx";
 
@@ -7,6 +8,7 @@ root.render(
   <ThemeProvider>
     <StoreProvider>
       <App />
+      <Analytics />
     </StoreProvider>
   </ThemeProvider>
 );
