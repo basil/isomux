@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export function UsernameModal({
   onSave,
@@ -13,13 +13,25 @@ export function UsernameModal({
   const isEditing = defaultValue != null;
   const canSubmit = name.trim().length > 0;
 
+  const canClose = isEditing && onClose && defaultValue!.trim().length > 0;
+
   function handleSubmit() {
     if (!canSubmit) return;
     onSave(name.trim());
   }
 
+  // ESC to close (only if name is non-empty)
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && canClose) onClose!();
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [canClose, onClose]);
+
   return (
     <div
+      onClick={canClose ? onClose : undefined}
       style={{
         position: "fixed",
         inset: 0,

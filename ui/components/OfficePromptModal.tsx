@@ -1,15 +1,34 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAppState } from "../store.tsx";
 import { send } from "../ws.ts";
 
 export function OfficePromptModal({ onClose }: { onClose: () => void }) {
   const { officePrompt, isMobile } = useAppState();
   const [text, setText] = useState(officePrompt);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   function handleSave() {
     send({ type: "set_office_prompt", text });
     onClose();
   }
+
+  // Place cursor at end of text on mount
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (ta) {
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+    }
+  }, []);
+
+  // ESC to close
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") { e.stopPropagation(); onClose(); }
+    }
+    window.addEventListener("keydown", handleKey, true);
+    return () => window.removeEventListener("keydown", handleKey, true);
+  }, [onClose]);
 
   return (
     <div
@@ -50,9 +69,9 @@ export function OfficePromptModal({ onClose }: { onClose: () => void }) {
         </p>
 
         <textarea
+          ref={textareaRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          autoFocus
           placeholder="e.g. Always write tests. Use TypeScript. Be concise."
           rows={8}
           style={{

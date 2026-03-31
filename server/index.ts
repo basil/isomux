@@ -86,6 +86,7 @@ async function handleCommand(cmd: ClientCommand) {
       break;
     case "set_office_prompt":
       AgentManager.setOfficePrompt(cmd.text);
+      broadcast({ type: "office_prompt", text: cmd.text.trim() } as ServerMessage);
       break;
   }
 }
