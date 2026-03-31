@@ -9,10 +9,13 @@ export type AgentState =
 
 // Deterministic outfit from name hash
 export interface AgentOutfit {
-  hat: "none" | "cap" | "beanie";
+  hat: "none" | "cap" | "beanie" | "bow" | "headband";
   color: string; // shirt color hex
   hair: string; // hair color hex
-  accessory: "glasses" | "headphones" | null;
+  hairStyle: "short" | "long" | "ponytail" | "bun" | "pigtails" | "curly";
+  skin: string; // skin color hex
+  beard: "none" | "stubble" | "full" | "goatee";
+  accessory: "glasses" | "headphones" | "bow_tie" | "earrings" | null;
 }
 
 // What the browser knows about an agent

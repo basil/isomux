@@ -1,9 +1,41 @@
 import { useState } from "react";
 import type { AgentInfo, AgentOutfit } from "../../shared/types.ts";
-import { SHIRT_COLORS, HAIR_COLORS, HATS, ACCESSORIES } from "../../shared/outfit-options.ts";
+import { SHIRT_COLORS, HAIR_COLORS, SKIN_COLORS, HAIR_STYLES, BEARDS, HATS, ACCESSORIES } from "../../shared/outfit-options.ts";
 import { Character } from "../office/Character.tsx";
 import { send } from "../ws.ts";
 import { useAppState } from "../store.tsx";
+
+const HAIR_STYLE_LABELS: Record<AgentOutfit["hairStyle"], string> = {
+  short: "Short",
+  long: "Long",
+  ponytail: "Ponytail",
+  bun: "Bun",
+  pigtails: "Pigtails",
+  curly: "Curly",
+};
+
+const HAT_LABELS: Record<AgentOutfit["hat"], string> = {
+  none: "None",
+  cap: "Cap",
+  beanie: "Beanie",
+  bow: "Hair Bow",
+  headband: "Headband",
+};
+
+const ACCESSORY_LABELS: Record<string, string> = {
+  none: "None",
+  glasses: "Glasses",
+  headphones: "Headphones",
+  bow_tie: "Bow Tie",
+  earrings: "Earrings",
+};
+
+const BEARD_LABELS: Record<AgentOutfit["beard"], string> = {
+  none: "None",
+  stubble: "Stubble",
+  full: "Full",
+  goatee: "Goatee",
+};
 
 export function EditAgentDialog({
   agent,
@@ -24,6 +56,9 @@ export function EditAgentDialog({
       hat: HATS[Math.floor(Math.random() * HATS.length)],
       color: SHIRT_COLORS[Math.floor(Math.random() * SHIRT_COLORS.length)],
       hair: HAIR_COLORS[Math.floor(Math.random() * HAIR_COLORS.length)],
+      hairStyle: HAIR_STYLES[Math.floor(Math.random() * HAIR_STYLES.length)],
+      skin: SKIN_COLORS[Math.floor(Math.random() * SKIN_COLORS.length)],
+      beard: BEARDS[Math.floor(Math.random() * BEARDS.length)],
       accessory: ACCESSORIES[Math.floor(Math.random() * ACCESSORIES.length)],
     });
   }
@@ -66,6 +101,8 @@ export function EditAgentDialog({
           marginBottom: isMobile ? 16 : undefined,
           width: isMobile ? "calc(100% - 32px)" : 380,
           maxWidth: isMobile ? "100%" : undefined,
+          maxHeight: isMobile ? "calc(100dvh - 32px)" : "90vh",
+          overflowY: "auto",
           boxShadow: "0 20px 60px var(--shadow-heavy)",
           animation: "hudIn 0.2s ease-out",
         }}
@@ -103,9 +140,28 @@ export function EditAgentDialog({
           </button>
         </div>
 
+        {/* Skin Color */}
+        <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4 }}>Skin</div>
+        <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
+          {SKIN_COLORS.map((c) => (
+            <div
+              key={c}
+              onClick={() => setOutfit({ ...outfit, skin: c })}
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 6,
+                background: c,
+                cursor: "pointer",
+                border: outfit.skin === c ? "2px solid var(--text-primary)" : "2px solid transparent",
+              }}
+            />
+          ))}
+        </div>
+
         {/* Shirt Color */}
         <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4 }}>Shirt</div>
-        <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+        <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
           {SHIRT_COLORS.map((c) => (
             <div
               key={c}
@@ -123,8 +179,8 @@ export function EditAgentDialog({
         </div>
 
         {/* Hair Color */}
-        <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4 }}>Hair</div>
-        <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+        <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4 }}>Hair Color</div>
+        <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
           {HAIR_COLORS.map((c) => (
             <div
               key={c}
@@ -141,8 +197,20 @@ export function EditAgentDialog({
           ))}
         </div>
 
-        {/* Hat & Accessory */}
-        <div style={{ display: "flex", gap: 12, marginBottom: 4 }}>
+        {/* Hair Style & Hat */}
+        <div style={{ display: "flex", gap: 12, marginBottom: 8 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4 }}>Hair Style</div>
+            <select
+              value={outfit.hairStyle ?? "short"}
+              onChange={(e) => setOutfit({ ...outfit, hairStyle: e.target.value as AgentOutfit["hairStyle"] })}
+              style={selectStyle}
+            >
+              {HAIR_STYLES.map((s) => (
+                <option key={s} value={s}>{HAIR_STYLE_LABELS[s]}</option>
+              ))}
+            </select>
+          </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4 }}>Hat</div>
             <select
@@ -150,21 +218,37 @@ export function EditAgentDialog({
               onChange={(e) => setOutfit({ ...outfit, hat: e.target.value as AgentOutfit["hat"] })}
               style={selectStyle}
             >
-              <option value="none">None</option>
-              <option value="cap">Cap</option>
-              <option value="beanie">Beanie</option>
+              {HATS.map((h) => (
+                <option key={h} value={h}>{HAT_LABELS[h]}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Beard & Accessory */}
+        <div style={{ display: "flex", gap: 12, marginBottom: 4 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4 }}>Beard</div>
+            <select
+              value={outfit.beard ?? "none"}
+              onChange={(e) => setOutfit({ ...outfit, beard: e.target.value as AgentOutfit["beard"] })}
+              style={selectStyle}
+            >
+              {BEARDS.map((b) => (
+                <option key={b} value={b}>{BEARD_LABELS[b]}</option>
+              ))}
             </select>
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4 }}>Accessory</div>
             <select
               value={outfit.accessory ?? "none"}
-              onChange={(e) => setOutfit({ ...outfit, accessory: e.target.value === "none" ? null : e.target.value as "glasses" | "headphones" })}
+              onChange={(e) => setOutfit({ ...outfit, accessory: e.target.value === "none" ? null : e.target.value as AgentOutfit["accessory"] })}
               style={selectStyle}
             >
-              <option value="none">None</option>
-              <option value="glasses">Glasses</option>
-              <option value="headphones">Headphones</option>
+              {ACCESSORIES.map((a) => (
+                <option key={a ?? "none"} value={a ?? "none"}>{ACCESSORY_LABELS[a ?? "none"]}</option>
+              ))}
             </select>
           </div>
         </div>
