@@ -10,7 +10,7 @@ import { send } from "../ws.ts";
 import type { AgentInfo } from "../../shared/types.ts";
 
 export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, onEditOfficePrompt }: { onSpawn: (deskIndex: number) => void; onContextMenu: (x: number, y: number, agent: AgentInfo) => void; username: string; onEditUsername: () => void; onEditOfficePrompt: () => void }) {
-  const { agents, needsAttention, stateChangedAt } = useAppState();
+  const { agents, needsAttention, stateChangedAt, officePrompt } = useAppState();
   const dispatch = useDispatch();
   const { theme, toggleTheme } = useTheme();
 
@@ -176,7 +176,7 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
             height: SCENE_H,
           }}
         >
-          <Walls onToggleTheme={toggleTheme} />
+          <Walls onToggleTheme={toggleTheme} onEditOfficePrompt={onEditOfficePrompt} hasOfficePrompt={!!officePrompt} />
           <Floor />
           <RoomProps />
           {Array.from({ length: 8 }, (_, i) => {
