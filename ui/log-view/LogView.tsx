@@ -573,7 +573,7 @@ export function LogView({
       {/* Input */}
       <div
         style={{
-          padding: isMobile ? "10px 12px" : "12px 24px",
+          padding: isMobile ? "10px 12px" : "10px 24px",
           paddingBottom: isMobile ? "calc(10px + env(safe-area-inset-bottom, 0px))" : undefined,
           borderTop: "1px solid var(--border-strong)",
           background: "var(--bg-surface)",
@@ -712,6 +712,7 @@ export function LogView({
                 fontSize: isMobile ? 16 : 13,
                 caretColor: "var(--green)",
                 resize: "none",
+                padding: "0 0 4px",
                 lineHeight: "20px",
                 maxHeight: 200,
                 overflowY: "auto",
