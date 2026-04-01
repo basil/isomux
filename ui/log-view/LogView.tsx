@@ -146,37 +146,27 @@ export function LogView({
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const { offsetX: swipeX, phase: swipePhase, onTransitionEnd: swipeTransitionEnd } = useSwipeBack(onBack, isMobile);
 
-  // Mobile keyboard fix: when the virtual keyboard opens, the browser
-  // inconsistently auto-scrolls the focused textarea into view — sometimes it
-  // does, sometimes it doesn't, causing the input to be hidden behind the
-  // keyboard until the user types (which triggers autoResize → layout → browser
-  // scroll-to-caret).
-  //
-  // What didn't work:
-  //   - interactive-widget=resizes-content meta tag: no effect on Android Chrome
-  //   - 100dvh: does NOT shrink when the keyboard opens (dvh tracks URL bar, not keyboard)
-  //   - Setting container height from visualViewport.height: double-compensates because
-  //     the browser also scrolls the page, causing the input to overshoot off the top
-  //   - scrollIntoView on textarea focus with setTimeout: fires before keyboard is fully open
-  //
-  // What works: listen to visualViewport resize (fires during keyboard animation),
-  // debounce to wait for it to settle, then scrollIntoView if the textarea is focused.
-  // This is a no-op when the browser already auto-scrolled correctly.
+  // Mobile keyboard fix: use visualViewport.height as the container height.
+  // On mobile browsers, 100dvh/100vh do NOT shrink when the virtual keyboard
+  // opens, so the input bar gets pushed behind it. By tracking the actual
+  // visible viewport height and using position:fixed, the container always
+  // matches exactly what's visible — keyboard or not. No scrollIntoView hacks.
+  const [vpHeight, setVpHeight] = useState<number | null>(null);
   useEffect(() => {
     if (!isMobile) return;
     const vv = window.visualViewport;
     if (!vv) return;
-    let timer: ReturnType<typeof setTimeout>;
-    const onResize = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        if (document.activeElement === textareaRef.current) {
-          textareaRef.current!.scrollIntoView({ block: "nearest" });
-        }
-      }, 150);
+    const update = () => {
+      setVpHeight(vv.height);
+      window.scrollTo(0, 0);
+      // When keyboard opens (viewport shrinks), scroll chat to bottom
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
     };
-    vv.addEventListener("resize", onResize);
-    return () => { clearTimeout(timer); vv.removeEventListener("resize", onResize); };
+    update();
+    vv.addEventListener("resize", update);
+    return () => vv.removeEventListener("resize", update);
   }, [isMobile]);
 
   // Build merged command list for autocomplete, with origin labels for skills
@@ -393,7 +383,16 @@ export function LogView({
     <div
       onTransitionEnd={swipeTransitionEnd}
       style={{
-        height: isMobile ? "100dvh" : "100vh",
+        ...(isMobile ? {
+          position: "fixed" as const,
+          top: 0,
+          left: 0,
+          right: 0,
+          height: vpHeight != null ? vpHeight : "100dvh",
+          overflow: "hidden",
+        } : {
+          height: "100vh",
+        }),
         display: "flex",
         flexDirection: "row",
         background: "var(--bg-base)",
