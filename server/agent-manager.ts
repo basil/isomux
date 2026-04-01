@@ -264,8 +264,13 @@ export function editAgent(agentId: string, changes: { name?: string; cwd?: strin
   const updated: Partial<AgentInfo> = {};
 
   if (changes.name && changes.name !== managed.info.name) {
-    managed.info.name = changes.name;
-    updated.name = changes.name;
+    // Reject duplicate names
+    const nameLower = changes.name.trim().toLowerCase();
+    const duplicate = [...agents.values()].some((a) => a.info.id !== agentId && a.info.name.toLowerCase() === nameLower);
+    if (!duplicate) {
+      managed.info.name = changes.name;
+      updated.name = changes.name;
+    }
   }
   if (changes.cwd && changes.cwd !== managed.info.cwd) {
     managed.info.cwd = resolveCwd(changes.cwd);
@@ -841,6 +846,11 @@ function createSession(managed: ManagedAgent, resumeSessionId?: string) {
 }
 
 export async function spawn(name: string, cwd: string, permissionMode: AgentInfo["permissionMode"], desk?: number, customInstructions?: string, room?: number): Promise<AgentInfo | null> {
+  // Reject duplicate names across all rooms
+  const nameLower = name.trim().toLowerCase();
+  for (const a of agents.values()) {
+    if (a.info.name.toLowerCase() === nameLower) return null;
+  }
   const targetRoom = (room !== undefined && room >= 0 && room < roomCount) ? room : 0;
   const roomAgents = [...agents.values()].filter((a) => a.info.room === targetRoom);
   const taken = new Set(roomAgents.map((a) => a.info.desk));
@@ -865,7 +875,7 @@ export async function spawn(name: string, cwd: string, permissionMode: AgentInfo
     desk,
     room: targetRoom,
     cwd: resolvedCwd,
-    outfit: generateOutfit(name),
+    outfit: generateOutfit(),
     permissionMode,
     state: "idle",
     topic: null,
