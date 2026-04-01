@@ -8,15 +8,18 @@ Claude Code has built-in commands (`/clear`, `/compact`, `/fast`, etc.) and bund
 
 ## Taxonomy
 
-There are 5 sources of slash commands, in resolution priority order:
+There are 6 sources of slash commands, in resolution priority order:
 
 | # | Source | Example | Discoverable? | Overridable? |
 |---|--------|---------|---------------|--------------|
 | 1 | Isomux built-in handlers | `/clear`, `/context`, `/help` | No (hardcoded) | No |
 | 2 | User skills | `~/.claude/skills/*/SKILL.md`, `~/.claude/commands/*.md` | Yes (disk scan) | N/A (highest skill tier) |
 | 3 | Project skills | `<cwd>/.claude/skills/*/SKILL.md`, `<cwd>/.claude/commands/*.md` | Yes (disk scan) | N/A |
-| 4 | Isomux bundled skills | `isomux/skills/*/SKILL.md` | Yes (disk scan) | Yes (by tiers 2-3) |
-| 5 | Claude's bundled skills | `/review`, `/simplify` | No (inside CLI binary) | Yes (by tiers 2-4) |
+| 4 | Plugin skills | `~/.claude/plugins/cache/.../skills/*/SKILL.md`, `.../commands/*.md` | Yes (manifest + disk) | N/A |
+| 5 | Isomux bundled skills | `isomux/skills/*/SKILL.md` | Yes (disk scan) | Yes (by tiers 2-4) |
+| 6 | Claude's bundled skills | `/review`, `/simplify` | No (inside CLI binary) | Yes (by tiers 2-5) |
+
+Plugin skills are namespaced as `/plugin:skill` (e.g., `/codex:rescue`). The colon namespace is always resolved directly to the plugin — it does not participate in the flat skill priority chain. Skills with `user-invocable: false` in their frontmatter are excluded from discovery and autocomplete but can still be invoked explicitly via the namespaced form.
 
 Claude Code's own categories (see `docs/skills-investigation.md` for full list):
 - **Hardcoded commands** — fixed logic, not prompt-based (`/clear`, `/compact`, `/fast`, `/model`, etc.)
@@ -65,8 +68,10 @@ When a user types `/<something>`:
    - Stop here.
 
 2. **Skill override check.** If the command is in the config with `overridable: true`, OR is not in the config at all, check for skill files in priority order:
+   - If the name contains `:`, treat as plugin-namespaced (`plugin:skill`) and resolve directly from the plugin's install path. Stop here (hit or miss — no fallthrough to other tiers).
    - User skills (`~/.claude/skills/`, `~/.claude/commands/`)
    - Project skills (`<cwd>/.claude/skills/`, `<cwd>/.claude/commands/`)
+   - Plugin skills (`~/.claude/plugins/cache/.../skills/`, `.../commands/`)
    - Isomux bundled skills (`isomux/skills/`)
    - If a skill is found → execute the skill prompt. Stop here.
 
@@ -83,7 +88,7 @@ When a user types `/<something>`:
 
 The autocomplete list is built from two sources:
 - Config entries with `autocomplete: true`
-- All dynamically discovered skills (user, project, Isomux bundled)
+- All dynamically discovered skills (user, project, plugin, Isomux bundled)
 
 SDK-reported commands are NOT added to autocomplete (they may overlap with config entries, and their behavior through `session.send()` is unreliable).
 

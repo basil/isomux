@@ -58,7 +58,7 @@ export interface SessionInfo {
 }
 
 // Skill metadata for autocomplete and /help
-export type SkillOrigin = "user" | "project" | "isomux" | "claude";
+export type SkillOrigin = "user" | "project" | "plugin" | "isomux" | "claude";
 export interface SkillInfo {
   name: string;
   origin: SkillOrigin;

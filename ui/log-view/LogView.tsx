@@ -140,6 +140,8 @@ export function LogView({
   const [terminalOpen, setTerminalOpen] = useState(false);
   const { offsetX: swipeX, phase: swipePhase, onTransitionEnd: swipeTransitionEnd } = useSwipeBack(onBack, isMobile);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+
   // Build merged command list for autocomplete, with origin labels for skills
   const agentCmds = slashCommands.get(agent.id);
   const { allCommands, skillOrigins } = useMemo(() => {
@@ -148,6 +150,7 @@ export function LogView({
     const originLabels: Record<string, string> = {
       user: "user skill",
       project: "project skill",
+      plugin: "plugin skill",
       isomux: "isomux-bundled skill",
       claude: "claude skill",
     };
@@ -282,6 +285,7 @@ export function LogView({
 
   return (
     <div
+      ref={containerRef}
       onTransitionEnd={swipeTransitionEnd}
       style={{
         height: isMobile ? "100dvh" : "100vh",
@@ -712,7 +716,7 @@ export function LogView({
                   send({ type: "abort", agentId: agent.id });
                 }
               }}
-              placeholder={isBusy ? (isMobile ? "Agent is busy..." : "Agent is busy — Ctrl+C to interrupt...") : "Type a message or / for commands..."}
+              placeholder={isBusy ? (isMobile ? "Agent is busy..." : "Agent is busy — Ctrl+C to interrupt...") : isMobile ? "[v2] Type a message..." : "Type a message or / for commands..."}
               autoFocus={!isMobile}
               rows={1}
               style={{

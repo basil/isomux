@@ -91,6 +91,60 @@ function discoverProjectSkills(cwd: string): SkillInfo[] {
   return skills;
 }
 
+// Scan skills from installed Claude Code plugins (~/.claude/plugins/)
+function discoverPluginSkills(): SkillInfo[] {
+  const skills: SkillInfo[] = [];
+  const manifestPath = join(homedir(), ".claude", "plugins", "installed_plugins.json");
+  if (!existsSync(manifestPath)) return skills;
+
+  let manifest: any;
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+  } catch {
+    return skills;
+  }
+
+  if (!manifest.plugins || typeof manifest.plugins !== "object") return skills;
+
+  for (const [key, entries] of Object.entries(manifest.plugins)) {
+    if (!Array.isArray(entries) || entries.length === 0) continue;
+    const pluginName = key.split("@")[0];
+    const installPath = (entries as any[])[0].installPath;
+    if (!installPath || !existsSync(installPath)) continue;
+
+    // skills/<name>/SKILL.md (check user-invocable frontmatter)
+    const skillsDir = join(installPath, "skills");
+    if (existsSync(skillsDir)) {
+      try {
+        for (const d of readdirSync(skillsDir, { withFileTypes: true })) {
+          if (!d.isDirectory()) continue;
+          const skillMd = join(skillsDir, d.name, "SKILL.md");
+          if (!existsSync(skillMd)) continue;
+          try {
+            const content = readFileSync(skillMd, "utf-8");
+            const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+            if (fmMatch && /user-invocable:\s*false/i.test(fmMatch[1])) continue;
+          } catch {}
+          skills.push({ name: `${pluginName}:${d.name}`, origin: "plugin" });
+        }
+      } catch {}
+    }
+
+    // commands/<name>.md (legacy format, always user-invocable)
+    const cmdsDir = join(installPath, "commands");
+    if (existsSync(cmdsDir)) {
+      try {
+        for (const f of readdirSync(cmdsDir, { withFileTypes: true })) {
+          if (f.isFile() && f.name.endsWith(".md")) {
+            skills.push({ name: `${pluginName}:${f.name.replace(/\.md$/, "")}`, origin: "plugin" });
+          }
+        }
+      } catch {}
+    }
+  }
+  return skills;
+}
+
 // Deduplicate skills by name, keeping the first (highest-priority) occurrence
 function deduplicateSkills(skills: SkillInfo[]): SkillInfo[] {
   const seen = new Set<string>();
@@ -308,7 +362,7 @@ export async function restoreAgents() {
       streamGeneration: 0,
       launcherPath,
       slashCommands: autocompleteCommands(),
-      skills: deduplicateSkills([...discoverUserSkills(), ...discoverProjectSkills(p.cwd), ...discoverBundledSkills()]),
+      skills: deduplicateSkills([...discoverUserSkills(), ...discoverProjectSkills(p.cwd), ...discoverPluginSkills(), ...discoverBundledSkills()]),
       sdkReportedCommands: [],
       thinkingStartedAt: 0,
       toolCallTimestamps: new Map(),
@@ -546,7 +600,7 @@ function processMessage(agentId: string, msg: SDKMessage) {
         // SDK-reported commands are NOT added to autocomplete (per design)
         // Skills are listed in priority order; deduplicate by name (highest priority wins)
         const discoveredSkills = managed
-          ? [...discoverUserSkills(), ...discoverProjectSkills(managed.info.cwd), ...discoverBundledSkills()]
+          ? [...discoverUserSkills(), ...discoverProjectSkills(managed.info.cwd), ...discoverPluginSkills(), ...discoverBundledSkills()]
           : [];
         const uniqueSkills = deduplicateSkills(discoveredSkills);
         const configCommands = autocompleteCommands();
@@ -754,7 +808,7 @@ export async function spawn(name: string, cwd: string, permissionMode: AgentInfo
     streamGeneration: 0,
     launcherPath,
     slashCommands: autocompleteCommands(),
-    skills: deduplicateSkills([...discoverUserSkills(), ...discoverProjectSkills(resolvedCwd), ...discoverBundledSkills()]),
+    skills: deduplicateSkills([...discoverUserSkills(), ...discoverProjectSkills(resolvedCwd), ...discoverPluginSkills(), ...discoverBundledSkills()]),
     sdkReportedCommands: [],
     thinkingStartedAt: 0,
     toolCallTimestamps: new Map(),
@@ -975,6 +1029,7 @@ const commandHandlers: Record<string, HandlerFn> = {
     const originLabel: Record<SkillOrigin, string> = {
       user: "user skill",
       project: "project skill",
+      plugin: "plugin skill",
       isomux: "isomux-bundled skill",
       claude: "claude skill",
     };
@@ -1114,11 +1169,50 @@ async function executeSkill(agentId: string, managed: ManagedAgent, skillPrompt:
   return true;
 }
 
+// Read a skill file, stripping YAML frontmatter
+function readSkillFile(path: string): string | null {
+  if (!existsSync(path)) return null;
+  try {
+    const content = readFileSync(path, "utf-8");
+    const stripped = content.replace(/^---\n[\s\S]*?\n---\n*/, "");
+    return stripped.trim();
+  } catch {
+    return null;
+  }
+}
+
+// Resolve a plugin-namespaced skill (e.g., "codex:rescue") to its prompt text
+function resolvePluginSkillPrompt(pluginName: string, skillName: string): string | null {
+  const manifestPath = join(homedir(), ".claude", "plugins", "installed_plugins.json");
+  if (!existsSync(manifestPath)) return null;
+  let manifest: any;
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+  } catch { return null; }
+
+  const pluginKey = Object.keys(manifest.plugins ?? {}).find(k => k.split("@")[0] === pluginName);
+  if (!pluginKey) return null;
+  const entries = manifest.plugins[pluginKey];
+  if (!Array.isArray(entries) || entries.length === 0) return null;
+  const installPath = entries[0].installPath;
+  if (!installPath) return null;
+
+  return readSkillFile(join(installPath, "skills", skillName, "SKILL.md"))
+    ?? readSkillFile(join(installPath, "commands", `${skillName}.md`));
+}
+
 // Resolve a skill name to its prompt text, checking skill dirs in priority order:
 // 1. User skills (~/.claude/) — highest skill tier
 // 2. Project skills (<cwd>/.claude/)
-// 3. Isomux bundled skills (isomux/skills/)
+// 3. Plugin skills (~/.claude/plugins/) — namespaced with "plugin:skill"
+// 4. Isomux bundled skills (isomux/skills/)
 function resolveSkillPrompt(name: string, cwd: string): string | null {
+  // Handle plugin-namespaced skills: "pluginName:skillName"
+  if (name.includes(":")) {
+    const [pluginName, skillName] = name.split(":", 2);
+    return resolvePluginSkillPrompt(pluginName, skillName);
+  }
+
   const candidates = [
     join(homedir(), ".claude", "skills", name, "SKILL.md"),
     join(homedir(), ".claude", "commands", `${name}.md`),
@@ -1127,16 +1221,8 @@ function resolveSkillPrompt(name: string, cwd: string): string | null {
     join(BUNDLED_SKILLS_DIR, name, "SKILL.md"),
   ];
   for (const path of candidates) {
-    if (existsSync(path)) {
-      try {
-        const content = readFileSync(path, "utf-8");
-        // Strip YAML frontmatter
-        const stripped = content.replace(/^---\n[\s\S]*?\n---\n*/, "");
-        return stripped.trim();
-      } catch {
-        continue;
-      }
-    }
+    const prompt = readSkillFile(path);
+    if (prompt !== null) return prompt;
   }
   return null;
 }
