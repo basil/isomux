@@ -230,10 +230,12 @@ export function LogView({
     }
   }, [logs, autoScroll, agent.state]);
 
-  // Auto-resize textarea when draft is restored
+  // Auto-resize textarea and place cursor at end when draft is restored
   useEffect(() => {
     if (textareaRef.current && input) {
       autoResize(textareaRef.current);
+      const len = textareaRef.current.value.length;
+      textareaRef.current.setSelectionRange(len, len);
     }
   }, []);
 
