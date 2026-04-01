@@ -131,10 +131,14 @@ const server = Bun.serve({
     let filePath = url.pathname === "/" ? "/index.html" : url.pathname;
     const file = Bun.file(join(UI_DIST, filePath));
     if (await file.exists()) {
-      return new Response(file);
+      return new Response(file, {
+        headers: { "Cache-Control": "no-cache" },
+      });
     }
     // SPA fallback
-    return new Response(Bun.file(join(UI_DIST, "index.html")));
+    return new Response(Bun.file(join(UI_DIST, "index.html")), {
+      headers: { "Cache-Control": "no-cache" },
+    });
   },
   websocket: {
     open(ws) {

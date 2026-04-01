@@ -140,7 +140,38 @@ export function LogView({
   const [terminalOpen, setTerminalOpen] = useState(false);
   const { offsetX: swipeX, phase: swipePhase, onTransitionEnd: swipeTransitionEnd } = useSwipeBack(onBack, isMobile);
 
-  const containerRef = useRef<HTMLDivElement>(null);
+  // Mobile keyboard fix: when the virtual keyboard opens, the browser
+  // inconsistently auto-scrolls the focused textarea into view — sometimes it
+  // does, sometimes it doesn't, causing the input to be hidden behind the
+  // keyboard until the user types (which triggers autoResize → layout → browser
+  // scroll-to-caret).
+  //
+  // What didn't work:
+  //   - interactive-widget=resizes-content meta tag: no effect on Android Chrome
+  //   - 100dvh: does NOT shrink when the keyboard opens (dvh tracks URL bar, not keyboard)
+  //   - Setting container height from visualViewport.height: double-compensates because
+  //     the browser also scrolls the page, causing the input to overshoot off the top
+  //   - scrollIntoView on textarea focus with setTimeout: fires before keyboard is fully open
+  //
+  // What works: listen to visualViewport resize (fires during keyboard animation),
+  // debounce to wait for it to settle, then scrollIntoView if the textarea is focused.
+  // This is a no-op when the browser already auto-scrolled correctly.
+  useEffect(() => {
+    if (!isMobile) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const onResize = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (document.activeElement === textareaRef.current) {
+          textareaRef.current!.scrollIntoView({ block: "nearest" });
+        }
+      }, 150);
+    };
+    vv.addEventListener("resize", onResize);
+    return () => { clearTimeout(timer); vv.removeEventListener("resize", onResize); };
+  }, [isMobile]);
 
   // Build merged command list for autocomplete, with origin labels for skills
   const agentCmds = slashCommands.get(agent.id);
@@ -285,7 +316,6 @@ export function LogView({
 
   return (
     <div
-      ref={containerRef}
       onTransitionEnd={swipeTransitionEnd}
       style={{
         height: isMobile ? "100dvh" : "100vh",
@@ -716,7 +746,7 @@ export function LogView({
                   send({ type: "abort", agentId: agent.id });
                 }
               }}
-              placeholder={isBusy ? (isMobile ? "Agent is busy..." : "Agent is busy — Ctrl+C to interrupt...") : isMobile ? "[v2] Type a message..." : "Type a message or / for commands..."}
+              placeholder={isBusy ? (isMobile ? "Agent is busy..." : "Agent is busy — Ctrl+C to interrupt...") : isMobile ? "Type a message..." : "Type a message or / for commands..."}
               autoFocus={!isMobile}
               rows={1}
               style={{
