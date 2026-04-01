@@ -44,7 +44,7 @@ export function EditAgentDialog({
   agent: AgentInfo;
   onClose: () => void;
 }) {
-  const { recentCwds: allRecentCwds, isMobile } = useAppState();
+  const { recentCwds: allRecentCwds, isMobile, agents, roomCount } = useAppState();
   const [name, setName] = useState(agent.name);
   const [cwd, setCwd] = useState(agent.cwd);
   const [outfit, setOutfit] = useState<AgentOutfit>({ ...agent.outfit });
@@ -108,7 +108,9 @@ export function EditAgentDialog({
         }}
       >
         <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>Edit Agent</h3>
-        <p style={{ fontSize: 12, color: "var(--text-faint)", margin: "2px 0 18px" }}>Desk #{agent.desk + 1}</p>
+        <p style={{ fontSize: 12, color: "var(--text-faint)", margin: "2px 0 18px" }}>
+          {roomCount > 1 ? `Room ${agent.room + 1}, ` : ""}Desk #{agent.desk + 1}
+        </p>
 
         <label style={labelStyle}>Name</label>
         <input value={name} onChange={(e) => setName(e.target.value)} autoFocus style={inputStyle} />
@@ -262,6 +264,43 @@ export function EditAgentDialog({
           style={{ ...inputStyle, resize: "vertical" }}
         />
         <p style={{ fontSize: 10, color: "var(--text-ghost)", margin: "3px 0 0" }}>Changes take effect on next conversation.</p>
+
+        {/* Move to Room — only show when multiple rooms exist */}
+        {roomCount > 1 && (
+          <>
+            <label style={{ ...labelStyle, marginTop: 14 }}>Move to Room</label>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              {Array.from({ length: roomCount }, (_, i) => {
+                if (i === agent.room) return null;
+                const roomAgentCount = agents.filter((a) => a.room === i).length;
+                const isFull = roomAgentCount >= 8;
+                return (
+                  <button
+                    key={i}
+                    disabled={isFull}
+                    onClick={() => {
+                      send({ type: "move_agent", agentId: agent.id, targetRoom: i });
+                      onClose();
+                    }}
+                    style={{
+                      padding: "5px 12px",
+                      borderRadius: 6,
+                      border: "1px solid var(--border)",
+                      background: isFull ? "var(--bg-input)" : "var(--btn-surface)",
+                      color: isFull ? "var(--text-ghost)" : "var(--text-dim)",
+                      fontSize: 11,
+                      cursor: isFull ? "not-allowed" : "pointer",
+                      fontFamily: "'JetBrains Mono',monospace",
+                      opacity: isFull ? 0.5 : 1,
+                    }}
+                  >
+                    Room {i + 1} ({roomAgentCount}/8)
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
           <button onClick={onClose} style={cancelBtnStyle}>Cancel</button>

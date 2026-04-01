@@ -13,7 +13,7 @@ import { CSS } from "./styles.ts";
 import type { AgentInfo } from "../shared/types.ts";
 
 export function App() {
-  const { agents, logs, focusedAgentId, isMobile, drafts } = useAppState();
+  const { agents, logs, focusedAgentId, isMobile, drafts, currentRoom, roomCount } = useAppState();
   const dispatch = useDispatch();
   const [spawnDesk, setSpawnDesk] = useState<number | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; agent: AgentInfo } | null>(null);
@@ -39,23 +39,33 @@ export function App() {
         setCtxMenu(null);
         setEditAgent(null);
       }
-      // Number keys 1-8: focus agent at that desk (only from office view)
+      // Number keys 1-8: focus agent at that desk in current room (only from office view)
       if (!focusedAgentId && e.key >= "1" && e.key <= "8" && !e.metaKey && !e.ctrlKey && !e.altKey) {
         const deskIndex = parseInt(e.key) - 1;
-        const agent = agents.find((a) => a.desk === deskIndex);
+        const agent = agents.find((a) => a.desk === deskIndex && a.room === currentRoom);
         if (agent) {
           e.preventDefault();
           dispatch({ type: "focus", agentId: agent.id });
         }
       }
-      // Tab: cycle to next agent (Shift+Tab: previous) when viewing an agent
+      // Tab/Shift+Tab in office view: switch rooms
+      if (!focusedAgentId && e.key === "Tab" && roomCount > 1 && !e.defaultPrevented) {
+        e.preventDefault();
+        const next = e.shiftKey
+          ? (currentRoom - 1 + roomCount) % roomCount
+          : (currentRoom + 1) % roomCount;
+        dispatch({ type: "set_current_room", room: next });
+      }
+      // Tab: cycle to next agent within current room (Shift+Tab: previous) when viewing an agent
       // Skip if autocomplete already consumed this Tab (it calls preventDefault)
       if (focusedAgentId && e.key === "Tab" && agents.length > 1 && !e.defaultPrevented) {
         e.preventDefault();
-        const sorted = [...agents].sort((a, b) => a.desk - b.desk);
+        const roomAgents = agents.filter((a) => a.room === currentRoom);
+        const sorted = [...roomAgents].sort((a, b) => a.desk - b.desk);
         // Skip idle/stopped agents unless they have a non-empty draft
         const nonIdle = sorted.filter((a) => (a.state !== "idle" && a.state !== "stopped") || (drafts.get(a.id) ?? "").length > 0);
         const pool = nonIdle.length > 0 ? nonIdle : sorted;
+        if (pool.length <= 1) return;
         const idx = pool.findIndex((a) => a.id === focusedAgentId);
         // If current agent isn't in the pool, start from the beginning
         const startIdx = idx === -1 ? 0 : idx;
@@ -67,7 +77,7 @@ export function App() {
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [dispatch, focusedAgentId, agents, drafts]);
+  }, [dispatch, focusedAgentId, agents, drafts, currentRoom, roomCount]);
 
   return (
     <>
@@ -123,6 +133,7 @@ export function App() {
           deskIndex={spawnDesk}
           defaultCwd="~"
           onClose={() => setSpawnDesk(null)}
+          room={currentRoom}
         />
       )}
       {ctxMenu && (

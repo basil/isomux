@@ -123,19 +123,30 @@ export interface PersistedAgent {
   customInstructions: string | null;
 }
 
-export function loadAgents(): PersistedAgent[] {
+export function loadAgents(): PersistedAgent[][] {
   try {
-    if (!existsSync(AGENTS_FILE)) return [];
+    if (!existsSync(AGENTS_FILE)) return [[]];
     const content = readFileSync(AGENTS_FILE, "utf-8");
-    return JSON.parse(content) as PersistedAgent[];
+    const parsed = JSON.parse(content);
+    // Migration: detect flat array (array of objects) vs nested (array of arrays)
+    if (Array.isArray(parsed) && parsed.length > 0 && !Array.isArray(parsed[0])) {
+      // Flat format — wrap in single room
+      return [parsed as PersistedAgent[]];
+    }
+    if (Array.isArray(parsed)) {
+      // Already nested — ensure at least one room
+      const rooms = parsed as PersistedAgent[][];
+      return rooms.length > 0 ? rooms : [[]];
+    }
+    return [[]];
   } catch {
-    return [];
+    return [[]];
   }
 }
 
-export function saveAgents(agents: PersistedAgent[]) {
+export function saveAgents(rooms: PersistedAgent[][]) {
   try {
-    writeFileSync(AGENTS_FILE, JSON.stringify(agents, null, 2));
+    writeFileSync(AGENTS_FILE, JSON.stringify(rooms, null, 2));
   } catch (err) {
     console.error("Failed to save agents:", err);
   }
@@ -144,12 +155,13 @@ export function saveAgents(agents: PersistedAgent[]) {
 // Agent manifest for discovery by other agents
 const MANIFEST_FILE = join(ISOMUX_DIR, "agents-summary.json");
 
-export function writeManifest(agents: { id: string; name: string; desk: number; topic: string | null; cwd: string }[]) {
+export function writeManifest(agents: { id: string; name: string; desk: number; room: number; topic: string | null; cwd: string }[]) {
   try {
     const manifest = agents.map((a) => ({
       id: a.id,
       name: a.name,
       desk: a.desk,
+      room: a.room + 1, // 1-based for human readability
       topic: a.topic,
       cwd: a.cwd,
       logDir: join(LOGS_DIR, a.id),

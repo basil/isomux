@@ -17,10 +17,12 @@ export interface AppState {
   stateChangedAt: Map<string, number>; // agentId → timestamp when agent state last changed
   officePrompt: string;
   todos: TodoItem[];
+  currentRoom: number; // 0-based room index
+  roomCount: number; // total number of rooms
 }
 
 type Action =
-  | { type: "full_state"; agents: AgentInfo[]; recentCwds: string[] }
+  | { type: "full_state"; agents: AgentInfo[]; recentCwds: string[]; roomCount: number }
   | { type: "agent_added"; agent: AgentInfo }
   | { type: "agent_removed"; agentId: string }
   | { type: "agent_updated"; agentId: string; changes: Partial<AgentInfo> }
@@ -33,7 +35,10 @@ type Action =
   | { type: "clear_logs"; agentId: string }
   | { type: "set_mobile"; isMobile: boolean }
   | { type: "office_prompt"; text: string }
-  | { type: "todos"; todos: TodoItem[] };
+  | { type: "todos"; todos: TodoItem[] }
+  | { type: "set_current_room"; room: number }
+  | { type: "room_created"; roomCount: number }
+  | { type: "room_closed"; room: number; roomCount: number };
 
 // States that warrant attention
 const ATTENTION_STATES = new Set(["idle", "error", "waiting_for_response"]);
@@ -45,6 +50,8 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         agents: action.agents,
         recentCwds: action.recentCwds,
+        roomCount: action.roomCount,
+        currentRoom: Math.min(state.currentRoom, action.roomCount - 1),
         logs: new Map(),
         needsAttention: new Set(),
         slashCommands: new Map(),
@@ -137,6 +144,19 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, officePrompt: action.text };
     case "todos":
       return { ...state, todos: action.todos };
+    case "set_current_room":
+      return { ...state, currentRoom: action.room };
+    case "room_created":
+      return { ...state, roomCount: action.roomCount };
+    case "room_closed": {
+      let currentRoom = state.currentRoom;
+      if (currentRoom === action.room) {
+        currentRoom = 0; // Fall back to room 0
+      } else if (currentRoom > action.room) {
+        currentRoom--; // Adjust for renumbering
+      }
+      return { ...state, roomCount: action.roomCount, currentRoom };
+    }
     default:
       return state;
   }
@@ -157,6 +177,8 @@ const initialState: AppState = {
   stateChangedAt: new Map(),
   officePrompt: "",
   todos: [],
+  currentRoom: 0,
+  roomCount: 1,
 };
 
 const StateCtx = createContext<AppState>(initialState);

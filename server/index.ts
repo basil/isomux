@@ -25,7 +25,7 @@ async function handleCommand(cmd: ClientCommand) {
   switch (cmd.type) {
     case "spawn":
       saveRecentCwd(cmd.cwd);
-      await AgentManager.spawn(cmd.name, cmd.cwd, cmd.permissionMode, cmd.desk, cmd.customInstructions);
+      await AgentManager.spawn(cmd.name, cmd.cwd, cmd.permissionMode, cmd.desk, cmd.customInstructions, cmd.room);
       break;
     case "kill":
       await AgentManager.kill(cmd.agentId);
@@ -48,7 +48,7 @@ async function handleCommand(cmd: ClientCommand) {
       AgentManager.editAgent(cmd.agentId, { name: cmd.name, cwd: cmd.cwd, outfit: cmd.outfit, customInstructions: cmd.customInstructions });
       break;
     case "swap_desks":
-      AgentManager.swapDesks(cmd.deskA, cmd.deskB);
+      AgentManager.swapDesks(cmd.deskA, cmd.deskB, cmd.room);
       break;
     case "set_topic":
       AgentManager.setTopic(cmd.agentId, cmd.topic);
@@ -109,6 +109,15 @@ async function handleCommand(cmd: ClientCommand) {
       broadcast({ type: "todos", todos } as ServerMessage);
       break;
     }
+    case "create_room":
+      AgentManager.createRoom();
+      break;
+    case "close_room":
+      AgentManager.closeRoom(cmd.room);
+      break;
+    case "move_agent":
+      AgentManager.moveAgent(cmd.agentId, cmd.targetRoom);
+      break;
   }
 }
 
@@ -176,7 +185,7 @@ const server = Bun.serve({
       // Send current agent list
       const agents = AgentManager.getAllAgents();
       const recentCwds = loadRecentCwds();
-      ws.send(JSON.stringify({ type: "full_state", agents, recentCwds } as ServerMessage));
+      ws.send(JSON.stringify({ type: "full_state", agents, recentCwds, roomCount: AgentManager.getRoomCount() } as ServerMessage));
       // Send office prompt
       ws.send(JSON.stringify({ type: "office_prompt", text: AgentManager.getOfficePrompt() } as ServerMessage));
       // Send todos

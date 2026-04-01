@@ -23,6 +23,7 @@ export interface AgentInfo {
   id: string;
   name: string;
   desk: number; // 0-7
+  room: number; // 0-based room index
   cwd: string;
   outfit: AgentOutfit;
   permissionMode: "default" | "acceptEdits" | "bypassPermissions";
@@ -66,7 +67,7 @@ export interface SkillInfo {
 
 // Server → Browser messages
 export type ServerMessage =
-  | { type: "full_state"; agents: AgentInfo[]; recentCwds: string[] }
+  | { type: "full_state"; agents: AgentInfo[]; recentCwds: string[]; roomCount: number }
   | { type: "agent_added"; agent: AgentInfo }
   | { type: "agent_removed"; agentId: string }
   | { type: "agent_updated"; agentId: string; changes: Partial<AgentInfo> }
@@ -77,11 +78,13 @@ export type ServerMessage =
   | { type: "terminal_output"; agentId: string; data: string }
   | { type: "terminal_exit"; agentId: string; exitCode: number }
   | { type: "office_prompt"; text: string }
-  | { type: "todos"; todos: TodoItem[] };
+  | { type: "todos"; todos: TodoItem[] }
+  | { type: "room_created"; roomCount: number }
+  | { type: "room_closed"; room: number; roomCount: number };
 
 // Browser → Server commands
 export type ClientCommand =
-  | { type: "spawn"; name: string; cwd: string; permissionMode: AgentInfo["permissionMode"]; desk: number; customInstructions?: string }
+  | { type: "spawn"; name: string; cwd: string; permissionMode: AgentInfo["permissionMode"]; desk: number; room?: number; customInstructions?: string }
   | { type: "kill"; agentId: string }
   | { type: "abort"; agentId: string }
   | { type: "send_message"; agentId: string; text: string; username?: string }
@@ -89,7 +92,7 @@ export type ClientCommand =
   | { type: "resume"; agentId: string; sessionId: string }
   | { type: "list_sessions"; agentId: string }
   | { type: "edit_agent"; agentId: string; name?: string; cwd?: string; outfit?: AgentOutfit; customInstructions?: string }
-  | { type: "swap_desks"; deskA: number; deskB: number }
+  | { type: "swap_desks"; deskA: number; deskB: number; room: number }
   | { type: "set_topic"; agentId: string; topic: string }
   | { type: "reset_topic"; agentId: string }
   | { type: "terminal_open"; agentId: string }
@@ -98,4 +101,7 @@ export type ClientCommand =
   | { type: "terminal_close"; agentId: string }
   | { type: "set_office_prompt"; text: string }
   | { type: "add_todo"; text: string; username: string }
-  | { type: "delete_todo"; id: string };
+  | { type: "delete_todo"; id: string }
+  | { type: "create_room" }
+  | { type: "close_room"; room: number }
+  | { type: "move_agent"; agentId: string; targetRoom: number };

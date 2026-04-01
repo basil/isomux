@@ -435,7 +435,7 @@ export function LogView({
               fontWeight: 600, color: "var(--text-primary)", fontSize: 15,
               cursor: "pointer", flex: 1, overflow: "hidden",
               textOverflow: "ellipsis", whiteSpace: "nowrap",
-            }}>{agent.name}</span>
+            }}>{agent.name}{agent.room > 0 ? <span style={{ opacity: 0.4, fontWeight: 400, fontSize: 12, marginLeft: 6 }}>R{agent.room + 1}:{agent.desk + 1}</span> : ""}</span>
             {STATE_LABELS[agent.state] && (
               <HeaderTimer state={agent.state} stateChangedAt={stateChangedAt.get(agent.id)} />
             )}
@@ -488,7 +488,7 @@ export function LogView({
               onClick={onEditAgent}
               style={{ fontWeight: 600, color: "var(--text-primary)", cursor: "pointer" }}
               title="Edit agent"
-            ><span style={{ opacity: 0.5 }}>{agent.desk + 1} ·</span> {agent.name}</span>
+            ><span style={{ opacity: 0.5 }}>{agent.room > 0 ? `R${agent.room + 1}:` : ""}{agent.desk + 1} ·</span> {agent.name}</span>
             {STATE_LABELS[agent.state] && (
               <HeaderTimer state={agent.state} stateChangedAt={stateChangedAt.get(agent.id)} />
             )}

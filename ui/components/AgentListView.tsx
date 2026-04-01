@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
-import { useAppState } from "../store.tsx";
+import { useAppState, useDispatch } from "../store.tsx";
 import { useTheme } from "../store.tsx";
 import { StatusLight } from "../office/StatusLight.tsx";
 import { TodoButton } from "./TodoPanel.tsx";
+import { send } from "../ws.ts";
 import type { AgentInfo } from "../../shared/types.ts";
 
 export function AgentListView({
@@ -22,10 +23,14 @@ export function AgentListView({
   onEditOfficePrompt: () => void;
   onOpenTodos: () => void;
 }) {
-  const { agents, connected } = useAppState();
+  const { agents, connected, currentRoom, roomCount } = useAppState();
+  const dispatch = useDispatch();
   const { theme, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const roomAgents = agents.filter((a) => a.room === currentRoom);
+  const room0Full = agents.filter((a) => a.room === 0).length >= 8;
+  const showRoomTabs = roomCount > 1 || room0Full;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -178,6 +183,62 @@ export function AgentListView({
         </div>
       </div>
 
+      {/* Room tabs */}
+      {showRoomTabs && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            padding: "8px 16px",
+            borderBottom: "1px solid var(--border)",
+            overflowX: "auto",
+            flexShrink: 0,
+          }}
+        >
+          {Array.from({ length: roomCount }, (_, i) => {
+            const isActive = i === currentRoom;
+            const count = agents.filter((a) => a.room === i).length;
+            return (
+              <button
+                key={i}
+                onClick={() => dispatch({ type: "set_current_room", room: i })}
+                style={{
+                  padding: "5px 12px",
+                  borderRadius: 8,
+                  border: isActive ? "1px solid var(--accent)" : "1px solid var(--border)",
+                  background: isActive ? "var(--accent-bg)" : "transparent",
+                  color: isActive ? "var(--accent)" : "var(--text-dim)",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: "'JetBrains Mono',monospace",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                }}
+              >
+                {i + 1} <span style={{ fontSize: 10, opacity: 0.6 }}>{count}/8</span>
+              </button>
+            );
+          })}
+          <button
+            onClick={() => send({ type: "create_room" })}
+            style={{
+              padding: "5px 10px",
+              borderRadius: 8,
+              border: "1px dashed var(--border)",
+              background: "transparent",
+              color: "var(--text-hint)",
+              fontSize: 14,
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            +
+          </button>
+        </div>
+      )}
+
       {/* Agent list */}
       <div
         style={{
@@ -187,7 +248,7 @@ export function AgentListView({
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
         }}
       >
-        {agents.length === 0 ? (
+        {roomAgents.length === 0 ? (
           <div
             style={{
               display: "flex",
@@ -200,14 +261,14 @@ export function AgentListView({
             }}
           >
             <span style={{ fontSize: 15, color: "var(--text-muted)" }}>
-              No agents yet
+              {roomCount > 1 ? `Room ${currentRoom + 1} is empty` : "No agents yet"}
             </span>
             <span style={{ fontSize: 13, color: "var(--text-faint)" }}>
               Tap + to spawn one
             </span>
           </div>
         ) : (
-          agents.map((agent) => (
+          roomAgents.map((agent) => (
             <div
               key={agent.id}
               style={{

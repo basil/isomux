@@ -207,7 +207,9 @@ type AgentEvent =
   | { type: "agent_added"; agent: AgentInfo }
   | { type: "agent_removed"; agentId: string }
   | { type: "agent_updated"; agentId: string; changes: Partial<AgentInfo> }
-  | { type: "log_entry"; entry: LogEntry };
+  | { type: "log_entry"; entry: LogEntry }
+  | { type: "room_created"; roomCount: number }
+  | { type: "room_closed"; room: number; roomCount: number };
 
 type EventHandler = (event: AgentEvent) => void;
 
@@ -215,6 +217,11 @@ const agents = new Map<string, ManagedAgent>();
 const logCache = new Map<string, LogEntry[]>(); // agentId → entries
 let eventHandler: EventHandler = () => {};
 let officePrompt: string = loadOfficePrompt();
+let roomCount: number = 1; // number of rooms (at least 1)
+
+export function getRoomCount(): number {
+  return roomCount;
+}
 
 export function getOfficePrompt(): string {
   return officePrompt;
@@ -284,11 +291,12 @@ export function editAgent(agentId: string, changes: { name?: string; cwd?: strin
   eventHandler({ type: "agent_updated", agentId, changes: updated });
 }
 
-export function swapDesks(deskA: number, deskB: number) {
+export function swapDesks(deskA: number, deskB: number, room: number) {
   if (deskA === deskB || deskA < 0 || deskA > 7 || deskB < 0 || deskB > 7) return;
+  if (room < 0 || room >= roomCount) return;
   const allManaged = [...agents.values()];
-  const agentA = allManaged.find((m) => m.info.desk === deskA);
-  const agentB = allManaged.find((m) => m.info.desk === deskB);
+  const agentA = allManaged.find((m) => m.info.desk === deskA && m.info.room === room);
+  const agentB = allManaged.find((m) => m.info.desk === deskB && m.info.room === room);
   if (!agentA && !agentB) return;
 
   if (agentA) {
@@ -302,6 +310,56 @@ export function swapDesks(deskA: number, deskB: number) {
   persistAll();
 }
 
+export function createRoom(): number {
+  roomCount++;
+  persistAll();
+  eventHandler({ type: "room_created", roomCount });
+  return roomCount;
+}
+
+export function closeRoom(room: number): boolean {
+  if (room === 0) return false; // Room 1 is permanent
+  if (room < 0 || room >= roomCount) return false;
+  // Check room is empty
+  const roomAgents = [...agents.values()].filter((a) => a.info.room === room);
+  if (roomAgents.length > 0) return false;
+
+  roomCount--;
+  // Renumber agents in higher rooms
+  for (const managed of agents.values()) {
+    if (managed.info.room > room) {
+      managed.info.room--;
+      eventHandler({ type: "agent_updated", agentId: managed.info.id, changes: { room: managed.info.room } });
+    }
+  }
+  persistAll();
+  eventHandler({ type: "room_closed", room, roomCount });
+  return true;
+}
+
+export function moveAgent(agentId: string, targetRoom: number): boolean {
+  const managed = agents.get(agentId);
+  if (!managed) return false;
+  if (targetRoom < 0 || targetRoom >= roomCount) return false;
+  if (managed.info.room === targetRoom) return false;
+
+  // Find first available desk in target room
+  const targetAgents = [...agents.values()].filter((a) => a.info.room === targetRoom);
+  if (targetAgents.length >= 8) return false;
+  const taken = new Set(targetAgents.map((a) => a.info.desk));
+  let newDesk = -1;
+  for (let i = 0; i < 8; i++) {
+    if (!taken.has(i)) { newDesk = i; break; }
+  }
+  if (newDesk === -1) return false;
+
+  managed.info.room = targetRoom;
+  managed.info.desk = newDesk;
+  eventHandler({ type: "agent_updated", agentId, changes: { room: targetRoom, desk: newDesk } });
+  persistAll();
+  return true;
+}
+
 export function getAllAgents(): AgentInfo[] {
   return [...agents.values()].map((a) => a.info);
 }
@@ -311,24 +369,32 @@ function updateManifest() {
     id: a.info.id,
     name: a.info.name,
     desk: a.info.desk,
+    room: a.info.room,
     topic: a.info.topic,
     cwd: a.info.cwd,
   })));
 }
 
 function persistAll() {
-  const persisted: PersistedAgent[] = [...agents.values()].map((a) => ({
-    id: a.info.id,
-    name: a.info.name,
-    desk: a.info.desk,
-    cwd: a.info.cwd,
-    outfit: a.info.outfit,
-    permissionMode: a.info.permissionMode,
-    lastSessionId: a.sessionId,
-    topic: a.info.topic,
-    customInstructions: a.info.customInstructions,
-  }));
-  saveAgents(persisted);
+  // Build nested array: rooms[roomIndex] = agents in that room
+  const rooms: PersistedAgent[][] = Array.from({ length: roomCount }, () => []);
+  for (const a of agents.values()) {
+    const room = a.info.room;
+    if (room >= 0 && room < roomCount) {
+      rooms[room].push({
+        id: a.info.id,
+        name: a.info.name,
+        desk: a.info.desk,
+        cwd: a.info.cwd,
+        outfit: a.info.outfit,
+        permissionMode: a.info.permissionMode,
+        lastSessionId: a.sessionId,
+        topic: a.info.topic,
+        customInstructions: a.info.customInstructions,
+      });
+    }
+  }
+  saveAgents(rooms);
   updateManifest();
 }
 
@@ -338,61 +404,66 @@ export async function restoreAgents() {
   rmSync(LAUNCHERS_DIR, { recursive: true, force: true });
   mkdirSync(LAUNCHERS_DIR, { recursive: true });
 
-  const persisted = loadAgents();
-  for (const p of persisted) {
-    const launcherPath = createLauncher(p.id, p.cwd, p.name, officePrompt, p.customInstructions);
-    const info: AgentInfo = {
-      id: p.id,
-      name: p.name,
-      desk: p.desk,
-      cwd: p.cwd,
-      outfit: p.outfit,
-      permissionMode: p.permissionMode,
-      state: p.lastSessionId ? "waiting_for_response" : "idle",
-      topic: p.topic ?? null,
-      topicStale: false,
-      customInstructions: p.customInstructions ?? null,
-    };
-    const managed: ManagedAgent = {
-      info,
-      session: null,
-      sessionId: p.lastSessionId,
-      streaming: false,
-      aborting: false,
-      streamGeneration: 0,
-      launcherPath,
-      slashCommands: autocompleteCommands(),
-      skills: deduplicateSkills([...discoverUserSkills(), ...discoverProjectSkills(p.cwd), ...discoverPluginSkills(), ...discoverBundledSkills()]),
-      sdkReportedCommands: [],
-      thinkingStartedAt: 0,
-      toolCallTimestamps: new Map(),
-      topicGenerating: false,
-      topicMessageCount: 0,
-      pendingResume: false,
-      pendingResumeSessions: [],
-      ptySidecar: null,
-      ptyBuffer: "",
-    };
-    agents.set(p.id, managed);
+  const rooms = loadAgents();
+  roomCount = rooms.length;
 
-    // Load log history into cache (browsers connect later, so we cache it)
-    if (p.lastSessionId) {
-      const history = loadLog(p.id, p.lastSessionId);
-      if (history.length > 0) {
-        logCache.set(p.id, [...history]);
-      }
-    }
+  for (let roomIdx = 0; roomIdx < rooms.length; roomIdx++) {
+    for (const p of rooms[roomIdx]) {
+      const launcherPath = createLauncher(p.id, p.cwd, p.name, officePrompt, p.customInstructions);
+      const info: AgentInfo = {
+        id: p.id,
+        name: p.name,
+        desk: p.desk,
+        room: roomIdx,
+        cwd: p.cwd,
+        outfit: p.outfit,
+        permissionMode: p.permissionMode,
+        state: p.lastSessionId ? "waiting_for_response" : "idle",
+        topic: p.topic ?? null,
+        topicStale: false,
+        customInstructions: p.customInstructions ?? null,
+      };
+      const managed: ManagedAgent = {
+        info,
+        session: null,
+        sessionId: p.lastSessionId,
+        streaming: false,
+        aborting: false,
+        streamGeneration: 0,
+        launcherPath,
+        slashCommands: autocompleteCommands(),
+        skills: deduplicateSkills([...discoverUserSkills(), ...discoverProjectSkills(p.cwd), ...discoverPluginSkills(), ...discoverBundledSkills()]),
+        sdkReportedCommands: [],
+        thinkingStartedAt: 0,
+        toolCallTimestamps: new Map(),
+        topicGenerating: false,
+        topicMessageCount: 0,
+        pendingResume: false,
+        pendingResumeSessions: [],
+        ptySidecar: null,
+        ptyBuffer: "",
+      };
+      agents.set(p.id, managed);
 
-    // Auto-resume session
-    try {
+      // Load log history into cache (browsers connect later, so we cache it)
       if (p.lastSessionId) {
-        managed.session = createSession(managed, p.lastSessionId);
-      } else {
-        managed.session = createSession(managed);
+        const history = loadLog(p.id, p.lastSessionId);
+        if (history.length > 0) {
+          logCache.set(p.id, [...history]);
+        }
       }
-    } catch (err: any) {
-      console.error(`Failed to restore session for ${p.name}:`, err.message);
-      managed.info.state = "error";
+
+      // Auto-resume session
+      try {
+        if (p.lastSessionId) {
+          managed.session = createSession(managed, p.lastSessionId);
+        } else {
+          managed.session = createSession(managed);
+        }
+      } catch (err: any) {
+        console.error(`Failed to restore session for ${p.name}:`, err.message);
+        managed.info.state = "error";
+      }
     }
   }
   return [...agents.values()].map((a) => a.info);
@@ -769,12 +840,14 @@ function createSession(managed: ManagedAgent, resumeSessionId?: string) {
     : unstable_v2_createSession(opts);
 }
 
-export async function spawn(name: string, cwd: string, permissionMode: AgentInfo["permissionMode"], desk?: number, customInstructions?: string): Promise<AgentInfo | null> {
-  const taken = new Set([...agents.values()].map((a) => a.info.desk));
+export async function spawn(name: string, cwd: string, permissionMode: AgentInfo["permissionMode"], desk?: number, customInstructions?: string, room?: number): Promise<AgentInfo | null> {
+  const targetRoom = (room !== undefined && room >= 0 && room < roomCount) ? room : 0;
+  const roomAgents = [...agents.values()].filter((a) => a.info.room === targetRoom);
+  const taken = new Set(roomAgents.map((a) => a.info.desk));
   if (desk !== undefined && !taken.has(desk)) {
     // Use the requested desk
   } else {
-    // Find first free desk
+    // Find first free desk in the target room
     desk = -1;
     for (let i = 0; i < 8; i++) {
       if (!taken.has(i)) { desk = i; break; }
@@ -790,6 +863,7 @@ export async function spawn(name: string, cwd: string, permissionMode: AgentInfo
     id,
     name,
     desk,
+    room: targetRoom,
     cwd: resolvedCwd,
     outfit: generateOutfit(name),
     permissionMode,

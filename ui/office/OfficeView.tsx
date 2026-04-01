@@ -1,6 +1,7 @@
 import { useAppState, useDispatch, useTheme } from "../store.tsx";
 import { Floor, Walls } from "./Floor.tsx";
 import { RoomProps } from "./RoomProps.tsx";
+import { RoomTabBar } from "./RoomTabBar.tsx";
 import { DeskUnit } from "./DeskUnit.tsx";
 import { EmptySlot } from "./EmptySlot.tsx";
 import { StatusLight } from "./StatusLight.tsx";
@@ -10,9 +11,12 @@ import { TodoButton } from "../components/TodoPanel.tsx";
 import type { AgentInfo } from "../../shared/types.ts";
 
 export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, onEditOfficePrompt, onOpenTodos }: { onSpawn: (deskIndex: number) => void; onContextMenu: (x: number, y: number, agent: AgentInfo) => void; username: string; onEditUsername: () => void; onEditOfficePrompt: () => void; onOpenTodos: () => void }) {
-  const { agents, needsAttention, stateChangedAt, officePrompt, todos } = useAppState();
+  const { agents, needsAttention, stateChangedAt, officePrompt, todos, currentRoom, roomCount } = useAppState();
   const dispatch = useDispatch();
   const { theme, toggleTheme } = useTheme();
+
+  // Filter agents to current room for rendering
+  const roomAgents = agents.filter((a) => a.room === currentRoom);
 
   const counts = {
     working: agents.filter((a) => ["thinking", "tool_executing"].includes(a.state)).length,
@@ -20,8 +24,6 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
     error: agents.filter((a) => a.state === "error").length,
     idle: agents.filter((a) => a.state === "idle" || a.state === "stopped").length,
   };
-
-  const occupied = new Set(agents.map((a) => a.desk));
 
   return (
     <div
@@ -154,6 +156,8 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
         </div>
       </div>
 
+      <RoomTabBar />
+
       {/* Office scene */}
       <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
         {/* Ambient gradients */}
@@ -177,11 +181,19 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
             height: SCENE_H,
           }}
         >
-          <Walls onToggleTheme={toggleTheme} onEditOfficePrompt={onEditOfficePrompt} hasOfficePrompt={!!officePrompt} onOpenTodos={onOpenTodos} todoCount={todos.length} />
+          <Walls
+            onToggleTheme={toggleTheme}
+            onEditOfficePrompt={onEditOfficePrompt}
+            hasOfficePrompt={!!officePrompt}
+            onOpenTodos={onOpenTodos}
+            todoCount={todos.length}
+            leftDoor={currentRoom > 0 ? { label: `Room ${currentRoom}`, onClick: () => dispatch({ type: "set_current_room", room: currentRoom - 1 }) } : null}
+            rightDoor={currentRoom < roomCount - 1 ? { label: `Room ${currentRoom + 2}`, onClick: () => dispatch({ type: "set_current_room", room: currentRoom + 1 }) } : null}
+          />
           <Floor />
           <RoomProps />
           {Array.from({ length: 8 }, (_, i) => {
-            const agent = agents.find((a) => a.desk === i);
+            const agent = roomAgents.find((a) => a.desk === i);
             if (agent) {
               return (
                 <DeskUnit
@@ -190,12 +202,12 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
                   onClick={() => dispatch({ type: "focus", agentId: agent.id })}
                   onContextMenu={(e) => onContextMenu(e.clientX, e.clientY, agent)}
                   needsAttention={needsAttention.has(agent.id)}
-                  onSwap={(a, b) => send({ type: "swap_desks", deskA: a, deskB: b })}
+                  onSwap={(a, b) => send({ type: "swap_desks", deskA: a, deskB: b, room: currentRoom })}
                   stateChangedAt={stateChangedAt.get(agent.id)}
                 />
               );
             }
-            return <EmptySlot key={`empty-${i}`} deskIndex={i} onClick={() => onSpawn(i)} onSwap={(a, b) => send({ type: "swap_desks", deskA: a, deskB: b })} />;
+            return <EmptySlot key={`empty-${i}`} deskIndex={i} onClick={() => onSpawn(i)} onSwap={(a, b) => send({ type: "swap_desks", deskA: a, deskB: b, room: currentRoom })} />;
           })}
         </div>
 

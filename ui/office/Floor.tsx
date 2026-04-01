@@ -38,7 +38,7 @@ export function Floor() {
   );
 }
 
-export function Walls({ onToggleTheme, onEditOfficePrompt, hasOfficePrompt, onOpenTodos, todoCount = 0 }: { onToggleTheme?: () => void; onEditOfficePrompt?: () => void; hasOfficePrompt?: boolean; onOpenTodos?: () => void; todoCount?: number }) {
+export function Walls({ onToggleTheme, onEditOfficePrompt, hasOfficePrompt, onOpenTodos, todoCount = 0, leftDoor, rightDoor }: { onToggleTheme?: () => void; onEditOfficePrompt?: () => void; hasOfficePrompt?: boolean; onOpenTodos?: () => void; todoCount?: number; leftDoor?: { label: string; onClick: () => void } | null; rightDoor?: { label: string; onClick: () => void } | null }) {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30_000);
@@ -342,6 +342,50 @@ export function Walls({ onToggleTheme, onEditOfficePrompt, hasOfficePrompt, onOp
         <line x1="-22" y1="4" x2="22" y2="4" stroke="var(--wall-decor-stroke)" strokeWidth="1.5" />
         <line x1="-22" y1="10" x2="22" y2="10" stroke="var(--wall-decor-stroke)" strokeWidth="1.5" />
       </g>
+
+      {/* Left wall door — leads to previous room */}
+      {leftDoor && (
+        <g onClick={leftDoor.onClick} style={{ cursor: "pointer", pointerEvents: "auto" }}>
+          {/* Door frame — on left wall, iso skew -27° */}
+          <g transform="translate(-280, 100) skewY(-27)">
+            {/* Door frame */}
+            <rect x="-22" y="-55" width="44" height="75" rx="2" fill="#3a2a1a" stroke="#2a1a0a" strokeWidth="1.5" />
+            {/* Door panel */}
+            <rect x="-18" y="-51" width="36" height="67" rx="1" fill="#5a4030" />
+            {/* Door panels (raised) */}
+            <rect x="-14" y="-45" width="28" height="24" rx="1" fill="#6a5040" stroke="#4a3020" strokeWidth="0.5" />
+            <rect x="-14" y="-14" width="28" height="24" rx="1" fill="#6a5040" stroke="#4a3020" strokeWidth="0.5" />
+            {/* Door knob */}
+            <circle cx="10" cy="-10" r="2.5" fill="#c0a060" stroke="#a08040" strokeWidth="0.5" />
+            {/* Room number label */}
+            <text x="0" y="-58" textAnchor="middle" fill="var(--text-dim)" fontSize="10" fontFamily="'JetBrains Mono',monospace" fontWeight="600">
+              ← {leftDoor.label}
+            </text>
+          </g>
+        </g>
+      )}
+
+      {/* Right wall door — leads to next room */}
+      {rightDoor && (
+        <g onClick={rightDoor.onClick} style={{ cursor: "pointer", pointerEvents: "auto" }}>
+          {/* Door frame — on right wall, iso skew 27° */}
+          <g transform="translate(500, 160) skewY(27)">
+            {/* Door frame */}
+            <rect x="-22" y="-55" width="44" height="75" rx="2" fill="#3a2a1a" stroke="#2a1a0a" strokeWidth="1.5" />
+            {/* Door panel */}
+            <rect x="-18" y="-51" width="36" height="67" rx="1" fill="#5a4030" />
+            {/* Door panels (raised) */}
+            <rect x="-14" y="-45" width="28" height="24" rx="1" fill="#6a5040" stroke="#4a3020" strokeWidth="0.5" />
+            <rect x="-14" y="-14" width="28" height="24" rx="1" fill="#6a5040" stroke="#4a3020" strokeWidth="0.5" />
+            {/* Door knob */}
+            <circle cx="-10" cy="-10" r="2.5" fill="#c0a060" stroke="#a08040" strokeWidth="0.5" />
+            {/* Room number label */}
+            <text x="0" y="-58" textAnchor="middle" fill="var(--text-dim)" fontSize="10" fontFamily="'JetBrains Mono',monospace" fontWeight="600">
+              {rightDoor.label} →
+            </text>
+          </g>
+        </g>
+      )}
     </svg>
   );
 }

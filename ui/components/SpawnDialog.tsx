@@ -7,10 +7,12 @@ export function SpawnDialog({
   deskIndex,
   defaultCwd,
   onClose,
+  room,
 }: {
   deskIndex: number;
   defaultCwd: string;
   onClose: () => void;
+  room?: number;
 }) {
   const { recentCwds: allRecentCwds, isMobile } = useAppState();
   const [name, setName] = useState("");
@@ -26,6 +28,7 @@ export function SpawnDialog({
       cwd,
       permissionMode,
       desk: deskIndex,
+      room,
       customInstructions: customInstructions.trim() || undefined,
     });
     onClose();
