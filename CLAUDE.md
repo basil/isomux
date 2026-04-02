@@ -32,7 +32,7 @@ See [isomux.com](https://isomux.com) for a full feature overview and setup instr
 - `server/` — Bun HTTP + WebSocket server, agent lifecycle, SDK integration
 - `ui/` — React frontend
 - `shared/` — TypeScript types shared between server and UI
-- `site/` — Landing page deployed to isomux.com via Vercel
+- `site/` — Landing page and demo, deployed to isomux.com via Vercel. Demo build artifacts (`site/demo/*.js`, etc.) are gitignored and built by Vercel at deploy time (see `vercel.json`)
 - `docs/` — Design documents, plans, and reference material
 - `skills/` — Claude Code skills bundled with the project, available to any isomux agent
 
@@ -42,3 +42,4 @@ See [isomux.com](https://isomux.com) for a full feature overview and setup instr
 - `~/.isomux/logs/` — agent conversation logs
 - `~/.isomux/launchers/` — launcher scripts (cwd workaround for SDK - details in docs/sdk-investigation.md)
 - `ui/dist/` — UI build output (gitignored)
+- `ui/demo-entry.tsx` / `ui/demo.html` — Demo source files (built by Vercel, not by `build:ui`)
