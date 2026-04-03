@@ -389,10 +389,10 @@ export function LogView({
           top: 0,
           left: 0,
           right: 0,
-          height: vpHeight != null ? vpHeight : "100dvh",
+          height: vpHeight != null ? vpHeight : "calc(100dvh - var(--banner-h, 0px))",
           overflow: "hidden",
         } : {
-          height: "100vh",
+          height: "calc(100vh - var(--banner-h, 0px))",
         }),
         display: "flex",
         flexDirection: "row",

@@ -45,7 +45,7 @@ export function AgentListView({
       style={{
         position: "fixed",
         inset: 0,
-        height: "100dvh",
+        height: "calc(100dvh - var(--banner-h, 0px))",
         background: "var(--bg-base)",
         display: "flex",
         flexDirection: "column",

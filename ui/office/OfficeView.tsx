@@ -44,7 +44,7 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
   return (
     <div
       style={{
-        height: isMobile ? "100dvh" : "100vh",
+        height: isMobile ? "calc(100dvh - var(--banner-h, 0px))" : "calc(100vh - var(--banner-h, 0px))",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
@@ -333,14 +333,16 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
       {/* Bottom HUD */}
       <div
         style={{
-          padding: isMobile ? "4px 12px" : "6px 20px",
-          paddingBottom: isMobile ? "calc(4px + env(safe-area-inset-bottom, 0px))" : undefined,
+          padding: isMobile ? "8px 12px" : "8px 20px",
+          ...(isMobile ? { paddingBottom: "calc(8px + env(safe-area-inset-bottom, 0px))" } : {}),
           background: "var(--bg-hud-bottom)",
           backdropFilter: "blur(8px)",
           borderTop: "1px solid var(--border-subtle)",
           display: "flex",
+          alignItems: "center",
           justifyContent: "center",
           gap: isMobile ? 12 : 20,
+          flexShrink: 0,
           zIndex: 500,
         }}
       >

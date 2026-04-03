@@ -49,11 +49,14 @@ function DemoBanner() {
   );
 }
 
+const DEMO_BANNER_HEIGHT = 33;
+
 function DemoApp() {
   return (
     <>
+      <style>{`:root { --banner-h: ${DEMO_BANNER_HEIGHT}px; }`}</style>
       <DemoBanner />
-      <div style={{ paddingTop: 33 }}>
+      <div style={{ position: "fixed", top: DEMO_BANNER_HEIGHT, left: 0, right: 0, bottom: 0, transform: "translateZ(0)" }}>
         <App />
       </div>
     </>
