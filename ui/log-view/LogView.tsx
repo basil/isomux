@@ -236,7 +236,14 @@ export function LogView({
 
   useEffect(() => {
     if (autoScroll && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      const el = scrollRef.current;
+      // Defer scroll until after browser layout so scrollHeight is final.
+      // Double-rAF ensures content (images, code blocks, etc.) has been measured.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          el.scrollTop = el.scrollHeight;
+        });
+      });
     }
   }, [logs, autoScroll, agent.state]);
 
