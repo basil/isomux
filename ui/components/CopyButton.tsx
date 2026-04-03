@@ -50,7 +50,7 @@ export function CopyButton({ getText, size = 24 }: { getText: () => string; size
         border: "1px solid var(--border-medium)",
         borderRadius: 6,
         background: copied ? "var(--green-bg)" : "var(--btn-surface)",
-        color: copied ? "var(--green)" : "var(--text-faint)",
+        color: copied ? "var(--green)" : "var(--text-dim)",
         cursor: "pointer",
         padding: 0,
         flexShrink: 0,

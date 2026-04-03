@@ -5,6 +5,7 @@ import { send } from "../ws.ts";
 import { useAppState, useDispatch, useFeatures, useTheme } from "../store.tsx";
 import { LogEntryCard, serializeEntries } from "./LogEntryCard.tsx";
 import { CopyButton } from "../components/CopyButton.tsx";
+import { SunIcon, MoonIcon } from "../components/ThemeIcons.tsx";
 import { TerminalPanel } from "./TerminalPanel.tsx";
 import { useSwipeBack } from "../hooks/useSwipeBack.ts";
 
@@ -608,6 +609,25 @@ export function LogView({
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
             {logs.length > 0 && <CopyButton getText={getConversationText} />}
+            {!isMobile && (
+              <button
+                onClick={toggleTheme}
+                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                  border: "1px solid var(--border-medium)",
+                  background: "var(--btn-surface)",
+                  color: "var(--text-dim)",
+                  cursor: "pointer",
+                }}
+              >
+                {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+              </button>
+            )}
             {features.terminal && (
             <button
               onClick={() => setTerminalOpen((prev) => !prev)}
@@ -620,7 +640,7 @@ export function LogView({
                 borderRadius: 6,
                 border: `1px solid ${terminalOpen ? "var(--green-border)" : "var(--border-medium)"}`,
                 background: terminalOpen ? "var(--green-bg)" : "var(--btn-surface)",
-                color: terminalOpen ? "var(--green)" : "var(--text-muted)",
+                color: terminalOpen ? "var(--green)" : "var(--text-dim)",
                 fontFamily: "'DM Sans',sans-serif",
                 fontSize: 12,
                 cursor: "pointer",
@@ -629,24 +649,6 @@ export function LogView({
             >
               <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11 }}>&gt;_</span>
             </button>
-            )}
-            {!isMobile && (
-              <button
-                onClick={toggleTheme}
-                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: 6,
-                  border: "1px solid var(--border-medium)",
-                  background: "var(--btn-surface)",
-                  color: "var(--text-muted)",
-                  fontFamily: "'DM Sans',sans-serif",
-                  fontSize: 12,
-                  cursor: "pointer",
-                }}
-              >
-                {theme === "dark" ? "☀" : "☾"}
-              </button>
             )}
           </div>
         </div>

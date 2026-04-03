@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useAppState, useTheme } from "../store.tsx";
 import { StatusLight } from "../office/StatusLight.tsx";
 import { RoomTabBar } from "../office/RoomTabBar.tsx";
+import { SunIcon, MoonIcon } from "./ThemeIcons.tsx";
 import type { AgentInfo } from "../../shared/types.ts";
 
 export function AgentListView({
@@ -49,6 +50,7 @@ export function AgentListView({
         background: "var(--bg-base)",
         display: "flex",
         flexDirection: "column",
+        overflow: "hidden",
         fontFamily: "'DM Sans', sans-serif",
       }}
     >
@@ -99,8 +101,8 @@ export function AgentListView({
         <div style={{ display: "flex", gap: 8 }}>
           {(
             [
-              { n: roomAgents.filter((a) => ["thinking", "tool_executing"].includes(a.state)).length, c: "var(--green)", short: "work" },
-              { n: roomAgents.filter((a) => a.state === "waiting_for_response").length, c: "var(--purple)", short: "wait" },
+              { n: roomAgents.filter((a) => ["thinking", "tool_executing"].includes(a.state)).length, c: "var(--green)", short: "working" },
+              { n: roomAgents.filter((a) => a.state === "waiting_for_response").length, c: "var(--purple)", short: "waiting" },
               { n: roomAgents.filter((a) => a.state === "error").length, c: "var(--red)", short: "err" },
             ] as const
           )
@@ -165,9 +167,9 @@ export function AgentListView({
                 }}
               >
                 {[
-                  { icon: "\u2611", label: "Todos", action: onOpenTodos },
-                  { icon: "\u2699", label: "Office settings", action: onEditOfficePrompt },
-                  { icon: theme === "dark" ? "\u2600" : "\u263E", label: theme === "dark" ? "Light mode" : "Dark mode", action: toggleTheme },
+                  { icon: <span style={{ fontSize: 15 }}>&#x2611;</span>, label: "Todos", action: onOpenTodos },
+                  { icon: <span style={{ fontSize: 15 }}>&#x2699;</span>, label: "Office settings", action: onEditOfficePrompt },
+                  { icon: theme === "dark" ? <SunIcon size={15} /> : <MoonIcon size={15} />, label: theme === "dark" ? "Light mode" : "Dark mode", action: toggleTheme },
                 ].map((item, i) => (
                   <button
                     key={i}
@@ -181,7 +183,7 @@ export function AgentListView({
                       fontFamily: "'DM Sans',sans-serif",
                     }}
                   >
-                    <span style={{ width: 20, textAlign: "center", fontSize: 15 }}>{item.icon}</span>
+                    <span style={{ width: 20, display: "flex", alignItems: "center", justifyContent: "center" }}>{item.icon}</span>
                     <span>{item.label}</span>
                   </button>
                 ))}

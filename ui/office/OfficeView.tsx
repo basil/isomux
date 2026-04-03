@@ -9,6 +9,7 @@ import { StatusLight } from "./StatusLight.tsx";
 import { SCENE_W, SCENE_H } from "./grid.ts";
 import { send } from "../ws.ts";
 import { TodoButton } from "../components/TodoPanel.tsx";
+import { SunIcon, MoonIcon } from "../components/ThemeIcons.tsx";
 import type { AgentInfo } from "../../shared/types.ts";
 
 export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, onEditOfficePrompt, onOpenTodos }: { onSpawn: (deskIndex: number) => void; onContextMenu: (x: number, y: number, agent: AgentInfo) => void; username: string; onEditUsername: () => void; onEditOfficePrompt: () => void; onOpenTodos: () => void }) {
@@ -168,9 +169,9 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
                   }}
                 >
                   {[
-                    { icon: "\u2611", label: "Todos", action: onOpenTodos },
-                    { icon: "\u2699", label: "Office settings", action: onEditOfficePrompt },
-                    { icon: theme === "dark" ? "\u2600" : "\u263E", label: theme === "dark" ? "Light mode" : "Dark mode", action: toggleTheme },
+                    { icon: <span style={{ fontSize: 15 }}>&#x2611;</span>, label: "Todos", action: onOpenTodos },
+                    { icon: <span style={{ fontSize: 15 }}>&#x2699;</span>, label: "Office settings", action: onEditOfficePrompt },
+                    { icon: theme === "dark" ? <SunIcon size={15} /> : <MoonIcon size={15} />, label: theme === "dark" ? "Light mode" : "Dark mode", action: toggleTheme },
                   ].map((item, i) => (
                     <button
                       key={i}
@@ -184,7 +185,7 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
                         fontFamily: "'DM Sans',sans-serif",
                       }}
                     >
-                      <span style={{ width: 20, textAlign: "center", fontSize: 15 }}>{item.icon}</span>
+                      <span style={{ width: 20, display: "flex", alignItems: "center", justifyContent: "center" }}>{item.icon}</span>
                       <span>{item.label}</span>
                     </button>
                   ))}
@@ -212,18 +213,20 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
             </button>
             <button
               onClick={toggleTheme}
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
               style={{
-                padding: "4px 10px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "4px 8px",
                 borderRadius: 8,
                 border: "1px solid var(--border-medium)",
                 background: "var(--btn-surface)",
                 color: "var(--text-dim)",
-                fontSize: 11,
                 cursor: "pointer",
-                fontFamily: "'DM Sans',sans-serif",
               }}
             >
-              {theme === "dark" ? "Light" : "Dark"}
+              {theme === "dark" ? <SunIcon /> : <MoonIcon />}
             </button>
           </div>
         )}
