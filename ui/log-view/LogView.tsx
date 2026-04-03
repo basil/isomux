@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import type { AgentInfo, AgentState, LogEntry, SkillInfo } from "../../shared/types.ts";
 import { StatusLight } from "../office/StatusLight.tsx";
 import { send } from "../ws.ts";
-import { useAppState, useDispatch, useFeatures } from "../store.tsx";
+import { useAppState, useDispatch, useFeatures, useTheme } from "../store.tsx";
 import { LogEntryCard, serializeEntries } from "./LogEntryCard.tsx";
 import { CopyButton } from "../components/CopyButton.tsx";
 import { TerminalPanel } from "./TerminalPanel.tsx";
@@ -130,6 +130,7 @@ export function LogView({
   const { drafts, slashCommands, stateChangedAt, isMobile } = useAppState();
   const dispatch = useDispatch();
   const features = useFeatures();
+  const { theme, toggleTheme } = useTheme();
   const input = drafts.get(agent.id) ?? "";
   const inputRef = useRef(input);
   inputRef.current = input;
@@ -617,6 +618,24 @@ export function LogView({
             >
               <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11 }}>&gt;_</span>
             </button>
+            )}
+            {!isMobile && (
+              <button
+                onClick={toggleTheme}
+                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: 6,
+                  border: "1px solid var(--border-medium)",
+                  background: "var(--btn-surface)",
+                  color: "var(--text-muted)",
+                  fontFamily: "'DM Sans',sans-serif",
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                {theme === "dark" ? "☀" : "☾"}
+              </button>
             )}
           </div>
         </div>

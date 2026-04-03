@@ -97,6 +97,18 @@ export const CSS = `
     --btn-surface: rgba(255,255,255,0.03);
     --expand-btn: rgba(255,255,255,0.04);
 
+    --hljs-keyword: #c678dd;
+    --hljs-string: #98c379;
+    --hljs-comment: #5c6370;
+    --hljs-number: #d19a66;
+    --hljs-function: #61afef;
+    --hljs-type: #e5c07b;
+    --hljs-variable: #e06c75;
+    --hljs-regexp: #56b6c2;
+    --hljs-symbol: #56b6c2;
+    --hljs-meta: #abb2bf;
+    --hljs-deletion: #e06c75;
+
     color-scheme: dark;
   }
 
@@ -180,6 +192,18 @@ export const CSS = `
     --btn-surface: rgba(0,0,0,0.03);
     --expand-btn: rgba(0,0,0,0.04);
 
+    --hljs-keyword: #a626a4;
+    --hljs-string: #50a14f;
+    --hljs-comment: #a0a1a7;
+    --hljs-number: #986801;
+    --hljs-function: #4078f2;
+    --hljs-type: #c18401;
+    --hljs-variable: #e45649;
+    --hljs-regexp: #0184bc;
+    --hljs-symbol: #0184bc;
+    --hljs-meta: #696c77;
+    --hljs-deletion: #e45649;
+
     color-scheme: light;
   }
 
@@ -231,6 +255,22 @@ export const CSS = `
   .md-content pre code {
     background: transparent; padding: 0; font-size: 12px; line-height: 1.5; color: var(--text-dim);
   }
+
+  /* Syntax highlighting tokens */
+  .hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name { color: var(--hljs-keyword); }
+  .hljs-string, .hljs-attr, .hljs-addition { color: var(--hljs-string); }
+  .hljs-comment, .hljs-quote { color: var(--hljs-comment); font-style: italic; }
+  .hljs-number, .hljs-literal, .hljs-boolean { color: var(--hljs-number); }
+  .hljs-function .hljs-title, .hljs-title.function_, .hljs-title.class_ { color: var(--hljs-function); }
+  .hljs-type, .hljs-template-variable { color: var(--hljs-type); }
+  .hljs-variable, .hljs-template-tag { color: var(--hljs-variable); }
+  .hljs-regexp, .hljs-link { color: var(--hljs-regexp); }
+  .hljs-symbol, .hljs-bullet { color: var(--hljs-symbol); }
+  .hljs-meta, .hljs-meta .hljs-keyword { color: var(--hljs-meta); }
+  .hljs-deletion { color: var(--hljs-deletion); }
+  .hljs-section, .hljs-title { color: var(--hljs-function); font-weight: 600; }
+  .hljs-attribute { color: var(--hljs-type); }
+  .hljs-params { color: var(--text-dim); }
   .md-content ul, .md-content ol { margin: 4px 0 8px 20px; }
   .md-content li { margin: 2px 0; }
   .md-content a { color: var(--accent); text-decoration: none; }
