@@ -743,7 +743,7 @@ function processMessage(agentId: string, msg: SDKMessage) {
           if (managed && callStart) {
             managed.toolCallTimestamps.delete(block.tool_use_id);
           }
-          addLogEntry(agentId, "tool_result", resultText.slice(0, 2000), {
+          addLogEntry(agentId, "tool_result", resultText.slice(0, 10000), {
             toolUseId: block.tool_use_id,
             ...(duration_ms != null ? { duration_ms } : {}),
           });
