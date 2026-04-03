@@ -63,6 +63,7 @@ export type SkillOrigin = "user" | "project" | "plugin" | "isomux" | "claude";
 export interface SkillInfo {
   name: string;
   origin: SkillOrigin;
+  description?: string;
 }
 
 // Server → Browser messages
@@ -73,7 +74,7 @@ export type ServerMessage =
   | { type: "agent_updated"; agentId: string; changes: Partial<AgentInfo> }
   | { type: "log_entry"; entry: LogEntry }
   | { type: "sessions_list"; agentId: string; sessions: SessionInfo[]; currentSessionId: string | null }
-  | { type: "slash_commands"; agentId: string; commands: string[]; skills: SkillInfo[] }
+  | { type: "slash_commands"; agentId: string; commands: { name: string; description?: string }[]; skills: SkillInfo[] }
   | { type: "clear_logs"; agentId: string }
   | { type: "terminal_output"; agentId: string; data: string }
   | { type: "terminal_exit"; agentId: string; exitCode: number }

@@ -35,6 +35,19 @@ function isAuthError(text: string): boolean {
   return AUTH_ERROR_PATTERNS.test(text);
 }
 
+// Extract description from SKILL.md / command .md YAML frontmatter
+function extractSkillDescription(filePath: string): string | undefined {
+  try {
+    const content = readFileSync(filePath, "utf-8");
+    const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+    if (!fmMatch) return undefined;
+    const descMatch = fmMatch[1].match(/description:\s*(.+)/);
+    return descMatch ? descMatch[1].trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // Scan disk for user-defined skills and commands that the SDK doesn't report
 function discoverUserSkills(): SkillInfo[] {
   const skills: SkillInfo[] = [];
@@ -43,7 +56,10 @@ function discoverUserSkills(): SkillInfo[] {
   if (existsSync(globalSkillsDir)) {
     try {
       for (const entry of readdirSync(globalSkillsDir, { withFileTypes: true })) {
-        if (entry.isDirectory()) skills.push({ name: entry.name, origin: "user" });
+        if (entry.isDirectory()) {
+          const description = extractSkillDescription(join(globalSkillsDir, entry.name, "SKILL.md"));
+          skills.push({ name: entry.name, origin: "user", description });
+        }
       }
     } catch {}
   }
@@ -53,7 +69,8 @@ function discoverUserSkills(): SkillInfo[] {
     try {
       for (const entry of readdirSync(globalCmdsDir, { withFileTypes: true })) {
         if (entry.isFile() && entry.name.endsWith(".md")) {
-          skills.push({ name: entry.name.replace(/\.md$/, ""), origin: "user" });
+          const description = extractSkillDescription(join(globalCmdsDir, entry.name));
+          skills.push({ name: entry.name.replace(/\.md$/, ""), origin: "user", description });
         }
       }
     } catch {}
@@ -67,7 +84,10 @@ function discoverBundledSkills(): SkillInfo[] {
   if (existsSync(BUNDLED_SKILLS_DIR)) {
     try {
       for (const entry of readdirSync(BUNDLED_SKILLS_DIR, { withFileTypes: true })) {
-        if (entry.isDirectory()) skills.push({ name: entry.name, origin: "isomux" });
+        if (entry.isDirectory()) {
+          const description = extractSkillDescription(join(BUNDLED_SKILLS_DIR, entry.name, "SKILL.md"));
+          skills.push({ name: entry.name, origin: "isomux", description });
+        }
       }
     } catch {}
   }
@@ -83,7 +103,8 @@ function discoverProjectSkills(cwd: string): SkillInfo[] {
     try {
       for (const entry of readdirSync(projCmdsDir, { withFileTypes: true })) {
         if (entry.isFile() && entry.name.endsWith(".md")) {
-          skills.push({ name: entry.name.replace(/\.md$/, ""), origin: "project" });
+          const description = extractSkillDescription(join(projCmdsDir, entry.name));
+          skills.push({ name: entry.name.replace(/\.md$/, ""), origin: "project", description });
         }
       }
     } catch {}
@@ -125,7 +146,8 @@ function discoverPluginSkills(): SkillInfo[] {
             const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
             if (fmMatch && /user-invocable:\s*false/i.test(fmMatch[1])) continue;
           } catch {}
-          skills.push({ name: `${pluginName}:${d.name}`, origin: "plugin" });
+          const description = extractSkillDescription(skillMd);
+          skills.push({ name: `${pluginName}:${d.name}`, origin: "plugin", description });
         }
       } catch {}
     }
@@ -136,7 +158,8 @@ function discoverPluginSkills(): SkillInfo[] {
       try {
         for (const f of readdirSync(cmdsDir, { withFileTypes: true })) {
           if (f.isFile() && f.name.endsWith(".md")) {
-            skills.push({ name: `${pluginName}:${f.name.replace(/\.md$/, "")}`, origin: "plugin" });
+            const description = extractSkillDescription(join(cmdsDir, f.name));
+            skills.push({ name: `${pluginName}:${f.name.replace(/\.md$/, "")}`, origin: "plugin", description });
           }
         }
       } catch {}
@@ -186,7 +209,7 @@ interface ManagedAgent {
   aborting: boolean;
   streamGeneration: number; // incremented on abort to invalidate old consumeStream cleanup
   launcherPath: string;
-  slashCommands: string[];
+  slashCommands: { name: string; description?: string }[];
   skills: SkillInfo[];
   sdkReportedCommands: string[]; // commands reported by SDK in system:init
   // Timing: track when phases start for duration_ms computation
@@ -241,7 +264,7 @@ export function getAgentLogs(agentId: string): LogEntry[] {
   return logCache.get(agentId) ?? [];
 }
 
-export function getAgentCommands(agentId: string): { commands: string[]; skills: string[] } {
+export function getAgentCommands(agentId: string): { commands: { name: string; description?: string }[]; skills: SkillInfo[] } {
   const managed = agents.get(agentId);
   return {
     commands: managed?.slashCommands ?? [],
@@ -1109,7 +1132,7 @@ const commandHandlers: Record<string, HandlerFn> = {
   async help(agentId, managed, _args, rawText, username) {
     const userMeta = username ? { username } : undefined;
     addLogEntry(agentId, "user_message", rawText, userMeta);
-    const cmdList = managed.slashCommands.map((c) => `  /${c}`).join("\n");
+    const cmdList = managed.slashCommands.map((c) => c.description ? `  /${c.name}  — ${c.description}` : `  /${c.name}`).join("\n");
     const originLabel: Record<SkillOrigin, string> = {
       user: "user skill",
       project: "project skill",
@@ -1118,7 +1141,10 @@ const commandHandlers: Record<string, HandlerFn> = {
       claude: "claude skill",
     };
     const skillList = managed.skills.length > 0
-      ? "\n\nSkills:\n" + managed.skills.map((s) => `  /${s.name}  (${originLabel[s.origin]})`).join("\n")
+      ? "\n\nSkills:\n" + managed.skills.map((s) => {
+          const desc = s.description ? ` — ${s.description}` : "";
+          return `  /${s.name}  (${originLabel[s.origin]})${desc}`;
+        }).join("\n")
       : "";
     addLogEntry(agentId, "system", `Available commands:\n${cmdList}${skillList}`);
     updateState(agentId, "waiting_for_response");

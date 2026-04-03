@@ -172,11 +172,12 @@ export function LogView({
     return () => vv.removeEventListener("resize", update);
   }, [isMobile]);
 
-  // Build merged command list for autocomplete, with origin labels for skills
+  // Build merged command list for autocomplete, with origin labels and descriptions
   const agentCmds = slashCommands.get(agent.id);
-  const { allCommands, skillOrigins } = useMemo(() => {
+  const { allCommands, skillOrigins, commandDescriptions } = useMemo(() => {
     const cmds: string[] = [];
     const origins = new Map<string, string>(); // name → origin label
+    const descs = new Map<string, string>(); // name → description
     const originLabels: Record<string, string> = {
       user: "user skill",
       project: "project skill",
@@ -185,13 +186,20 @@ export function LogView({
       claude: "claude skill",
     };
     if (agentCmds) {
-      for (const c of agentCmds.commands) cmds.push(c);
+      for (const c of agentCmds.commands) {
+        // Handle both old string format and new { name, description } format
+        const name = typeof c === "string" ? c : c.name;
+        const desc = typeof c === "string" ? undefined : c.description;
+        cmds.push(name);
+        if (desc) descs.set(name, desc);
+      }
       for (const s of agentCmds.skills) {
         if (!cmds.includes(s.name)) cmds.push(s.name);
         origins.set(s.name, originLabels[s.origin] ?? "skill");
+        if (s.description) descs.set(s.name, s.description);
       }
     }
-    return { allCommands: cmds.sort(), skillOrigins: origins };
+    return { allCommands: cmds.sort(), skillOrigins: origins, commandDescriptions: descs };
   }, [agentCmds]);
 
   // Filter commands based on input
@@ -748,6 +756,7 @@ export function LogView({
               >
                 {filteredCommands.map((cmd, i) => {
                   const originLabel = skillOrigins.get(cmd);
+                  const desc = commandDescriptions.get(cmd);
                   return (
                     <div
                       key={cmd}
@@ -772,6 +781,7 @@ export function LogView({
                         fontFamily: "'JetBrains Mono',monospace",
                         fontSize: 13,
                         fontWeight: 600,
+                        flexShrink: 0,
                       }}>
                         /{cmd}
                       </span>
@@ -783,8 +793,21 @@ export function LogView({
                           background: "var(--bg-base)",
                           padding: "1px 6px",
                           borderRadius: 4,
+                          flexShrink: 0,
                         }}>
                           {originLabel}
+                        </span>
+                      )}
+                      {desc && (
+                        <span style={{
+                          fontSize: 11,
+                          color: "var(--text-ghost)",
+                          fontFamily: "'DM Sans',sans-serif",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}>
+                          {desc}
                         </span>
                       )}
                     </div>

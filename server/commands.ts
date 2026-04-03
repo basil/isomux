@@ -16,6 +16,8 @@ export type CommandConfig = {
   overridable: boolean;
   /** Key into commandHandlers (required when supported: true) */
   handler?: string;
+  /** Short description of what this command does */
+  description?: string;
   /** Custom ephemeral message for unsupported commands (default is type-aware) */
   message?: string;
 };
@@ -50,6 +52,7 @@ export const commands: Record<string, CommandConfig> = {
     autocomplete: true,
     overridable: false,
     handler: "clear",
+    description: "Wipe conversation history",
   },
   context: {
     type: "hardcoded",
@@ -57,6 +60,7 @@ export const commands: Record<string, CommandConfig> = {
     autocomplete: true,
     overridable: false,
     handler: "context",
+    description: "Visualize context window usage",
   },
   help: {
     type: "hardcoded",
@@ -64,6 +68,7 @@ export const commands: Record<string, CommandConfig> = {
     autocomplete: true,
     overridable: false,
     handler: "help",
+    description: "List all available commands",
   },
   resume: {
     type: "hardcoded",
@@ -71,6 +76,7 @@ export const commands: Record<string, CommandConfig> = {
     autocomplete: true,
     overridable: false,
     handler: "resume",
+    description: "Pick up a previous session",
   },
   login: {
     type: "hardcoded",
@@ -78,6 +84,7 @@ export const commands: Record<string, CommandConfig> = {
     autocomplete: true,
     overridable: false,
     handler: "login",
+    description: "Log in to your Anthropic account",
   },
   logout: {
     type: "hardcoded",
@@ -85,6 +92,7 @@ export const commands: Record<string, CommandConfig> = {
     autocomplete: true,
     overridable: false,
     handler: "logout",
+    description: "Log out of your Anthropic account",
   },
 
   // =========================================================================
@@ -92,104 +100,104 @@ export const commands: Record<string, CommandConfig> = {
   // =========================================================================
 
   // --- Session & context ---
-  compact:    { ...UNSUPPORTED_HARDCODED, message: "`/compact` is not yet supported in Isomux. Context is auto-compacted by the SDK." },
-  branch:     { ...UNSUPPORTED_HARDCODED },
-  fork:       { ...UNSUPPORTED_HARDCODED }, // alias: branch in older versions
-  export:     { ...UNSUPPORTED_HARDCODED },
-  plan:       { ...UNSUPPORTED_HARDCODED },
-  rename:     { ...UNSUPPORTED_HARDCODED },
-  reset:      { type: "hardcoded", supported: true, autocomplete: false, overridable: false, handler: "clear" },
-  new:        { type: "hardcoded", supported: true, autocomplete: false, overridable: false, handler: "clear" },
+  compact:    { ...UNSUPPORTED_HARDCODED, description: "Compress context", message: "`/compact` is not yet supported in Isomux. Context is auto-compacted by the SDK." },
+  branch:     { ...UNSUPPORTED_HARDCODED, description: "Branch conversation into new session" },
+  fork:       { ...UNSUPPORTED_HARDCODED, description: "Branch conversation into new session" },
+  export:     { ...UNSUPPORTED_HARDCODED, description: "Export conversation to file" },
+  plan:       { ...UNSUPPORTED_HARDCODED, description: "Toggle plan mode" },
+  rename:     { ...UNSUPPORTED_HARDCODED, description: "Rename current session" },
+  reset:      { type: "hardcoded", supported: true, autocomplete: false, overridable: false, handler: "clear", description: "Reset conversation" },
+  new:        { type: "hardcoded", supported: true, autocomplete: false, overridable: false, handler: "clear", description: "Start new conversation" },
 
   // --- Model & performance ---
-  model:      { ...UNSUPPORTED_HARDCODED },
-  fast:       { ...UNSUPPORTED_HARDCODED },
-  effort:     { ...UNSUPPORTED_HARDCODED },
-  advisor:    { ...UNSUPPORTED_HARDCODED },
+  model:      { ...UNSUPPORTED_HARDCODED, description: "Switch model mid-session" },
+  fast:       { ...UNSUPPORTED_HARDCODED, description: "Toggle speed-optimized mode" },
+  effort:     { ...UNSUPPORTED_HARDCODED, description: "Set thinking effort level" },
+  advisor:    { ...UNSUPPORTED_HARDCODED, description: "Toggle advisor mode" },
 
   // --- Cost & usage ---
-  cost:       { ...UNSUPPORTED_HARDCODED, message: "`/cost` is a Claude Code command for API users. Isomux uses subscription-based billing." },
-  usage:      { ...UNSUPPORTED_HARDCODED },
-  stats:      { ...UNSUPPORTED_HARDCODED },
-  "extra-usage": { ...UNSUPPORTED_HARDCODED },
-  "rate-limit-options": { ...UNSUPPORTED_HARDCODED },
+  cost:       { ...UNSUPPORTED_HARDCODED, description: "Token usage and cost estimate", message: "`/cost` is a Claude Code command for API users. Isomux uses subscription-based billing." },
+  usage:      { ...UNSUPPORTED_HARDCODED, description: "Plan-level limits and rate limit status" },
+  stats:      { ...UNSUPPORTED_HARDCODED, description: "Usage patterns over time" },
+  "extra-usage": { ...UNSUPPORTED_HARDCODED, description: "Extra usage options" },
+  "rate-limit-options": { ...UNSUPPORTED_HARDCODED, description: "Rate limit configuration" },
 
   // --- Code & file operations ---
-  diff:       { ...UNSUPPORTED_HARDCODED },
-  rewind:     { ...UNSUPPORTED_HARDCODED },
-  checkpoint: { ...UNSUPPORTED_HARDCODED }, // alias for /rewind
-  copy:       { ...UNSUPPORTED_HARDCODED },
-  files:      { ...UNSUPPORTED_HARDCODED },
-  "add-dir":  { ...UNSUPPORTED_HARDCODED },
+  diff:       { ...UNSUPPORTED_HARDCODED, description: "Interactive diff of all changes" },
+  rewind:     { ...UNSUPPORTED_HARDCODED, description: "Undo changes and revert conversation" },
+  checkpoint: { ...UNSUPPORTED_HARDCODED, description: "Undo changes and revert conversation" },
+  copy:       { ...UNSUPPORTED_HARDCODED, description: "Copy last response to clipboard" },
+  files:      { ...UNSUPPORTED_HARDCODED, description: "List files in context" },
+  "add-dir":  { ...UNSUPPORTED_HARDCODED, description: "Add additional working directories" },
 
   // --- Side channel ---
-  btw:        { ...UNSUPPORTED_HARDCODED },
+  btw:        { ...UNSUPPORTED_HARDCODED, description: "Ask without polluting main context" },
 
   // --- Configuration & management ---
-  config:     { ...UNSUPPORTED_HARDCODED },
-  settings:   { ...UNSUPPORTED_HARDCODED }, // alias for /config
-  hooks:      { ...UNSUPPORTED_HARDCODED },
-  permissions: { ...UNSUPPORTED_HARDCODED },
-  keybindings: { ...UNSUPPORTED_HARDCODED },
-  memory:     { ...UNSUPPORTED_HARDCODED },
-  mcp:        { ...UNSUPPORTED_HARDCODED },
-  ide:        { ...UNSUPPORTED_HARDCODED },
-  agents:     { ...UNSUPPORTED_HARDCODED },
-  skills:     { ...UNSUPPORTED_HARDCODED },
-  sandbox:    { ...UNSUPPORTED_HARDCODED },
-  "privacy-settings": { ...UNSUPPORTED_HARDCODED },
-  theme:      { ...UNSUPPORTED_HARDCODED },
-  color:      { ...UNSUPPORTED_HARDCODED },
-  vim:        { ...UNSUPPORTED_HARDCODED },
-  "terminal-setup": { ...UNSUPPORTED_HARDCODED },
-  "reload-plugins": { ...UNSUPPORTED_HARDCODED },
+  config:     { ...UNSUPPORTED_HARDCODED, description: "Open settings interface" },
+  settings:   { ...UNSUPPORTED_HARDCODED, description: "Open settings interface" },
+  hooks:      { ...UNSUPPORTED_HARDCODED, description: "Manage lifecycle hooks" },
+  permissions: { ...UNSUPPORTED_HARDCODED, description: "Manage tool permissions" },
+  keybindings: { ...UNSUPPORTED_HARDCODED, description: "Edit key bindings" },
+  memory:     { ...UNSUPPORTED_HARDCODED, description: "View/edit persistent memory" },
+  mcp:        { ...UNSUPPORTED_HARDCODED, description: "Manage MCP server connections" },
+  ide:        { ...UNSUPPORTED_HARDCODED, description: "Manage IDE integrations" },
+  agents:     { ...UNSUPPORTED_HARDCODED, description: "Manage custom subagents" },
+  skills:     { ...UNSUPPORTED_HARDCODED, description: "List all available skills" },
+  sandbox:    { ...UNSUPPORTED_HARDCODED, description: "Manage sandbox settings" },
+  "privacy-settings": { ...UNSUPPORTED_HARDCODED, description: "Manage privacy settings" },
+  theme:      { ...UNSUPPORTED_HARDCODED, description: "Change color theme" },
+  color:      { ...UNSUPPORTED_HARDCODED, description: "Change color theme" },
+  vim:        { ...UNSUPPORTED_HARDCODED, description: "Toggle vim keybindings" },
+  "terminal-setup": { ...UNSUPPORTED_HARDCODED, description: "Configure terminal integration" },
+  "reload-plugins": { ...UNSUPPORTED_HARDCODED, description: "Reload installed plugins" },
 
   // --- Background & system ---
-  tasks:      { ...UNSUPPORTED_HARDCODED },
-  bashes:     { ...UNSUPPORTED_HARDCODED }, // older name for /tasks
-  doctor:     { ...UNSUPPORTED_HARDCODED },
-  feedback:   { ...UNSUPPORTED_HARDCODED },
-  bug:        { ...UNSUPPORTED_HARDCODED }, // older name for /feedback
-  "release-notes": { ...UNSUPPORTED_HARDCODED },
-  heapdump:   { ...UNSUPPORTED_HARDCODED },
-  status:     { ...UNSUPPORTED_HARDCODED },
-  tag:        { ...UNSUPPORTED_HARDCODED },
-  init:       { ...UNSUPPORTED_HARDCODED },
-  "install-github-app": { ...UNSUPPORTED_HARDCODED },
-  pr_comments: { ...UNSUPPORTED_HARDCODED },
+  tasks:      { ...UNSUPPORTED_HARDCODED, description: "List/manage background tasks" },
+  bashes:     { ...UNSUPPORTED_HARDCODED, description: "List/manage background tasks" },
+  doctor:     { ...UNSUPPORTED_HARDCODED, description: "Check installation health" },
+  feedback:   { ...UNSUPPORTED_HARDCODED, description: "Report bugs to Anthropic" },
+  bug:        { ...UNSUPPORTED_HARDCODED, description: "Report bugs to Anthropic" },
+  "release-notes": { ...UNSUPPORTED_HARDCODED, description: "View release notes" },
+  heapdump:   { ...UNSUPPORTED_HARDCODED, description: "Dump heap for debugging" },
+  status:     { ...UNSUPPORTED_HARDCODED, description: "Show system status" },
+  tag:        { ...UNSUPPORTED_HARDCODED, description: "Tag current conversation" },
+  init:       { ...UNSUPPORTED_HARDCODED, description: "Initialize Claude Code in a project" },
+  "install-github-app": { ...UNSUPPORTED_HARDCODED, description: "Set up Claude GitHub PR review app" },
+  pr_comments: { ...UNSUPPORTED_HARDCODED, description: "View PR comments" },
 
   // --- Desktop / mobile / remote ---
-  desktop:    { ...UNSUPPORTED_HARDCODED },
-  mobile:     { ...UNSUPPORTED_HARDCODED },
-  chrome:     { ...UNSUPPORTED_HARDCODED },
-  session:    { ...UNSUPPORTED_HARDCODED },
-  teleport:   { ...UNSUPPORTED_HARDCODED },
-  "remote-env": { ...UNSUPPORTED_HARDCODED },
+  desktop:    { ...UNSUPPORTED_HARDCODED, description: "Open desktop app" },
+  mobile:     { ...UNSUPPORTED_HARDCODED, description: "Open mobile app" },
+  chrome:     { ...UNSUPPORTED_HARDCODED, description: "Open Chrome extension" },
+  session:    { ...UNSUPPORTED_HARDCODED, description: "Manage sessions" },
+  teleport:   { ...UNSUPPORTED_HARDCODED, description: "Transfer session to another device" },
+  "remote-env": { ...UNSUPPORTED_HARDCODED, description: "Configure remote environment" },
 
   // --- Misc ---
-  exit:       { ...UNSUPPORTED_HARDCODED, message: "Use the Isomux UI to manage agents. `/exit` only works in the Claude Code CLI." },
-  stickers:   { ...UNSUPPORTED_HARDCODED },
-  upgrade:    { ...UNSUPPORTED_HARDCODED },
-  plugin:     { ...UNSUPPORTED_HARDCODED },
+  exit:       { ...UNSUPPORTED_HARDCODED, description: "Exit Claude Code", message: "Use the Isomux UI to manage agents. `/exit` only works in the Claude Code CLI." },
+  stickers:   { ...UNSUPPORTED_HARDCODED, description: "Fun stickers" },
+  upgrade:    { ...UNSUPPORTED_HARDCODED, description: "Upgrade Claude Code" },
+  plugin:     { ...UNSUPPORTED_HARDCODED, description: "Manage plugins" },
 
   // =========================================================================
   // Bundled skills (overridable — users can shadow with their own skill files)
   // =========================================================================
-  batch:              { ...UNSUPPORTED_BUNDLED_SKILL },
-  "claude-api":       { ...UNSUPPORTED_BUNDLED_SKILL },
-  "claude-in-chrome": { ...UNSUPPORTED_BUNDLED_SKILL },
-  debug:              { ...UNSUPPORTED_BUNDLED_SKILL },
-  "keybindings-help": { ...UNSUPPORTED_BUNDLED_SKILL },
-  loop:               { ...UNSUPPORTED_BUNDLED_SKILL },
-  "lorem-ipsum":      { ...UNSUPPORTED_BUNDLED_SKILL },
-  review:             { ...UNSUPPORTED_BUNDLED_SKILL },
-  schedule:           { ...UNSUPPORTED_BUNDLED_SKILL },
-  "security-review":  { ...UNSUPPORTED_BUNDLED_SKILL },
-  simplify:           { ...UNSUPPORTED_BUNDLED_SKILL },
-  skillify:           { ...UNSUPPORTED_BUNDLED_SKILL },
-  stuck:              { ...UNSUPPORTED_BUNDLED_SKILL },
-  ultrareview:        { ...UNSUPPORTED_BUNDLED_SKILL },
-  "update-config":    { ...UNSUPPORTED_BUNDLED_SKILL },
+  batch:              { ...UNSUPPORTED_BUNDLED_SKILL, description: "Decompose into parallel worktree agents" },
+  "claude-api":       { ...UNSUPPORTED_BUNDLED_SKILL, description: "Load API/SDK reference for detected language" },
+  "claude-in-chrome": { ...UNSUPPORTED_BUNDLED_SKILL, description: "Automate Chrome browser interactions" },
+  debug:              { ...UNSUPPORTED_BUNDLED_SKILL, description: "Diagnose session/tool issues from debug log" },
+  "keybindings-help": { ...UNSUPPORTED_BUNDLED_SKILL, description: "Customize keyboard shortcuts" },
+  loop:               { ...UNSUPPORTED_BUNDLED_SKILL, description: "Run a prompt on a recurring schedule" },
+  "lorem-ipsum":      { ...UNSUPPORTED_BUNDLED_SKILL, description: "Generate placeholder text" },
+  review:             { ...UNSUPPORTED_BUNDLED_SKILL, description: "Code review for bugs, logic, and edge cases" },
+  schedule:           { ...UNSUPPORTED_BUNDLED_SKILL, description: "Create cron-scheduled remote agents" },
+  "security-review":  { ...UNSUPPORTED_BUNDLED_SKILL, description: "Security-focused code review" },
+  simplify:           { ...UNSUPPORTED_BUNDLED_SKILL, description: "Code cleanup and reuse analysis" },
+  skillify:           { ...UNSUPPORTED_BUNDLED_SKILL, description: "Capture processes as reusable skills" },
+  stuck:              { ...UNSUPPORTED_BUNDLED_SKILL, description: "Diagnose frozen/slow sessions" },
+  ultrareview:        { ...UNSUPPORTED_BUNDLED_SKILL, description: "Ultra-thorough PR review" },
+  "update-config":    { ...UNSUPPORTED_BUNDLED_SKILL, description: "Configure settings.json" },
 };
 
 // ---------------------------------------------------------------------------
@@ -197,22 +205,23 @@ export const commands: Record<string, CommandConfig> = {
 // ---------------------------------------------------------------------------
 
 /** All command names that should appear in autocomplete from the config. */
-export function autocompleteCommands(): string[] {
+export function autocompleteCommands(): { name: string; description?: string }[] {
   return Object.entries(commands)
     .filter(([, cfg]) => cfg.autocomplete)
-    .map(([name]) => name);
+    .map(([name, cfg]) => ({ name, description: cfg.description }));
 }
 
 /** Unsupported message for a command, with type-aware defaults. */
 export function unsupportedMessage(name: string): string {
   const cfg = commands[name];
+  const desc = cfg?.description ? ` (${cfg.description.toLowerCase()})` : "";
   if (cfg?.message) return cfg.message;
   if (!cfg) return `\`/${name}\` is not available in Isomux.`;
   if (cfg.type === "hardcoded") {
-    return `\`/${name}\` is a Claude Code command, but it's not supported in Isomux.`;
+    return `\`/${name}\`${desc} is a Claude Code command, but it's not supported in Isomux.`;
   }
   if (cfg.type === "bundled-skill") {
-    return `\`/${name}\` is a Claude Code bundled skill, but it's not supported in Isomux. You can override it by creating your own skill file.`;
+    return `\`/${name}\`${desc} is a Claude Code bundled skill, but it's not supported in Isomux. You can override it by creating your own skill file.`;
   }
   return `\`/${name}\` is not available in Isomux.`;
 }
