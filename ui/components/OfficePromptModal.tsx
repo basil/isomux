@@ -34,7 +34,7 @@ export function OfficePromptModal({ onClose, username, onSaveUsername }: { onClo
 
   return (
     <div
-      onClick={onClose}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={{
         position: "fixed",
         inset: 0,
@@ -48,7 +48,6 @@ export function OfficePromptModal({ onClose, username, onSaveUsername }: { onClo
       }}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
           background: "var(--bg-overlay)",
           backdropFilter: "blur(16px)",

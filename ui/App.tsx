@@ -32,6 +32,8 @@ export function App() {
   // Keyboard shortcuts: Escape → office, 1-8 → jump to agent at desk
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement)?.tagName;
+      const isInput = tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable;
       if (e.key === "Escape") {
         dispatch({ type: "focus", agentId: null });
         setSpawnDesk(null);
@@ -39,7 +41,7 @@ export function App() {
         setEditAgent(null);
       }
       // Number keys 1-8: focus agent at that desk in current room (only from office view)
-      if (!focusedAgentId && e.key >= "1" && e.key <= "8" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      if (!isInput && !focusedAgentId && e.key >= "1" && e.key <= "8" && !e.metaKey && !e.ctrlKey && !e.altKey) {
         const deskIndex = parseInt(e.key) - 1;
         const agent = agents.find((a) => a.desk === deskIndex && a.room === currentRoom);
         if (agent) {
@@ -48,7 +50,7 @@ export function App() {
         }
       }
       // Tab/Shift+Tab in office view: switch rooms
-      if (!focusedAgentId && e.key === "Tab" && roomCount > 1 && !e.defaultPrevented) {
+      if (!isInput && !focusedAgentId && e.key === "Tab" && roomCount > 1 && !e.defaultPrevented) {
         e.preventDefault();
         const next = e.shiftKey
           ? (currentRoom - 1 + roomCount) % roomCount

@@ -32,7 +32,7 @@ export function TodoModal({ username, onClose }: { username: string; onClose: ()
 
   return (
     <div
-      onClick={onClose}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={{
         position: "fixed",
         inset: 0,
@@ -46,7 +46,6 @@ export function TodoModal({ username, onClose }: { username: string; onClose: ()
       }}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
           background: "var(--bg-overlay)",
           backdropFilter: "blur(16px)",

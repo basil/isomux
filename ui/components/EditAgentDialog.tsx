@@ -98,7 +98,7 @@ export function EditAgentDialog(props: EditAgentDialogProps) {
 
   return (
     <div
-      onClick={onClose}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={{
         position: "fixed",
         inset: 0,
@@ -112,7 +112,6 @@ export function EditAgentDialog(props: EditAgentDialogProps) {
       }}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
           background: "var(--bg-overlay)",
           backdropFilter: "blur(16px)",
