@@ -12,6 +12,7 @@ export function RoomTabBar() {
 
   return (
     <div
+      className="hide-scrollbar"
       style={{
         display: "flex",
         alignItems: "center",
@@ -22,6 +23,7 @@ export function RoomTabBar() {
         borderBottom: "1px solid var(--border-subtle)",
         overflowX: "auto",
         overflowY: "hidden",
+        scrollbarWidth: "none",
         flexShrink: 0,
         zIndex: 500,
       }}

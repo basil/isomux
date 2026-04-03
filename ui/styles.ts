@@ -4,6 +4,8 @@ export const CSS = `
   ::-webkit-scrollbar { width:6px; }
   ::-webkit-scrollbar-track { background:transparent; }
   ::-webkit-scrollbar-thumb { background:var(--bg-hover); border-radius:3px; }
+  .hide-scrollbar::-webkit-scrollbar { display:none; }
+  .hide-scrollbar { scrollbar-width:none; -ms-overflow-style:none; }
 
   @keyframes waitBounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
   @keyframes errShake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-2px)} 75%{transform:translateX(2px)} }

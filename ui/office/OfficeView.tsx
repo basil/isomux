@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from "react";
 import { useAppState, useDispatch, useTheme } from "../store.tsx";
 import { Floor, Walls } from "./Floor.tsx";
 import { RoomProps } from "./RoomProps.tsx";
@@ -14,8 +15,21 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
   const { agents, needsAttention, stateChangedAt, officePrompt, todos, currentRoom, roomCount, isMobile } = useAppState();
   const dispatch = useDispatch();
   const { theme, toggleTheme } = useTheme();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  const mobileScale = isMobile ? screen.width / SCENE_W : 1;
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
+
+  const mobileScale = isMobile ? screen.width / (SCENE_W - 200) : 1;
 
   // Filter agents to current room for rendering
   const roomAgents = agents.filter((a) => a.room === currentRoom);
@@ -63,18 +77,25 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
                 background: "var(--btn-surface)",
                 border: "1px solid var(--border)",
                 borderRadius: 6,
-                padding: "3px 8px",
+                width: 28,
+                height: 24,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 color: "var(--text-dim)",
-                fontSize: 11,
                 cursor: "pointer",
-                fontFamily: "'JetBrains Mono',monospace",
                 marginRight: 4,
+                padding: 0,
               }}
             >
-              &#9776;
+              <svg width="14" height="14" viewBox="0 0 32 32" style={{ display: "block" }}>
+                <polygon points="16,2 30,10 16,18 2,10" fill="currentColor" opacity="0.9" />
+                <polygon points="2,10 16,18 16,30 2,22" fill="currentColor" opacity="0.5" />
+                <polygon points="30,10 16,18 16,30 30,22" fill="currentColor" opacity="0.35" />
+              </svg>
             </button>
           )}
-          <span style={{ fontSize: isMobile ? 14 : 15, fontWeight: 700, letterSpacing: "-0.02em" }}>Isomux</span>
+          <span style={{ fontSize: isMobile ? 14 : 15, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>Isomux</span>
           {!isMobile && (
             <span
               style={{
@@ -94,13 +115,13 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
         <div style={{ display: "flex", gap: isMobile ? 8 : 12 }}>
           {(
             [
-              { n: counts.working, c: "var(--green)", l: "working" },
-              { n: counts.waiting, c: "var(--purple)", l: "waiting" },
-              { n: counts.error, c: "var(--red)", l: "error" },
-              { n: counts.idle, c: "var(--text-muted)", l: "idle" },
+              { n: counts.working, c: "var(--green)", l: "working", short: "work" },
+              { n: counts.waiting, c: "var(--purple)", l: "waiting", short: "wait" },
+              { n: counts.error, c: "var(--red)", l: "error", short: "err" },
+              { n: counts.idle, c: "var(--text-muted)", l: "idle", short: null as string | null },
             ] as const
           )
-            .filter((s) => s.n > 0)
+            .filter((s) => s.n > 0 && (!isMobile || s.short !== null))
             .map((s) => (
               <div
                 key={s.l}
@@ -124,28 +145,68 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
                     boxShadow: `0 0 6px ${s.c}`,
                   }}
                 />
-                {s.n} {isMobile ? s.l[0] : s.l}
+                {s.n} {isMobile ? s.short : s.l}
               </div>
             ))}
         </div>
         {isMobile ? (
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <button
-              onClick={onSpawn.bind(null, 0)}
-              style={{
-                background: "var(--accent)",
-                color: "var(--bg-base)",
-                border: "none",
-                borderRadius: 6,
-                padding: "3px 10px",
-                fontSize: 16,
-                fontWeight: 300,
-                cursor: "pointer",
-                lineHeight: 1,
-              }}
-            >
-              +
-            </button>
+            <div style={{ position: "relative" }} ref={menuRef}>
+              <button
+                onClick={() => setMenuOpen((v) => !v)}
+                style={{
+                  background: "var(--btn-surface)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 6,
+                  padding: "3px 8px",
+                  color: "var(--text-dim)",
+                  fontSize: 16,
+                  cursor: "pointer",
+                  lineHeight: 1,
+                }}
+              >
+                &#8943;
+              </button>
+              {menuOpen && (
+                <div
+                  style={{
+                    position: "fixed",
+                    top: menuRef.current ? menuRef.current.getBoundingClientRect().bottom + 6 : 0,
+                    right: 12,
+                    background: "var(--bg-surface)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 10,
+                    boxShadow: "0 8px 24px var(--shadow-heavy)",
+                    minWidth: 180,
+                    zIndex: 1000,
+                    overflow: "hidden",
+                  }}
+                >
+                  {[
+                    { icon: "\u2611", label: "Todos", action: onOpenTodos },
+                    { icon: "\u270E", label: username, action: onEditUsername },
+                    { icon: "\u2699", label: "Office rules", action: onEditOfficePrompt },
+                    { icon: theme === "dark" ? "\u2600" : "\u263E", label: theme === "dark" ? "Light mode" : "Dark mode", action: toggleTheme },
+                  ].map((item, i) => (
+                    <button
+                      key={i}
+                      onClick={() => { setMenuOpen(false); item.action(); }}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 10,
+                        width: "100%", padding: "12px 16px",
+                        background: "transparent", border: "none",
+                        color: "var(--text-primary)", fontSize: 14,
+                        cursor: "pointer", textAlign: "left",
+                        fontFamily: "'DM Sans',sans-serif",
+                      }}
+                    >
+                      <span style={{ width: 20, textAlign: "center", fontSize: 15 }}>{item.icon}</span>
+                      <span>{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

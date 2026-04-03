@@ -1,9 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { useAppState, useDispatch } from "../store.tsx";
-import { useTheme } from "../store.tsx";
+import { useAppState, useTheme } from "../store.tsx";
 import { StatusLight } from "../office/StatusLight.tsx";
-import { TodoButton } from "./TodoPanel.tsx";
-import { send } from "../ws.ts";
+import { RoomTabBar } from "../office/RoomTabBar.tsx";
 import type { AgentInfo } from "../../shared/types.ts";
 
 export function AgentListView({
@@ -25,14 +23,11 @@ export function AgentListView({
   onOpenTodos: () => void;
   onToggleView?: () => void;
 }) {
-  const { agents, connected, currentRoom, roomCount } = useAppState();
-  const dispatch = useDispatch();
+  const { agents, currentRoom, roomCount } = useAppState();
   const { theme, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const roomAgents = agents.filter((a) => a.room === currentRoom);
-  const room0Full = agents.filter((a) => a.room === 0).length >= 8;
-  const showRoomTabs = roomCount > 1 || room0Full;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -57,51 +52,97 @@ export function AgentListView({
         fontFamily: "'DM Sans', sans-serif",
       }}
     >
-      {/* Header */}
+      {/* Header — matches isometric view */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "12px 16px",
-          paddingTop: "calc(12px + env(safe-area-inset-top, 0px))",
-          borderBottom: "1px solid var(--border)",
-          background: "var(--bg-surface)",
+          padding: "0 12px",
+          paddingTop: "env(safe-area-inset-top, 0px)",
+          height: 40,
+          background: "var(--bg-hud)",
+          backdropFilter: "blur(16px)",
+          borderBottom: "1px solid var(--border-subtle)",
           flexShrink: 0,
+          zIndex: 500,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span
-            style={{
-              fontSize: 18,
-              fontWeight: 700,
-              color: "var(--text-primary)",
-              letterSpacing: "-0.3px",
-            }}
-          >
-            Isomux
-          </span>
-          <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: connected ? "var(--green)" : "var(--red)",
-              flexShrink: 0,
-            }}
-          />
+        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          {onToggleView && (
+            <button
+              onClick={onToggleView}
+              style={{
+                background: "var(--btn-surface)",
+                border: "1px solid var(--border)",
+                borderRadius: 6,
+                width: 28,
+                height: 24,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--text-dim)",
+                cursor: "pointer",
+                marginRight: 4,
+                padding: 0,
+              }}
+            >
+              <svg width="12" height="10" viewBox="0 0 12 10" fill="currentColor" style={{ display: "block" }}>
+                <rect y="0" width="12" height="2" rx="0.5" />
+                <rect y="4" width="12" height="2" rx="0.5" />
+                <rect y="8" width="12" height="2" rx="0.5" />
+              </svg>
+            </button>
+          )}
+          <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>Isomux</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          {(
+            [
+              { n: agents.filter((a) => ["thinking", "tool_executing"].includes(a.state)).length, c: "var(--green)", short: "work" },
+              { n: agents.filter((a) => a.state === "waiting_for_response").length, c: "var(--purple)", short: "wait" },
+              { n: agents.filter((a) => a.state === "error").length, c: "var(--red)", short: "err" },
+            ] as const
+          )
+            .filter((s) => s.n > 0)
+            .map((s) => (
+              <div
+                key={s.short}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 3,
+                  fontSize: 9,
+                  fontWeight: 600,
+                  color: s.c,
+                  fontFamily: "'JetBrains Mono',monospace",
+                  letterSpacing: "0.02em",
+                }}
+              >
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: s.c,
+                    boxShadow: `0 0 6px ${s.c}`,
+                  }}
+                />
+                {s.n} {s.short}
+              </div>
+            ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <div style={{ position: "relative" }} ref={menuRef}>
             <button
               onClick={() => setMenuOpen((v) => !v)}
               style={{
                 background: "var(--btn-surface)",
                 border: "1px solid var(--border)",
-                borderRadius: 8,
-                padding: "6px 10px",
+                borderRadius: 6,
+                padding: "3px 8px",
                 color: "var(--text-dim)",
-                fontSize: 18,
+                fontSize: 16,
                 cursor: "pointer",
                 lineHeight: 1,
               }}
@@ -111,77 +152,27 @@ export function AgentListView({
             {menuOpen && (
               <div
                 style={{
-                  position: "absolute",
-                  top: "calc(100% + 6px)",
-                  right: 0,
+                  position: "fixed",
+                  top: menuRef.current ? menuRef.current.getBoundingClientRect().bottom + 6 : 0,
+                  right: 12,
                   background: "var(--bg-surface)",
                   border: "1px solid var(--border)",
                   borderRadius: 10,
                   boxShadow: "0 8px 24px var(--shadow-heavy)",
                   minWidth: 180,
-                  zIndex: 200,
+                  zIndex: 1000,
                   overflow: "hidden",
                 }}
               >
-                <button
-                  onClick={() => { setMenuOpen(false); onOpenTodos(); }}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    width: "100%", padding: "12px 16px",
-                    background: "transparent", border: "none",
-                    color: "var(--text-primary)", fontSize: 14,
-                    cursor: "pointer", textAlign: "left",
-                    fontFamily: "'DM Sans',sans-serif",
-                  }}
-                >
-                  <span style={{ width: 20, textAlign: "center", fontSize: 15 }}>&#9745;</span>
-                  <span>Todos</span>
-                </button>
-                <button
-                  onClick={() => { setMenuOpen(false); onEditUsername(); }}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    width: "100%", padding: "12px 16px",
-                    background: "transparent", border: "none",
-                    color: "var(--text-primary)", fontSize: 14,
-                    cursor: "pointer", textAlign: "left",
-                    fontFamily: "'DM Sans',sans-serif",
-                  }}
-                >
-                  <span style={{ width: 20, textAlign: "center", fontSize: 15 }}>&#9998;</span>
-                  <span>{username}</span>
-                </button>
-                <button
-                  onClick={() => { setMenuOpen(false); onEditOfficePrompt(); }}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    width: "100%", padding: "12px 16px",
-                    background: "transparent", border: "none",
-                    color: "var(--text-primary)", fontSize: 14,
-                    cursor: "pointer", textAlign: "left",
-                    fontFamily: "'DM Sans',sans-serif",
-                  }}
-                >
-                  <span style={{ width: 20, textAlign: "center", fontSize: 15 }}>&#9881;</span>
-                  <span>Office rules</span>
-                </button>
-                <button
-                  onClick={() => { setMenuOpen(false); toggleTheme(); }}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    width: "100%", padding: "12px 16px",
-                    background: "transparent", border: "none",
-                    color: "var(--text-primary)", fontSize: 14,
-                    cursor: "pointer", textAlign: "left",
-                    fontFamily: "'DM Sans',sans-serif",
-                  }}
-                >
-                  <span style={{ width: 20, textAlign: "center", fontSize: 15 }}>{theme === "dark" ? "\u2600" : "\u263E"}</span>
-                  <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>
-                </button>
-                {onToggleView && (
+                {[
+                  { icon: "\u2611", label: "Todos", action: onOpenTodos },
+                  { icon: "\u270E", label: username, action: onEditUsername },
+                  { icon: "\u2699", label: "Office rules", action: onEditOfficePrompt },
+                  { icon: theme === "dark" ? "\u2600" : "\u263E", label: theme === "dark" ? "Light mode" : "Dark mode", action: toggleTheme },
+                ].map((item, i) => (
                   <button
-                    onClick={() => { setMenuOpen(false); onToggleView(); }}
+                    key={i}
+                    onClick={() => { setMenuOpen(false); item.action(); }}
                     style={{
                       display: "flex", alignItems: "center", gap: 10,
                       width: "100%", padding: "12px 16px",
@@ -189,74 +180,19 @@ export function AgentListView({
                       color: "var(--text-primary)", fontSize: 14,
                       cursor: "pointer", textAlign: "left",
                       fontFamily: "'DM Sans',sans-serif",
-                      borderTop: "1px solid var(--border)",
                     }}
                   >
-                    <span style={{ width: 20, textAlign: "center", fontSize: 15 }}>&#9634;</span>
-                    <span>Office view</span>
+                    <span style={{ width: 20, textAlign: "center", fontSize: 15 }}>{item.icon}</span>
+                    <span>{item.label}</span>
                   </button>
-                )}
+                ))}
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Room tabs */}
-      {showRoomTabs && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            padding: "8px 16px",
-            borderBottom: "1px solid var(--border)",
-            overflowX: "auto",
-            flexShrink: 0,
-          }}
-        >
-          {Array.from({ length: roomCount }, (_, i) => {
-            const isActive = i === currentRoom;
-            const count = agents.filter((a) => a.room === i).length;
-            return (
-              <button
-                key={i}
-                onClick={() => dispatch({ type: "set_current_room", room: i })}
-                style={{
-                  padding: "5px 12px",
-                  borderRadius: 8,
-                  border: isActive ? "1px solid var(--accent)" : "1px solid var(--border)",
-                  background: isActive ? "var(--accent-bg)" : "transparent",
-                  color: isActive ? "var(--accent)" : "var(--text-dim)",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  fontFamily: "'JetBrains Mono',monospace",
-                  whiteSpace: "nowrap",
-                  flexShrink: 0,
-                }}
-              >
-                {i + 1} <span style={{ fontSize: 10, opacity: 0.6 }}>{count}/8</span>
-              </button>
-            );
-          })}
-          <button
-            onClick={() => send({ type: "create_room" })}
-            style={{
-              padding: "5px 10px",
-              borderRadius: 8,
-              border: "1px dashed var(--border)",
-              background: "transparent",
-              color: "var(--text-hint)",
-              fontSize: 14,
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
-          >
-            +
-          </button>
-        </div>
-      )}
+      <RoomTabBar />
 
       {/* Agent list */}
       <div
@@ -341,7 +277,7 @@ export function AgentListView({
                 onClick={(e) => {
                   e.stopPropagation();
                   const rect = (e.target as HTMLElement).getBoundingClientRect();
-                  onContextMenu(rect.left, rect.bottom + 4, agent);
+                  onContextMenu(Math.max(8, rect.right - 208), rect.bottom + 4, agent);
                 }}
                 style={{
                   flexShrink: 0,
@@ -365,6 +301,7 @@ export function AgentListView({
       {/* Floating spawn button */}
       <button
         onClick={onSpawn}
+        disabled={roomAgents.length >= 8}
         style={{
           position: "fixed",
           bottom: "calc(24px + env(safe-area-inset-bottom, 0px))",
@@ -372,18 +309,20 @@ export function AgentListView({
           width: 56,
           height: 56,
           borderRadius: "50%",
-          background: "var(--accent)",
+          background: roomAgents.length >= 8 ? "var(--text-muted)" : "var(--accent)",
           color: "var(--bg-base)",
           border: "none",
           fontSize: 28,
           fontWeight: 300,
-          cursor: "pointer",
+          cursor: roomAgents.length >= 8 ? "default" : "pointer",
           boxShadow: "0 4px 20px var(--shadow-heavy)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          lineHeight: 1,
+          lineHeight: "56px",
           zIndex: 100,
+          opacity: roomAgents.length >= 8 ? 0.5 : 1,
+          paddingBottom: 2,
         }}
       >
         +
