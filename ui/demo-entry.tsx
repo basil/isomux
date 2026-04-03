@@ -3,7 +3,12 @@ import { StoreProvider, ThemeProvider, FeaturesProvider } from "./store.tsx";
 import { DEMO_FEATURES } from "../shared/features.ts";
 import { App } from "./App.tsx";
 import { setShim } from "./ws.ts";
-import { handleCommand, sendInitialState } from "./demo-server.ts";
+import { handleCommand, sendInitialState, setEmbedMode } from "./demo-server.ts";
+
+const isEmbed = new URLSearchParams(window.location.search).has("embed");
+
+// In embed mode, strip Angela (room 1) so only room 0 is seeded
+if (isEmbed) setEmbedMode();
 
 // Wire the shim before anything connects
 setShim(handleCommand, sendInitialState);
@@ -52,7 +57,16 @@ function DemoBanner() {
 
 const DEMO_BANNER_HEIGHT = 33;
 
+const features = isEmbed ? { ...DEMO_FEATURES, embed: true } : DEMO_FEATURES;
+
 function DemoApp() {
+  if (isEmbed) {
+    return (
+      <div style={{ position: "fixed", inset: 0, transform: "translateZ(0)" }}>
+        <App />
+      </div>
+    );
+  }
   return (
     <>
       <style>{`:root { --banner-h: ${DEMO_BANNER_HEIGHT}px; }`}</style>
@@ -67,7 +81,7 @@ function DemoApp() {
 const root = createRoot(document.getElementById("root")!);
 root.render(
   <ThemeProvider>
-    <FeaturesProvider features={DEMO_FEATURES}>
+    <FeaturesProvider features={features}>
       <StoreProvider>
         <DemoApp />
       </StoreProvider>

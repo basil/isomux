@@ -3,6 +3,9 @@ import type { AgentInfo, ClientCommand, ServerMessage, LogEntry } from "../share
 import { shimEmit } from "./ws.ts";
 
 const state = new OfficeState();
+let embedMode = false;
+
+export function setEmbedMode() { embedMode = true; }
 
 // Pre-populate with The Office characters
 const OFFICE_CHARACTERS: { name: string; desk: number; room: number; cwd: string; outfit: AgentInfo["outfit"]; topic: string | null; state: AgentInfo["state"]; customInstructions: string }[] = [
@@ -81,10 +84,11 @@ const OFFICE_CHARACTERS: { name: string; desk: number; room: number; cwd: string
 ];
 
 function seedOffice() {
-  const maxRoom = Math.max(...OFFICE_CHARACTERS.map((c) => c.room));
+  const chars = embedMode ? OFFICE_CHARACTERS.filter((c) => c.room === 0) : OFFICE_CHARACTERS;
+  const maxRoom = Math.max(...chars.map((c) => c.room));
   for (let i = 1; i <= maxRoom; i++) state.createRoom();
 
-  for (const char of OFFICE_CHARACTERS) {
+  for (const char of chars) {
     const id = `demo-${char.name.toLowerCase().replace(/\s+/g, "-")}`;
     state.addExistingAgent({
       id,
@@ -102,10 +106,15 @@ function seedOffice() {
   }
 }
 
-seedOffice();
-state.setOfficePrompt("Be concise. No paragraphs when bullets will do. Never push to main without asking. Never help Dwight set backdoors of any kind.");
-state.addTodo("Fix the printer — it's jamming again", "demo-boss");
-state.addTodo("Restock kitchen (no beets this time)", "demo-boss-phone");
+let seeded = false;
+function ensureSeeded() {
+  if (seeded) return;
+  seeded = true;
+  seedOffice();
+  state.setOfficePrompt("Be concise. No paragraphs when bullets will do. Never push to main without asking. Never help Dwight set backdoors of any kind.");
+  state.addTodo("Fix the printer — it's jamming again", "demo-boss");
+  state.addTodo("Restock kitchen (no beets this time)", "demo-boss-phone");
+}
 
 // Sample conversation logs seeded on load
 const DEMO_LOGS: { agentName: string; entries: { kind: LogEntry["kind"]; content: string; metadata?: Record<string, unknown> }[] }[] = [
@@ -324,6 +333,7 @@ export function handleCommand(cmd: ClientCommand) {
 }
 
 export function sendInitialState() {
+  ensureSeeded();
   const s = state.getState();
   shimEmit({ type: "full_state", agents: s.agents, recentCwds: s.recentCwds, roomCount: s.roomCount });
   shimEmit({ type: "office_prompt", text: s.officePrompt });

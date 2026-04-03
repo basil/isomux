@@ -1,4 +1,4 @@
-import { useAppState, useDispatch, useTheme } from "../store.tsx";
+import { useAppState, useDispatch, useTheme, useFeatures } from "../store.tsx";
 import { Floor, Walls } from "./Floor.tsx";
 import { RoomProps } from "./RoomProps.tsx";
 import { RoomTabBar } from "./RoomTabBar.tsx";
@@ -17,6 +17,7 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
   const { agents, needsAttention, stateChangedAt, officePrompt, todos, currentRoom, roomCount, isMobile } = useAppState();
   const dispatch = useDispatch();
   const { theme, toggleTheme } = useTheme();
+  const { embed } = useFeatures();
   const mobileScale = isMobile ? screen.width / (SCENE_W - 200) : 1;
   const swipeRef = useSwipeLeftRight(onSwipeLeft ?? (() => {}), onSwipeRight ?? (() => {}), isMobile);
 
@@ -38,7 +39,7 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
       }}
     >
       {/* Top HUD bar */}
-      {isMobile ? (
+      {embed ? null : isMobile ? (
         <MobileHeader
           viewMode="office"
           onToggleView={() => dispatch({ type: "toggle_mobile_view" })}
@@ -139,7 +140,7 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
         </div>
       )}
 
-      <RoomTabBar />
+      {!embed && <RoomTabBar />}
 
       {/* Office scene */}
       <div ref={swipeRef} style={{ flex: 1, position: "relative", overflow: "hidden" }}>
@@ -158,8 +159,10 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
           style={{
             position: "absolute",
             left: "50%",
-            top: isMobile ? "45%" : "50%",
-            transform: isMobile
+            top: embed ? (isMobile ? "55%" : "64%") : isMobile ? "45%" : "50%",
+            transform: embed
+              ? `translate(-50%, -50%) scale(${isMobile ? mobileScale * 0.85 : 0.9})`
+              : isMobile
               ? `translate(-50%, -50%) scale(${mobileScale})`
               : "translate(-50%, -50%)",
             transformOrigin: "center center",
@@ -198,18 +201,18 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
         </div>
 
         {/* Vignette */}
-        <div
+        {!embed && <div
           style={{
             position: "absolute",
             inset: 0,
             pointerEvents: "none",
             boxShadow: "inset 0 0 120px var(--vignette)",
           }}
-        />
+        />}
       </div>
 
       {/* Bottom HUD */}
-      <div
+      {!embed && <div
         style={{
           padding: isMobile ? "8px 12px" : "8px 20px",
           ...(isMobile ? { paddingBottom: "calc(8px + env(safe-area-inset-bottom, 0px))" } : {}),
@@ -240,7 +243,7 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
             {h}
           </span>
         ))}
-      </div>
+      </div>}
     </div>
   );
 }
