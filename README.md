@@ -12,7 +12,6 @@ See [isomux.com](https://isomux.com) for setup instructions and a live demo.
 
 ## Feature Highlights
 
-- **Tmux alternative** for managing multiple Claude Code agents
 - Visual office metaphor — see what every agent is doing at a glance
   - **Animated characters** — sleeping when idle, typing when working, waving when waiting for you
   - [**Skeuomorphic touches**](https://x.com/Nil053/status/2039027360117506399): click the moon to toggle dark mode, drag agents between desks, desk monitors glow based on state
@@ -25,6 +24,7 @@ See [isomux.com](https://isomux.com) for setup instructions and a live demo.
 - [**Pre-tool-call safety hooks**](https://x.com/Nil053/status/2039497314826666469) — blocks dangerous commands like `rm -rf` out of the box
 - [**Custom commands**](https://x.com/Nil053/status/2040018957453918431) — e.g. `/isomux-peer-review` to review another agent's work, or `/isomux-all-hands` to see what everyone is up to
 - [**Agents can check on each other**](https://x.com/Nil053/status/2039494626265149778) — inter-agent discovery via shared manifest
+- **Tmux alternative** for managing multiple Claude Code agents
 - **Slash command autocomplete** — bundled skills like `/grill-me`, user skills, keyboard-navigable dropdown
 - **Sound notifications** — get pinged when an agent finishes
 

@@ -468,7 +468,6 @@
     <div style="text-align: center; margin-bottom: 16px;"><div class="free-badge">free &amp; open source &middot; works with your Claude subscription &middot; runs locally; no cloud, no account</div></div>
 
     <ul class="feature-highlights">
-      <li><strong>Tmux alternative</strong> for managing multiple Claude Code agents</li>
       <li>Visual office metaphor &mdash; see what every agent is doing at a glance
         <ul>
           <li><strong>Animated characters</strong> &mdash; sleeping when idle, typing when working, waving when waiting for you</li>
@@ -487,6 +486,7 @@
       <li><a href="https://x.com/Nil053/status/2039497314826666469" target="_blank" rel="noopener"><strong>Pre-tool-call safety hooks</strong></a> &mdash; blocks dangerous commands like <code style="background: var(--bg); padding: 1px 6px; border-radius: 4px; font-size: 0.85em;">rm -rf</code> out of the box</li>
       <li><a href="https://x.com/Nil053/status/2040018957453918431" target="_blank" rel="noopener"><strong>Custom commands</strong></a> &mdash; e.g. <code style="background: var(--bg); padding: 1px 6px; border-radius: 4px; font-size: 0.85em;">/isomux-peer-review</code> to review another agent's work, or <code style="background: var(--bg); padding: 1px 6px; border-radius: 4px; font-size: 0.85em;">/isomux-all-hands</code> to see what everyone is up to</li>
       <li><a href="https://x.com/Nil053/status/2039494626265149778" target="_blank" rel="noopener"><strong>Agents can check on each other</strong></a> &mdash; inter-agent discovery via shared manifest</li>
+      <li><strong>Tmux alternative</strong> for managing multiple Claude Code agents</li>
       <li><strong>Slash command autocomplete</strong> &mdash; bundled skills like <code style="background: var(--bg); padding: 1px 6px; border-radius: 4px; font-size: 0.85em;">/grill-me</code>, user skills, keyboard-navigable dropdown</li>
       <li><strong>Sound notifications</strong> &mdash; get pinged when an agent finishes</li>
     </ul>
@@ -518,6 +518,7 @@ bun run dev</pre>
 
       <h3>3. Open</h3>
       <p>Visit <strong>http://localhost:4000</strong> in your browser. Click an empty desk to spawn your first agent.</p>
+      <p style="margin-top: 12px; color: var(--text-dim); font-size: 0.85rem;"><strong>Tip:</strong> On your phone, use &ldquo;Add to Home Screen&rdquo; for a full-screen app experience.</p>
     </div>
     </details>
   </section>
@@ -527,57 +528,15 @@ bun run dev</pre>
     <details class="section-collapse">
       <summary><h2 style="display: inline;">Persistent Server Setup <em style="font-weight: 400; font-size: 0.85em; color: var(--text-dim);">(Mac Mini style)</em></h2></summary>
     <p class="section-intro">
-      Run Isomux on a Mac Mini or any always-on box/server. Talk to your agents from your laptop, your phone, or anywhere via Tailscale. Same conversations, instantly sync'd via WebSocket.
+      Run Isomux on a Mac Mini or any always-on box/server. Talk to your agents from your laptop, your phone, or anywhere via <a href="https://tailscale.com/" target="_blank" rel="noopener">Tailscale</a>. Same conversations, instantly sync'd via WebSocket.
     </p>
 
     <div class="setup-card">
-      <p style="color: var(--accent); font-size: 0.85rem; margin-bottom: 16px;">Hint: save time by asking your agent to set it up for you.</p>
-      <h3>1. Create the systemd service</h3>
-      <p>This auto-rebuilds the UI on each start and restarts on failure.</p>
-<pre>mkdir -p ~/.config/systemd/user
-
-cat &gt; ~/.config/systemd/user/isomux.service &lt;&lt;'EOF'
-[Unit]
-Description=Isomux - Isometric Office Manager
-After=network.target
-
-[Service]
-Type=simple
-WorkingDirectory=/home/YOUR_USER/isomux
-ExecStartPre=/home/YOUR_USER/.bun/bin/bun run build:ui
-ExecStart=/home/YOUR_USER/.bun/bin/bun run server/index.ts
-Restart=always
-RestartSec=3
-Environment=PATH=/home/YOUR_USER/.bun/bin:/usr/local/bin:/usr/bin:/bin
-
-[Install]
-WantedBy=default.target
-EOF</pre>
-
-      <h3>2. Enable and start</h3>
-<pre>systemctl --user daemon-reload
-systemctl --user enable --now isomux
-
-<span class="comment"># Check status</span>
-systemctl --user status isomux</pre>
-
-      <h3>3. Enable lingering</h3>
-      <p>By default, systemd user services stop when you log out. Enable lingering so Isomux keeps running.</p>
-<pre>sudo loginctl enable-linger $USER</pre>
-
-      <h3>4. Set up Tailscale</h3>
-      <p>Install <a href="https://tailscale.com/" target="_blank" rel="noopener">Tailscale</a> on the server, your laptop, and your phone. Once connected, every device can reach Isomux at the server's Tailscale IP &mdash; same URL everywhere, instantly in sync.</p>
-<pre>curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up
-
-<span class="comment"># Find your Tailscale IP</span>
-tailscale ip -4</pre>
-
-      <p style="margin-top: 20px; margin-bottom: 8px;"><strong>Bonus:</strong> Instead of remembering an IP, rename your machine in the <a href="https://login.tailscale.com/admin/machines" target="_blank" rel="noopener">Tailscale admin console</a> to something friendly, like <code style="background: var(--bg); padding: 1px 6px; border-radius: 4px; font-size: 0.85em;">my-mac-mini</code>.</p>
-
-      <h3>5. Access from laptop or phone</h3>
-      <p>Open the same URL from any device on your Tailnet &mdash; laptop gets the full office view, phone gets a touch-optimized agent list:</p>
-<pre>http://my-mac-mini:4000</pre>
+      <p>Give this prompt to one of your Isomux agents:</p>
+<pre>Set up Isomux as an always-on server. Create a systemd user service
+that auto-rebuilds the UI on start and restarts on failure. Enable
+lingering so it survives logout. Then install Tailscale so I can
+access Isomux from any device on my Tailnet.</pre>
     </div>
     </details>
   </section>
