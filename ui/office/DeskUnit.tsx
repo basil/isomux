@@ -1,9 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import type { AgentInfo } from "../../shared/types.ts";
+import type { AgentInfo, ClaudeModel } from "../../shared/types.ts";
 import { DeskSprite } from "./DeskSprite.tsx";
 import { Character } from "./Character.tsx";
 import { StatusLight } from "./StatusLight.tsx";
 import { deskPixelPos, DESK_SLOTS } from "./grid.ts";
+
+const MODEL_TINT: Record<ClaudeModel, { border: string; bg: string }> = {
+  "claude-opus-4-6":          { border: "rgba(100,160,255,0.85)",  bg: "rgba(100,160,255,0.35)" },
+  "claude-sonnet-4-6":        { border: "rgba(218,165,32,0.80)", bg: "rgba(218,165,32,0.32)" },
+  "claude-haiku-4-5-20251001": { border: "rgba(230,130,180,0.80)", bg: "rgba(230,130,180,0.32)" },
+};
 
 export function DeskUnit({
   agent,
@@ -124,20 +130,6 @@ export function DeskUnit({
         WebkitUserSelect: "none",
       }}
     >
-      {/* Shadow on floor */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: -2,
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: 120,
-          height: 20,
-          background: "radial-gradient(ellipse,rgba(0,0,0,0.2),transparent)",
-          borderRadius: "50%",
-          zIndex: 0,
-        }}
-      />
 
       {/* Character behind desk — idle agents sit back a bit */}
       <div style={{ position: "absolute", left: agent.state === "idle" || agent.state === "stopped" ? 84 : 78, top: agent.state === "idle" || agent.state === "stopped" ? -16 : -20, zIndex: 1 }}>
@@ -146,7 +138,7 @@ export function DeskUnit({
 
       {/* Desk */}
       <div style={{ position: "relative", zIndex: 2 }}>
-        <DeskSprite state={agent.state} deskIndex={agent.desk} cwd={agent.cwd} />
+        <DeskSprite state={agent.state} deskIndex={agent.desk} cwd={agent.cwd} model={agent.model} />
       </div>
 
       {/* Floating nametag — outer div handles positioning, inner handles animation */}
@@ -168,10 +160,10 @@ export function DeskUnit({
             alignItems: "center",
             gap: 6,
             padding: "3px 10px 3px 7px",
-            background: needsAttention ? "var(--orange-bg)" : "var(--bg-tag)",
+            background: MODEL_TINT[agent.model]?.bg ?? "var(--bg-tag)",
             backdropFilter: "blur(10px)",
             borderRadius: 20,
-            border: needsAttention ? "1px solid var(--orange-border)" : "1px solid var(--border-medium)",
+            border: `1px solid ${MODEL_TINT[agent.model]?.border ?? "var(--border-medium)"}`,
             opacity: hov ? 1 : 0.8,
             transition: "opacity 0.2s, background 0.3s, border 0.3s",
             animation: needsAttention ? "dotPulse 2s ease-in-out infinite" : undefined,
