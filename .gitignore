@@ -5,3 +5,4 @@ site/demo/index.html
 site/demo/xterm.css
 *.log
 .vercel
+.claude/

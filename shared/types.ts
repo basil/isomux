@@ -91,7 +91,8 @@ export type ServerMessage =
   | { type: "office_prompt"; text: string }
   | { type: "todos"; todos: TodoItem[] }
   | { type: "room_created"; roomCount: number }
-  | { type: "room_closed"; room: number; roomCount: number };
+  | { type: "room_closed"; room: number; roomCount: number }
+  | { type: "update_status"; updateAvailable: boolean; latestMessage: string };
 
 // Browser → Server commands
 export type ClientCommand =

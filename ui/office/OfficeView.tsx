@@ -14,7 +14,7 @@ import { useSwipeLeftRight } from "../hooks/useSwipeLeftRight.ts";
 import type { AgentInfo } from "../../shared/types.ts";
 
 export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, onEditOfficePrompt, onOpenTodos, onSwipeLeft, onSwipeRight }: { onSpawn: (deskIndex: number) => void; onContextMenu: (x: number, y: number, agent: AgentInfo) => void; username: string; onEditUsername: () => void; onEditOfficePrompt: () => void; onOpenTodos: () => void; onSwipeLeft?: () => void; onSwipeRight?: () => void }) {
-  const { agents, needsAttention, stateChangedAt, officePrompt, todos, currentRoom, roomCount, isMobile } = useAppState();
+  const { agents, needsAttention, stateChangedAt, officePrompt, todos, currentRoom, roomCount, isMobile, updateAvailable, updateMessage } = useAppState();
   const dispatch = useDispatch();
   const { theme, toggleTheme } = useTheme();
   const { embed } = useFeatures();
@@ -46,6 +46,8 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
           counts={counts}
           onOpenTodos={onOpenTodos}
           onEditOfficePrompt={onEditOfficePrompt}
+          updateAvailable={updateAvailable}
+          updateMessage={updateMessage}
         />
       ) : (
         <div
@@ -64,6 +66,25 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
         >
           <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
             <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>Isomux</span>
+            {updateAvailable && (
+              <span
+                title={`Update available: ${updateMessage}\n\nPull the latest changes and run bun install, then restart the server.`}
+                style={{
+                  fontSize: 9,
+                  fontWeight: 600,
+                  color: "var(--blue, #58a6ff)",
+                  fontFamily: "'JetBrains Mono',monospace",
+                  letterSpacing: "0.02em",
+                  cursor: "help",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--blue, #58a6ff)", boxShadow: "0 0 6px var(--blue, #58a6ff)" }} />
+                update available
+              </span>
+            )}
           </div>
           <div style={{ display: "flex", gap: 12 }}>
             {(

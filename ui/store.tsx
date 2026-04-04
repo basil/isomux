@@ -21,6 +21,8 @@ export interface AppState {
   todos: TodoItem[];
   currentRoom: number; // 0-based room index
   roomCount: number; // total number of rooms
+  updateAvailable: boolean;
+  updateMessage: string;
 }
 
 type Action =
@@ -41,7 +43,8 @@ type Action =
   | { type: "todos"; todos: TodoItem[] }
   | { type: "set_current_room"; room: number }
   | { type: "room_created"; roomCount: number }
-  | { type: "room_closed"; room: number; roomCount: number };
+  | { type: "room_closed"; room: number; roomCount: number }
+  | { type: "update_status"; updateAvailable: boolean; latestMessage: string };
 
 // States that warrant attention
 const ATTENTION_STATES = new Set(["idle", "error", "waiting_for_response"]);
@@ -156,6 +159,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, currentRoom: action.room };
     case "room_created":
       return { ...state, roomCount: action.roomCount };
+    case "update_status":
+      return { ...state, updateAvailable: action.updateAvailable, updateMessage: action.latestMessage };
     case "room_closed": {
       let currentRoom = state.currentRoom;
       if (currentRoom === action.room) {
@@ -188,6 +193,8 @@ const initialState: AppState = {
   todos: [],
   currentRoom: 0,
   roomCount: 1,
+  updateAvailable: false,
+  updateMessage: "",
 };
 
 const StateCtx = createContext<AppState>(initialState);

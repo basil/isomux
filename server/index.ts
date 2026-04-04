@@ -2,6 +2,7 @@ import type { ServerWebSocket } from "bun";
 import type { ServerMessage, ClientCommand } from "../shared/types.ts";
 import * as AgentManager from "./agent-manager.ts";
 import { loadRecentCwds, saveRecentCwd, loadTodos, saveTodos } from "./persistence.ts";
+import { startUpdateChecker, getUpdateStatus, onUpdateChange } from "./update-checker.ts";
 import type { TodoItem } from "../shared/types.ts";
 import { join } from "path";
 import { execSync } from "child_process";
@@ -190,6 +191,11 @@ const server = Bun.serve({
       ws.send(JSON.stringify({ type: "office_prompt", text: AgentManager.getOfficePrompt() } as ServerMessage));
       // Send todos
       ws.send(JSON.stringify({ type: "todos", todos } as ServerMessage));
+      // Send update status
+      const update = getUpdateStatus();
+      if (update.updateAvailable) {
+        ws.send(JSON.stringify({ type: "update_status", updateAvailable: true, latestMessage: update.latestMessage } as ServerMessage));
+      }
       // Send cached log history and slash commands for each agent
       for (const agent of agents) {
         const logs = AgentManager.getAgentLogs(agent.id);
@@ -220,6 +226,12 @@ const server = Bun.serve({
     },
   },
 });
+
+// Start update checker
+onUpdateChange((status) => {
+  broadcast({ type: "update_status", updateAvailable: status.updateAvailable, latestMessage: status.latestMessage } as ServerMessage);
+});
+startUpdateChecker();
 
 // Restore persisted agents on startup
 AgentManager.restoreAgents().then((restored) => {

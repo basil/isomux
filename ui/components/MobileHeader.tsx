@@ -41,12 +41,16 @@ export function MobileHeader({
   counts,
   onOpenTodos,
   onEditOfficePrompt,
+  updateAvailable,
+  updateMessage,
 }: {
   viewMode: "list" | "office";
   onToggleView: () => void;
   counts: RoomCounts;
   onOpenTodos: () => void;
   onEditOfficePrompt: () => void;
+  updateAvailable?: boolean;
+  updateMessage?: string;
 }) {
   const { theme, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -100,6 +104,12 @@ export function MobileHeader({
           {viewMode === "list" ? LIST_ICON : ISO_ICON}
         </button>
         <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>Isomux</span>
+        {updateAvailable && (
+          <span
+            title={`Update available: ${updateMessage}\n\nPull the latest changes and run bun install, then restart the server.`}
+            style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--blue, #58a6ff)", boxShadow: "0 0 6px var(--blue, #58a6ff)", flexShrink: 0 }}
+          />
+        )}
       </div>
       <div style={{ display: "flex", gap: 8 }}>
         {(
