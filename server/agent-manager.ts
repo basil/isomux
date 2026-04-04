@@ -1346,7 +1346,8 @@ const commandHandlers: Record<string, HandlerFn> = {
 
       for (const a of roomAgents) {
         const selfTag = a.info.id === agentId ? "  **(me)**" : "";
-        lines.push(`**${a.info.name}** (desk ${a.info.desk + 1})${selfTag} — \`${a.info.cwd}\``);
+        const modelLabel = CLAUDE_MODELS.find((m) => m.id === a.info.model)?.label ?? a.info.model;
+        lines.push(`**${a.info.name}** (desk ${a.info.desk + 1})${selfTag} — ${modelLabel} — \`${a.info.cwd}\``);
 
         const sessions = listAgentSessions(a.info.id);
         if (sessions.length === 0) {
