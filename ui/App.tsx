@@ -74,6 +74,22 @@ export function App() {
     if (nextId) dispatch({ type: "focus", agentId: nextId });
   }, [dispatch, agents, drafts, currentRoom, focusedAgentId]);
 
+  // Browser back button: navigate to office view instead of leaving the page.
+  // Model: office = home, any other view = one level deep. Only one history
+  // entry is ever pushed. All "return to office" paths go through goHome(),
+  // which calls history.back() so the popstate handler does the actual cleanup.
+  const deepRef = useRef(false);
+
+  const goHome = useCallback(() => {
+    if (deepRef.current) {
+      window.history.back(); // popstate handler will reset state
+    } else {
+      // Safety fallback — shouldn't happen, but don't break if it does
+      setTasksOpen(false);
+      dispatch({ type: "focus", agentId: null });
+    }
+  }, [dispatch]);
+
   // Keyboard shortcuts: Escape → office, 1-8 → jump to agent at desk
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -113,22 +129,6 @@ export function App() {
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
   }, [dispatch, goHome, focusedAgentId, agents, drafts, currentRoom, roomCount]);
-
-  // Browser back button: navigate to office view instead of leaving the page.
-  // Model: office = home, any other view = one level deep. Only one history
-  // entry is ever pushed. All "return to office" paths go through goHome(),
-  // which calls history.back() so the popstate handler does the actual cleanup.
-  const deepRef = useRef(false);
-
-  const goHome = useCallback(() => {
-    if (deepRef.current) {
-      window.history.back(); // popstate handler will reset state
-    } else {
-      // Safety fallback — shouldn't happen, but don't break if it does
-      setTasksOpen(false);
-      dispatch({ type: "focus", agentId: null });
-    }
-  }, [dispatch]);
 
   // Sync history stack with view state
   const isDeep = tasksOpen || focusedAgentId !== null;
