@@ -23,6 +23,7 @@ See [isomux.com](https://isomux.com) for setup instructions and a live demo. Rea
 - [**Pre-tool-call safety hooks**](https://x.com/Nil053/status/2039497314826666469): blocks dangerous commands like `rm -rf`
 - [**Custom commands**](https://x.com/Nil053/status/2040018957453918431) in addition to your own, all with autocomplete: e.g. `/isomux-peer-review` to review another agent's work, or `/isomux-all-hands` to see what everyone is up to
 - [**Agents can check on each other**](https://x.com/Nil053/status/2039494626265149778): inter-agent discovery via shared manifest
+- [**Shared task board**](https://x.com/Nil053/status/2040871759529025617): humans and agents can create, assign, claim, and close tasks — full interop via UI and HTTP API
 - **Sound notifications**: get pinged when an agent finishes
 
 ## Get Started
