@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAppState, useDispatch } from "./store.tsx";
 import { OfficeView } from "./office/OfficeView.tsx";
 import { LogView } from "./log-view/LogView.tsx";
@@ -80,7 +80,7 @@ export function App() {
       const tag = (e.target as HTMLElement)?.tagName;
       const isInput = tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable;
       if (e.key === "Escape") {
-        dispatch({ type: "focus", agentId: null });
+        goHome();
         setSpawnDesk(null);
         setCtxMenu(null);
         setEditAgent(null);
@@ -112,7 +112,48 @@ export function App() {
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [dispatch, focusedAgentId, agents, drafts, currentRoom, roomCount]);
+  }, [dispatch, goHome, focusedAgentId, agents, drafts, currentRoom, roomCount]);
+
+  // Browser back button: navigate to office view instead of leaving the page.
+  // Model: office = home, any other view = one level deep. Only one history
+  // entry is ever pushed. All "return to office" paths go through goHome(),
+  // which calls history.back() so the popstate handler does the actual cleanup.
+  const deepRef = useRef(false);
+
+  const goHome = useCallback(() => {
+    if (deepRef.current) {
+      window.history.back(); // popstate handler will reset state
+    } else {
+      // Safety fallback — shouldn't happen, but don't break if it does
+      setTasksOpen(false);
+      dispatch({ type: "focus", agentId: null });
+    }
+  }, [dispatch]);
+
+  // Sync history stack with view state
+  const isDeep = tasksOpen || focusedAgentId !== null;
+  useEffect(() => {
+    if (isDeep && !deepRef.current) {
+      window.history.pushState({ isomux: true }, "");
+      deepRef.current = true;
+    } else if (isDeep && deepRef.current) {
+      // Deep → deep transition (e.g. tasks→log, agent cycling): keep one entry
+      window.history.replaceState({ isomux: true }, "");
+    } else if (!isDeep && deepRef.current) {
+      // Returned to office — entry was consumed by history.back()
+      deepRef.current = false;
+    }
+  }, [isDeep, focusedAgentId, tasksOpen]);
+
+  useEffect(() => {
+    function handlePopState() {
+      deepRef.current = false;
+      setTasksOpen(false);
+      dispatch({ type: "focus", agentId: null });
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [dispatch]);
 
   return (
     <>
@@ -137,7 +178,7 @@ export function App() {
       {tasksOpen ? (
         <TaskView
           username={username ?? ""}
-          onClose={() => setTasksOpen(false)}
+          onClose={goHome}
           onFocusAgent={(agentId) => { setTasksOpen(false); dispatch({ type: "focus", agentId }); }}
         />
       ) : focusedAgent ? (
@@ -145,7 +186,7 @@ export function App() {
           key={focusedAgent.id}
           agent={focusedAgent}
           logs={logs.get(focusedAgent.id) ?? []}
-          onBack={() => dispatch({ type: "focus", agentId: null })}
+          onBack={goHome}
           onEditAgent={() => setEditAgent(focusedAgent)}
           username={username ?? ""}
           onOpenTasks={() => setTasksOpen(true)}
