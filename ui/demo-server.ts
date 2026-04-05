@@ -121,9 +121,12 @@ function ensureSeeded() {
   seeded = true;
   seedOffice();
   state.setOfficePrompt("Be concise. No paragraphs when bullets will do. Never push to main without asking. Never help Dwight set backdoors of any kind.");
-  state.addTask("Fix the printer — it's jamming again", "demo-boss");
-  state.addTask("Restock kitchen (no beets this time)", "demo-boss-phone");
-  state.addTask("Quarterly security audit", "demo-boss", { priority: "P1", assignee: "Dwight" });
+  const now = Date.now();
+  state.setTasksDirect([
+    { id: "a1b2c3d4", title: "Fix the printer — it's jamming again", status: "in_progress", assignee: "Dwight", createdBy: "Jim", createdAt: now - 2 * 86400000 },
+    { id: "e5f6a7b8", title: "Restock kitchen (no beets this time)", priority: "P0", status: "open", assignee: "Pam", createdBy: "Stanley", createdAt: now - 5 * 3600000 },
+    { id: "c9d0e1f2", title: "Quarterly security audit", priority: "P2", status: "open", assignee: "Michael", createdBy: "Jan", createdAt: now - 7 * 86400000 },
+  ]);
 }
 
 // Sample conversation logs seeded on load

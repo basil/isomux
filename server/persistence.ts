@@ -2,14 +2,12 @@ import { join } from "path";
 import { homedir } from "os";
 import { mkdirSync, appendFileSync, readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync } from "fs";
 import type { AgentInfo, ClaudeModel, LogEntry, TaskItem } from "../shared/types.ts";
-import { generateTaskId } from "../shared/types.ts";
 
 const ISOMUX_DIR = join(homedir(), ".isomux");
 const LOGS_DIR = join(ISOMUX_DIR, "logs");
 const AGENTS_FILE = join(ISOMUX_DIR, "agents.json");
 const OFFICE_PROMPT_FILE = join(ISOMUX_DIR, "office-prompt.md");
 const TASKS_FILE = join(ISOMUX_DIR, "tasks.json");
-const TODOS_FILE = join(ISOMUX_DIR, "todos.json"); // legacy, for migration
 
 // Ensure directories exist
 try {
@@ -222,26 +220,11 @@ export function saveOfficePrompt(text: string) {
   }
 }
 
-// Tasks (replaces todos)
+// Tasks
 export function loadTasks(): TaskItem[] {
   try {
-    if (existsSync(TASKS_FILE)) {
-      return JSON.parse(readFileSync(TASKS_FILE, "utf-8")) as TaskItem[];
-    }
-    // Migrate from legacy todos.json
-    if (existsSync(TODOS_FILE)) {
-      const todos = JSON.parse(readFileSync(TODOS_FILE, "utf-8")) as { id: string; text: string; createdBy: string; createdAt: number }[];
-      const usedIds: string[] = [];
-      const tasks: TaskItem[] = todos.map((t) => {
-        const id = generateTaskId(usedIds);
-        usedIds.push(id);
-        return { id, title: t.text, status: "open" as const, createdBy: t.createdBy, createdAt: t.createdAt };
-      });
-      saveTasks(tasks);
-      unlinkSync(TODOS_FILE);
-      return tasks;
-    }
-    return [];
+    if (!existsSync(TASKS_FILE)) return [];
+    return JSON.parse(readFileSync(TASKS_FILE, "utf-8")) as TaskItem[];
   } catch {
     return [];
   }

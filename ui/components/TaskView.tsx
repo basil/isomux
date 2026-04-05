@@ -39,7 +39,7 @@ function timeAgo(ts: number): string {
   return `${days}d ago`;
 }
 
-function TaskDetailPanel({ task, onClose, username, mode = "edit", agents = [] }: { task?: TaskItem; onClose: () => void; username: string; mode?: "edit" | "create"; agents?: { name: string }[] }) {
+function TaskDetailPanel({ task, onClose, username, mode = "edit", agents = [], closeRef }: { task?: TaskItem; onClose: () => void; username: string; mode?: "edit" | "create"; agents?: { name: string }[]; closeRef?: React.MutableRefObject<(() => void) | null> }) {
   const [title, setTitle] = useState(task?.title || "");
   const [description, setDescription] = useState(task?.description || "");
   const [priority, setPriority] = useState<TaskPriority | "">(task?.priority || "");
@@ -61,6 +61,35 @@ function TaskDetailPanel({ task, onClose, username, mode = "edit", agents = [] }
       setAssignee("");
     }
   }, [task]);
+
+  function isDirty(): boolean {
+    if (mode === "create") {
+      return !!(title.trim() || description.trim() || priority || assignee.trim());
+    }
+    if (!task) return false;
+    return (
+      title !== task.title ||
+      description !== (task.description || "") ||
+      priority !== (task.priority || "") ||
+      status !== task.status ||
+      assignee !== (task.assignee || "")
+    );
+  }
+
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+
+  function requestClose() {
+    if (isDirty()) {
+      setConfirmDiscard(true);
+    } else {
+      onClose();
+    }
+  }
+
+  useEffect(() => {
+    if (closeRef) closeRef.current = requestClose;
+    return () => { if (closeRef) closeRef.current = null; };
+  });
 
   function handleSave() {
     if (!title.trim()) return;
@@ -89,7 +118,10 @@ function TaskDetailPanel({ task, onClose, username, mode = "edit", agents = [] }
     onClose();
   }
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   function handleDelete() {
+    if (!confirmDelete) { setConfirmDelete(true); return; }
     if (task) send({ type: "delete_task", id: task.id });
     onClose();
   }
@@ -137,7 +169,7 @@ function TaskDetailPanel({ task, onClose, username, mode = "edit", agents = [] }
         <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
           {mode === "create" ? "New Task" : `#${task!.id}`}
         </span>
-        <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", fontSize: 18, cursor: "pointer", padding: "2px 6px" }}>&times;</button>
+        <button onClick={requestClose} style={{ background: "none", border: "none", color: "var(--text-muted)", fontSize: 18, cursor: "pointer", padding: "2px 6px" }}>&times;</button>
       </div>
 
       <div>
@@ -211,6 +243,44 @@ function TaskDetailPanel({ task, onClose, username, mode = "edit", agents = [] }
         </div>
       )}
 
+      {confirmDiscard && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "8px 0" }}>
+          <span style={{ fontSize: 11, color: "var(--text-muted)", flex: 1 }}>Discard unsaved changes?</span>
+          <button
+            onClick={onClose}
+            style={{
+              padding: "6px 12px",
+              borderRadius: 6,
+              border: "1px solid var(--red)",
+              background: "var(--red)",
+              color: "var(--bg-base)",
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "'DM Sans',sans-serif",
+            }}
+          >
+            Discard
+          </button>
+          <button
+            onClick={() => setConfirmDiscard(false)}
+            style={{
+              padding: "6px 12px",
+              borderRadius: 6,
+              border: "1px solid var(--border)",
+              background: "transparent",
+              color: "var(--text-primary)",
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "'DM Sans',sans-serif",
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
         <button
           onClick={handleSave}
@@ -233,19 +303,20 @@ function TaskDetailPanel({ task, onClose, username, mode = "edit", agents = [] }
         {mode === "edit" && (
           <button
             onClick={handleDelete}
+            onBlur={() => setConfirmDelete(false)}
             style={{
               padding: "9px 14px",
               borderRadius: 8,
-              border: "1px solid var(--border)",
-              background: "transparent",
-              color: "var(--red)",
+              border: `1px solid ${confirmDelete ? "var(--red)" : "var(--border)"}`,
+              background: confirmDelete ? "var(--red)" : "transparent",
+              color: confirmDelete ? "var(--bg-base)" : "var(--red)",
               fontSize: 12,
               fontWeight: 600,
               cursor: "pointer",
               fontFamily: "'DM Sans',sans-serif",
             }}
           >
-            Delete
+            {confirmDelete ? "Confirm?" : "Delete"}
           </button>
         )}
       </div>
@@ -263,6 +334,16 @@ export function TaskView({ username, onClose, onFocusAgent }: { username: string
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const closeRef = useRef<(() => void) | null>(null);
+
+  const selectedTask = selectedId ? tasks.find((t) => t.id === selectedId) : null;
+  const panelOpen = !!(selectedTask || creating);
+
+  function tryClosePanel() {
+    if (closeRef.current) {
+      closeRef.current();
+    }
+  }
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -270,11 +351,14 @@ export function TaskView({ username, onClose, onFocusAgent }: { username: string
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") { e.stopPropagation(); onClose(); }
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        if (panelOpen) { tryClosePanel(); } else { onClose(); }
+      }
     }
     window.addEventListener("keydown", handleKey, true);
     return () => window.removeEventListener("keydown", handleKey, true);
-  }, [onClose]);
+  }, [onClose, panelOpen]);
 
   const agentsByName = useMemo(() => {
     const map = new Map<string, string>(); // lowercase name → agentId
@@ -329,8 +413,6 @@ export function TaskView({ username, onClose, onFocusAgent }: { username: string
     });
     return sorted;
   }, [tasks, filterStatus, search, filterAssignee, sortField, sortDir]);
-
-  const selectedTask = selectedId ? tasks.find((t) => t.id === selectedId) : null;
 
   function renderName(name: string | undefined) {
     if (!name) return "";
@@ -497,7 +579,12 @@ export function TaskView({ username, onClose, onFocusAgent }: { username: string
           </div>
 
           {/* Table */}
-          <div style={{ flex: 1, overflowY: "auto", overflowX: isMobile ? "hidden" : "auto" }}>
+          <div
+            onClick={(e) => {
+              // Click on empty table area (not on a row) dismisses the panel
+              if (panelOpen && e.target === e.currentTarget) tryClosePanel();
+            }}
+            style={{ flex: 1, overflowY: "auto", overflowX: isMobile ? "hidden" : "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: isMobile ? "fixed" : undefined }}>
               <thead>
                 <tr>
@@ -534,7 +621,11 @@ export function TaskView({ username, onClose, onFocusAgent }: { username: string
                   filtered.map((task) => (
                     <tr
                       key={task.id}
-                      onClick={() => { setSelectedId(task.id === selectedId ? null : task.id); setCreating(false); }}
+                      onClick={() => {
+                        if (task.id === selectedId) { tryClosePanel(); return; }
+                        if (panelOpen && closeRef.current) { closeRef.current(); return; }
+                        setSelectedId(task.id); setCreating(false);
+                      }}
                       style={{
                         cursor: "pointer",
                         background: task.id === selectedId ? "var(--bg-hover)" : "transparent",
@@ -615,6 +706,7 @@ export function TaskView({ username, onClose, onFocusAgent }: { username: string
         {/* Detail panel */}
         {!isMobile && (creating ? (
           <TaskDetailPanel
+            closeRef={closeRef}
             mode="create"
             onClose={() => setCreating(false)}
             username={username}
@@ -622,6 +714,7 @@ export function TaskView({ username, onClose, onFocusAgent }: { username: string
           />
         ) : selectedTask ? (
           <TaskDetailPanel
+            closeRef={closeRef}
             task={selectedTask}
             onClose={() => setSelectedId(null)}
             username={username}
@@ -633,7 +726,7 @@ export function TaskView({ username, onClose, onFocusAgent }: { username: string
       {/* Mobile detail panel as overlay */}
       {(selectedTask || creating) && isMobile && (
         <div
-          onMouseDown={(e) => { if (e.target === e.currentTarget) { setSelectedId(null); setCreating(false); } }}
+          onMouseDown={(e) => { if (e.target === e.currentTarget) tryClosePanel(); }}
           style={{
             position: "fixed",
             inset: 0,
@@ -648,6 +741,7 @@ export function TaskView({ username, onClose, onFocusAgent }: { username: string
           <div style={{ width: "90%", maxWidth: 380, maxHeight: "80vh", overflowY: "auto", margin: "0 auto", borderRadius: 12, overflow: "hidden" }}>
             {creating ? (
               <TaskDetailPanel
+                closeRef={closeRef}
                 mode="create"
                 onClose={() => setCreating(false)}
                 username={username}
@@ -655,6 +749,7 @@ export function TaskView({ username, onClose, onFocusAgent }: { username: string
               />
             ) : (
               <TaskDetailPanel
+                closeRef={closeRef}
                 task={selectedTask!}
                 onClose={() => setSelectedId(null)}
                 username={username}

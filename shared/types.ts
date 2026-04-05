@@ -70,14 +70,12 @@ export interface TaskItem {
 
 export function generateTaskId(existing?: string[]): string {
   const ids = existing ? new Set(existing) : undefined;
-  for (let i = 0; i < 10; i++) {
+  for (;;) {
     const bytes = new Uint8Array(4);
     crypto.getRandomValues(bytes);
     const id = Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
     if (!ids || !ids.has(id)) return id;
   }
-  // Fallback: timestamp-based
-  return Date.now().toString(16).slice(-8);
 }
 
 const VALID_STATUSES = new Set<TaskStatus>(["open", "in_progress", "done"]);

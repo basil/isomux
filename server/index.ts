@@ -111,10 +111,12 @@ async function handleCommand(cmd: ClientCommand) {
     case "update_task": {
       const task = tasks.find((t) => t.id === cmd.id);
       if (task) {
-        const changes = { ...cmd.changes };
-        if (changes.status !== undefined && !isValidStatus(changes.status)) delete changes.status;
-        if (changes.priority !== undefined && !isValidPriority(changes.priority)) delete changes.priority;
-        Object.assign(task, changes);
+        const c = cmd.changes;
+        if (c.title !== undefined) task.title = c.title;
+        if (c.description !== undefined) task.description = c.description;
+        if (c.assignee !== undefined) task.assignee = c.assignee;
+        if (c.status !== undefined && isValidStatus(c.status)) task.status = c.status;
+        if (c.priority !== undefined && isValidPriority(c.priority)) task.priority = c.priority;
         saveTasks(tasks);
         broadcast({ type: "tasks", tasks } as ServerMessage);
       }
@@ -181,7 +183,7 @@ const server = Bun.serve({
       if (req.method === "GET" && !taskId) {
         const status = url.searchParams.get("status");
         const assignee = url.searchParams.get("assignee");
-        const titleRegex = url.searchParams.get("title");
+        const titleFilter = url.searchParams.get("title");
         let filtered = tasks;
         if (!status) {
           filtered = filtered.filter((t) => t.status !== "done");
@@ -191,11 +193,9 @@ const server = Bun.serve({
         if (assignee) {
           filtered = filtered.filter((t) => t.assignee === assignee);
         }
-        if (titleRegex) {
-          try {
-            const re = new RegExp(titleRegex, "i");
-            filtered = filtered.filter((t) => re.test(t.title));
-          } catch {}
+        if (titleFilter) {
+          const q = titleFilter.toLowerCase();
+          filtered = filtered.filter((t) => t.title.toLowerCase().includes(q));
         }
         return new Response(JSON.stringify(filtered), { headers: corsHeaders });
       }
@@ -209,7 +209,10 @@ const server = Bun.serve({
 
       // POST /tasks — create
       if (req.method === "POST" && !taskId) {
-        const body = await req.json() as Record<string, unknown>;
+        let body: Record<string, unknown>;
+        try { body = await req.json() as Record<string, unknown>; } catch {
+          return new Response(JSON.stringify({ error: "invalid JSON" }), { status: 400, headers: corsHeaders });
+        }
         if (!body.title || !body.createdBy) {
           return new Response(JSON.stringify({ error: "title and createdBy required" }), { status: 400, headers: corsHeaders });
         }
@@ -236,17 +239,21 @@ const server = Bun.serve({
       if (req.method === "PATCH" && taskId && !action) {
         const task = tasks.find((t) => t.id === taskId);
         if (!task) return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: corsHeaders });
-        const body = await req.json() as Record<string, unknown>;
+        let body: Record<string, unknown>;
+        try { body = await req.json() as Record<string, unknown>; } catch {
+          return new Response(JSON.stringify({ error: "invalid JSON" }), { status: 400, headers: corsHeaders });
+        }
         if (body.status !== undefined && !isValidStatus(body.status)) {
           return new Response(JSON.stringify({ error: "invalid status, must be open|in_progress|done" }), { status: 400, headers: corsHeaders });
         }
         if (body.priority !== undefined && !isValidPriority(body.priority)) {
           return new Response(JSON.stringify({ error: "invalid priority, must be P0-P3" }), { status: 400, headers: corsHeaders });
         }
-        const allowed = ["title", "description", "priority", "status", "assignee"];
-        for (const key of allowed) {
-          if (key in body) (task as any)[key] = body[key];
-        }
+        if (body.title !== undefined) task.title = String(body.title);
+        if (body.description !== undefined) task.description = body.description ? String(body.description) : undefined;
+        if (body.status !== undefined) task.status = body.status as TaskItem["status"];
+        if (body.priority !== undefined) task.priority = body.priority ? body.priority as TaskItem["priority"] : undefined;
+        if (body.assignee !== undefined) task.assignee = body.assignee ? String(body.assignee) : undefined;
         saveTasks(tasks);
         broadcast({ type: "tasks", tasks } as ServerMessage);
         return new Response(JSON.stringify(task), { headers: corsHeaders });
@@ -256,7 +263,10 @@ const server = Bun.serve({
       if (req.method === "POST" && taskId && action === "claim") {
         const task = tasks.find((t) => t.id === taskId);
         if (!task) return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: corsHeaders });
-        const body = await req.json() as Record<string, unknown>;
+        let body: Record<string, unknown>;
+        try { body = await req.json() as Record<string, unknown>; } catch {
+          return new Response(JSON.stringify({ error: "invalid JSON" }), { status: 400, headers: corsHeaders });
+        }
         task.assignee = body.assignee ? String(body.assignee) : task.assignee;
         task.status = "in_progress";
         saveTasks(tasks);
@@ -268,6 +278,7 @@ const server = Bun.serve({
       if (req.method === "POST" && taskId && action === "done") {
         const task = tasks.find((t) => t.id === taskId);
         if (!task) return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: corsHeaders });
+        try { await req.json(); } catch {} // consume body if present
         task.status = "done";
         saveTasks(tasks);
         broadcast({ type: "tasks", tasks } as ServerMessage);
