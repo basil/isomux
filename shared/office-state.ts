@@ -1,4 +1,5 @@
-import type { AgentInfo, AgentOutfit, TodoItem } from "./types.ts";
+import type { AgentInfo, AgentOutfit, TaskItem, TaskPriority, TaskStatus } from "./types.ts";
+import { generateTaskId, isValidStatus, isValidPriority } from "./types.ts";
 import { SHIRT_COLORS, HAIR_COLORS, SKIN_COLORS, HAIR_STYLES, BEARDS, HATS, ACCESSORIES } from "./outfit-options.ts";
 
 // Domain events — callers translate these to ServerMessage
@@ -9,7 +10,7 @@ export type OfficeEvent =
   | { type: "room_created"; roomCount: number }
   | { type: "room_closed"; room: number; roomCount: number }
   | { type: "office_prompt_set"; value: string }
-  | { type: "todos_changed"; todos: TodoItem[] };
+  | { type: "tasks_changed"; tasks: TaskItem[] };
 
 function pick<T>(arr: readonly T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -31,7 +32,7 @@ export interface OfficeStateData {
   agents: AgentInfo[];
   roomCount: number;
   officePrompt: string;
-  todos: TodoItem[];
+  tasks: TaskItem[];
   recentCwds: string[];
 }
 
@@ -39,12 +40,12 @@ export class OfficeState {
   private agents = new Map<string, AgentInfo>();
   private _roomCount = 1;
   private _officePrompt = "";
-  private _todos: TodoItem[] = [];
+  private _tasks: TaskItem[] = [];
   private _recentCwds: string[] = [];
 
   get roomCount() { return this._roomCount; }
   get officePrompt() { return this._officePrompt; }
-  get todos() { return this._todos; }
+  get tasks() { return this._tasks; }
   get recentCwds() { return this._recentCwds; }
 
   getState(): OfficeStateData {
@@ -52,7 +53,7 @@ export class OfficeState {
       agents: [...this.agents.values()],
       roomCount: this._roomCount,
       officePrompt: this._officePrompt,
-      todos: [...this._todos],
+      tasks: [...this._tasks],
       recentCwds: [...this._recentCwds],
     };
   }
@@ -79,8 +80,8 @@ export class OfficeState {
     this._officePrompt = text;
   }
 
-  setTodosDirect(todos: TodoItem[]) {
-    this._todos = todos;
+  setTasksDirect(tasks: TaskItem[]) {
+    this._tasks = tasks;
   }
 
   setRecentCwds(cwds: string[]) {
@@ -275,20 +276,31 @@ export class OfficeState {
     return [{ type: "agent_updated", agentId, changes: { topic: null, topicStale: false } }];
   }
 
-  addTodo(text: string, username: string): OfficeEvent[] {
-    const todo: TodoItem = {
-      id: `todo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      text: text.trim(),
-      createdBy: username,
+  addTask(title: string, createdBy: string, opts?: { description?: string; priority?: TaskPriority; assignee?: string }): OfficeEvent[] {
+    const task: TaskItem = {
+      id: generateTaskId(this._tasks.map(t => t.id)),
+      title: title.trim(),
+      description: opts?.description,
+      priority: opts?.priority,
+      status: "open",
+      assignee: opts?.assignee,
+      createdBy,
       createdAt: Date.now(),
     };
-    this._todos.push(todo);
-    return [{ type: "todos_changed", todos: [...this._todos] }];
+    this._tasks.push(task);
+    return [{ type: "tasks_changed", tasks: [...this._tasks] }];
   }
 
-  deleteTodo(id: string): OfficeEvent[] {
-    this._todos = this._todos.filter((t) => t.id !== id);
-    return [{ type: "todos_changed", todos: [...this._todos] }];
+  updateTask(id: string, changes: Partial<Pick<TaskItem, "title" | "description" | "priority" | "status" | "assignee">>): OfficeEvent[] {
+    const task = this._tasks.find((t) => t.id === id);
+    if (!task) return [];
+    Object.assign(task, changes);
+    return [{ type: "tasks_changed", tasks: [...this._tasks] }];
+  }
+
+  deleteTask(id: string): OfficeEvent[] {
+    this._tasks = this._tasks.filter((t) => t.id !== id);
+    return [{ type: "tasks_changed", tasks: [...this._tasks] }];
   }
 
   addRecentCwd(cwd: string) {

@@ -53,12 +53,42 @@ export interface LogEntry {
   metadata?: Record<string, unknown>;
 }
 
-// Todo item
-export interface TodoItem {
-  id: string;
-  text: string;
+// Task item (replaces todos)
+export type TaskStatus = "open" | "in_progress" | "done";
+export type TaskPriority = "P0" | "P1" | "P2" | "P3";
+
+export interface TaskItem {
+  id: string;           // 8-char hex hash
+  title: string;
+  description?: string;
+  priority?: TaskPriority;
+  status: TaskStatus;
+  assignee?: string;
   createdBy: string;
   createdAt: number;
+}
+
+export function generateTaskId(existing?: string[]): string {
+  const ids = existing ? new Set(existing) : undefined;
+  for (let i = 0; i < 10; i++) {
+    const bytes = new Uint8Array(4);
+    crypto.getRandomValues(bytes);
+    const id = Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+    if (!ids || !ids.has(id)) return id;
+  }
+  // Fallback: timestamp-based
+  return Date.now().toString(16).slice(-8);
+}
+
+const VALID_STATUSES = new Set<TaskStatus>(["open", "in_progress", "done"]);
+const VALID_PRIORITIES = new Set<TaskPriority>(["P0", "P1", "P2", "P3"]);
+
+export function isValidStatus(s: unknown): s is TaskStatus {
+  return typeof s === "string" && VALID_STATUSES.has(s as TaskStatus);
+}
+
+export function isValidPriority(p: unknown): p is TaskPriority {
+  return typeof p === "string" && VALID_PRIORITIES.has(p as TaskPriority);
 }
 
 // Session info for resume feature
@@ -89,7 +119,7 @@ export type ServerMessage =
   | { type: "terminal_output"; agentId: string; data: string }
   | { type: "terminal_exit"; agentId: string; exitCode: number }
   | { type: "office_prompt"; text: string }
-  | { type: "todos"; todos: TodoItem[] }
+  | { type: "tasks"; tasks: TaskItem[] }
   | { type: "room_created"; roomCount: number }
   | { type: "room_closed"; room: number; roomCount: number }
   | { type: "update_status"; updateAvailable: boolean; current: { sha: string; message: string; date: string }; latest: { sha: string; message: string; date: string } };
@@ -112,8 +142,9 @@ export type ClientCommand =
   | { type: "terminal_resize"; agentId: string; cols: number; rows: number }
   | { type: "terminal_close"; agentId: string }
   | { type: "set_office_prompt"; text: string }
-  | { type: "add_todo"; text: string; username: string }
-  | { type: "delete_todo"; id: string }
+  | { type: "add_task"; title: string; description?: string; priority?: TaskPriority; assignee?: string; username: string }
+  | { type: "update_task"; id: string; changes: Partial<Pick<TaskItem, "title" | "description" | "priority" | "status" | "assignee">> }
+  | { type: "delete_task"; id: string }
   | { type: "create_room" }
   | { type: "close_room"; room: number }
   | { type: "move_agent"; agentId: string; targetRoom: number };

@@ -12,7 +12,7 @@ export function AgentListView({
   username,
   onEditUsername,
   onEditOfficePrompt,
-  onOpenTodos,
+  onOpenTasks,
   onOpenUpdate,
   onToggleView,
   onSwipeLeft,
@@ -24,7 +24,7 @@ export function AgentListView({
   username: string;
   onEditUsername: () => void;
   onEditOfficePrompt: () => void;
-  onOpenTodos: () => void;
+  onOpenTasks: () => void;
   onOpenUpdate: () => void;
   onToggleView: () => void;
   onSwipeLeft?: () => void;
@@ -49,7 +49,7 @@ export function AgentListView({
         viewMode="list"
         onToggleView={onToggleView}
         counts={getRoomCounts(roomAgents)}
-        onOpenTodos={onOpenTodos}
+        onOpenTasks={onOpenTasks}
         onEditOfficePrompt={onEditOfficePrompt}
         updateAvailable={updateAvailable}
         onOpenUpdate={onOpenUpdate}

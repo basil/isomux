@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, useEffect, useRef, useState, useCallback, type ReactNode, type Dispatch } from "react";
-import type { AgentInfo, LogEntry, SessionInfo, ServerMessage, SkillInfo, TodoItem } from "../shared/types.ts";
+import type { AgentInfo, LogEntry, SessionInfo, ServerMessage, SkillInfo, TaskItem } from "../shared/types.ts";
 import { connect } from "./ws.ts";
 import { type Features, PRODUCTION_FEATURES } from "../shared/features.ts";
 
@@ -18,7 +18,7 @@ export interface AppState {
   slashCommands: Map<string, { commands: { name: string; description?: string }[]; skills: SkillInfo[] }>; // agentId → available commands
   stateChangedAt: Map<string, number>; // agentId → timestamp when agent state last changed
   officePrompt: string;
-  todos: TodoItem[];
+  tasks: TaskItem[];
   currentRoom: number; // 0-based room index
   roomCount: number; // total number of rooms
   updateAvailable: boolean;
@@ -41,7 +41,7 @@ type Action =
   | { type: "set_mobile"; isMobile: boolean }
   | { type: "toggle_mobile_view" }
   | { type: "office_prompt"; text: string }
-  | { type: "todos"; todos: TodoItem[] }
+  | { type: "tasks"; tasks: TaskItem[] }
   | { type: "set_current_room"; room: number }
   | { type: "room_created"; roomCount: number }
   | { type: "room_closed"; room: number; roomCount: number }
@@ -154,8 +154,8 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case "office_prompt":
       return { ...state, officePrompt: action.text };
-    case "todos":
-      return { ...state, todos: action.todos };
+    case "tasks":
+      return { ...state, tasks: action.tasks };
     case "set_current_room":
       return { ...state, currentRoom: action.room };
     case "room_created":
@@ -191,7 +191,7 @@ const initialState: AppState = {
   slashCommands: new Map(),
   stateChangedAt: new Map(),
   officePrompt: "",
-  todos: [],
+  tasks: [],
   currentRoom: 0,
   roomCount: 1,
   updateAvailable: false,

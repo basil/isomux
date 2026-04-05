@@ -7,7 +7,7 @@ import { ContextMenu } from "./components/ContextMenu.tsx";
 import { EditAgentDialog } from "./components/EditAgentDialog.tsx";
 import { UsernameModal } from "./components/UsernameModal.tsx";
 import { OfficePromptModal } from "./components/OfficePromptModal.tsx";
-import { TodoModal } from "./components/TodoModal.tsx";
+import { TaskView } from "./components/TaskView.tsx";
 import { UpdateModal } from "./components/UpdateModal.tsx";
 import { CSS } from "./styles.ts";
 import type { AgentInfo } from "../shared/types.ts";
@@ -49,7 +49,7 @@ export function App() {
   });
   const [editingUsername, setEditingUsername] = useState(false);
   const [editingOfficePrompt, setEditingOfficePrompt] = useState(false);
-  const [todosOpen, setTodosOpen] = useState(false);
+  const [tasksOpen, setTasksOpen] = useState(false);
   const [updateOpen, setUpdateOpen] = useState(false);
 
   const focusedAgent = focusedAgentId ? agents.find((a) => a.id === focusedAgentId) : null;
@@ -134,7 +134,13 @@ export function App() {
           onClose={() => setEditingUsername(false)}
         />
       )}
-      {focusedAgent ? (
+      {tasksOpen ? (
+        <TaskView
+          username={username ?? ""}
+          onClose={() => setTasksOpen(false)}
+          onFocusAgent={(agentId) => { setTasksOpen(false); dispatch({ type: "focus", agentId }); }}
+        />
+      ) : focusedAgent ? (
         <LogView
           key={focusedAgent.id}
           agent={focusedAgent}
@@ -142,6 +148,7 @@ export function App() {
           onBack={() => dispatch({ type: "focus", agentId: null })}
           onEditAgent={() => setEditAgent(focusedAgent)}
           username={username ?? ""}
+          onOpenTasks={() => setTasksOpen(true)}
           onSwipeLeft={swipeAgentNext}
           onSwipeRight={swipeAgentPrev}
         />
@@ -153,7 +160,7 @@ export function App() {
           username={username ?? ""}
           onEditUsername={() => setEditingUsername(true)}
           onEditOfficePrompt={() => setEditingOfficePrompt(true)}
-          onOpenTodos={() => setTodosOpen(true)}
+          onOpenTasks={() => setTasksOpen(true)}
           onOpenUpdate={() => setUpdateOpen(true)}
           onToggleView={() => dispatch({ type: "toggle_mobile_view" })}
           onSwipeLeft={swipeRoomNext}
@@ -166,7 +173,7 @@ export function App() {
           username={username ?? ""}
           onEditUsername={() => setEditingUsername(true)}
           onEditOfficePrompt={() => setEditingOfficePrompt(true)}
-          onOpenTodos={() => setTodosOpen(true)}
+          onOpenTasks={() => setTasksOpen(true)}
           onOpenUpdate={() => setUpdateOpen(true)}
           onSwipeLeft={swipeRoomNext}
           onSwipeRight={swipeRoomPrev}
@@ -204,9 +211,6 @@ export function App() {
             setUsername(name);
           }}
         />
-      )}
-      {todosOpen && (
-        <TodoModal username={username ?? ""} onClose={() => setTodosOpen(false)} />
       )}
       {updateOpen && (
         <UpdateModal onClose={() => setUpdateOpen(false)} />

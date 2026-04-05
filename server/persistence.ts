@@ -1,13 +1,15 @@
 import { join } from "path";
 import { homedir } from "os";
 import { mkdirSync, appendFileSync, readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync } from "fs";
-import type { AgentInfo, ClaudeModel, LogEntry, TodoItem } from "../shared/types.ts";
+import type { AgentInfo, ClaudeModel, LogEntry, TaskItem } from "../shared/types.ts";
+import { generateTaskId } from "../shared/types.ts";
 
 const ISOMUX_DIR = join(homedir(), ".isomux");
 const LOGS_DIR = join(ISOMUX_DIR, "logs");
 const AGENTS_FILE = join(ISOMUX_DIR, "agents.json");
 const OFFICE_PROMPT_FILE = join(ISOMUX_DIR, "office-prompt.md");
-const TODOS_FILE = join(ISOMUX_DIR, "todos.json");
+const TASKS_FILE = join(ISOMUX_DIR, "tasks.json");
+const TODOS_FILE = join(ISOMUX_DIR, "todos.json"); // legacy, for migration
 
 // Ensure directories exist
 try {
@@ -220,20 +222,35 @@ export function saveOfficePrompt(text: string) {
   }
 }
 
-// Todos
-export function loadTodos(): TodoItem[] {
+// Tasks (replaces todos)
+export function loadTasks(): TaskItem[] {
   try {
-    if (!existsSync(TODOS_FILE)) return [];
-    return JSON.parse(readFileSync(TODOS_FILE, "utf-8")) as TodoItem[];
+    if (existsSync(TASKS_FILE)) {
+      return JSON.parse(readFileSync(TASKS_FILE, "utf-8")) as TaskItem[];
+    }
+    // Migrate from legacy todos.json
+    if (existsSync(TODOS_FILE)) {
+      const todos = JSON.parse(readFileSync(TODOS_FILE, "utf-8")) as { id: string; text: string; createdBy: string; createdAt: number }[];
+      const usedIds: string[] = [];
+      const tasks: TaskItem[] = todos.map((t) => {
+        const id = generateTaskId(usedIds);
+        usedIds.push(id);
+        return { id, title: t.text, status: "open" as const, createdBy: t.createdBy, createdAt: t.createdAt };
+      });
+      saveTasks(tasks);
+      unlinkSync(TODOS_FILE);
+      return tasks;
+    }
+    return [];
   } catch {
     return [];
   }
 }
 
-export function saveTodos(todos: TodoItem[]) {
+export function saveTasks(tasks: TaskItem[]) {
   try {
-    writeFileSync(TODOS_FILE, JSON.stringify(todos, null, 2));
+    writeFileSync(TASKS_FILE, JSON.stringify(tasks, null, 2));
   } catch (err) {
-    console.error("Failed to save todos:", err);
+    console.error("Failed to save tasks:", err);
   }
 }

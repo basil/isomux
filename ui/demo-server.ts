@@ -121,8 +121,9 @@ function ensureSeeded() {
   seeded = true;
   seedOffice();
   state.setOfficePrompt("Be concise. No paragraphs when bullets will do. Never push to main without asking. Never help Dwight set backdoors of any kind.");
-  state.addTodo("Fix the printer — it's jamming again", "demo-boss");
-  state.addTodo("Restock kitchen (no beets this time)", "demo-boss-phone");
+  state.addTask("Fix the printer — it's jamming again", "demo-boss");
+  state.addTask("Restock kitchen (no beets this time)", "demo-boss-phone");
+  state.addTask("Quarterly security audit", "demo-boss", { priority: "P1", assignee: "Dwight" });
 }
 
 // Sample conversation logs seeded on load
@@ -214,8 +215,8 @@ function emitEvents(events: OfficeEvent[]) {
       case "office_prompt_set":
         shimEmit({ type: "office_prompt", text: event.value });
         break;
-      case "todos_changed":
-        shimEmit({ type: "todos", todos: event.todos });
+      case "tasks_changed":
+        shimEmit({ type: "tasks", tasks: event.tasks });
         break;
     }
   }
@@ -292,12 +293,16 @@ export function handleCommand(cmd: ClientCommand) {
       emitEvents(state.setOfficePrompt(cmd.text));
       break;
     }
-    case "add_todo": {
-      emitEvents(state.addTodo(cmd.text, cmd.username));
+    case "add_task": {
+      emitEvents(state.addTask(cmd.title, cmd.username, { description: cmd.description, priority: cmd.priority, assignee: cmd.assignee }));
       break;
     }
-    case "delete_todo": {
-      emitEvents(state.deleteTodo(cmd.id));
+    case "update_task": {
+      emitEvents(state.updateTask(cmd.id, cmd.changes));
+      break;
+    }
+    case "delete_task": {
+      emitEvents(state.deleteTask(cmd.id));
       break;
     }
     case "send_message": {
@@ -346,6 +351,6 @@ export function sendInitialState() {
   const s = state.getState();
   shimEmit({ type: "full_state", agents: s.agents, recentCwds: s.recentCwds, roomCount: s.roomCount });
   shimEmit({ type: "office_prompt", text: s.officePrompt });
-  shimEmit({ type: "todos", todos: s.todos });
+  shimEmit({ type: "tasks", tasks: s.tasks });
   seedLogs();
 }

@@ -1,14 +1,14 @@
 import type { ServerWebSocket } from "bun";
 import type { ServerMessage, ClientCommand } from "../shared/types.ts";
 import * as AgentManager from "./agent-manager.ts";
-import { loadRecentCwds, saveRecentCwd, loadTodos, saveTodos } from "./persistence.ts";
+import { loadRecentCwds, saveRecentCwd, loadTasks, saveTasks } from "./persistence.ts";
 import { startUpdateChecker, getUpdateStatus, onUpdateChange } from "./update-checker.ts";
-import type { TodoItem } from "../shared/types.ts";
+import type { TaskItem } from "../shared/types.ts";
+import { generateTaskId, isValidStatus, isValidPriority } from "../shared/types.ts";
 import { join } from "path";
-import { execSync } from "child_process";
 
 const browsers = new Set<ServerWebSocket<unknown>>();
-let todos: TodoItem[] = loadTodos();
+let tasks: TaskItem[] = loadTasks();
 
 function broadcast(msg: ServerMessage) {
   const data = JSON.stringify(msg);
@@ -92,22 +92,38 @@ async function handleCommand(cmd: ClientCommand) {
       AgentManager.setOfficePrompt(cmd.text);
       broadcast({ type: "office_prompt", text: cmd.text.trim() } as ServerMessage);
       break;
-    case "add_todo": {
-      const todo: TodoItem = {
-        id: crypto.randomUUID(),
-        text: cmd.text.trim(),
+    case "add_task": {
+      const task: TaskItem = {
+        id: generateTaskId(tasks.map(t => t.id)),
+        title: cmd.title.trim(),
+        description: cmd.description,
+        priority: cmd.priority && isValidPriority(cmd.priority) ? cmd.priority : undefined,
+        status: "open",
+        assignee: cmd.assignee,
         createdBy: cmd.username,
         createdAt: Date.now(),
       };
-      todos.push(todo);
-      saveTodos(todos);
-      broadcast({ type: "todos", todos } as ServerMessage);
+      tasks.push(task);
+      saveTasks(tasks);
+      broadcast({ type: "tasks", tasks } as ServerMessage);
       break;
     }
-    case "delete_todo": {
-      todos = todos.filter((t) => t.id !== cmd.id);
-      saveTodos(todos);
-      broadcast({ type: "todos", todos } as ServerMessage);
+    case "update_task": {
+      const task = tasks.find((t) => t.id === cmd.id);
+      if (task) {
+        const changes = { ...cmd.changes };
+        if (changes.status !== undefined && !isValidStatus(changes.status)) delete changes.status;
+        if (changes.priority !== undefined && !isValidPriority(changes.priority)) delete changes.priority;
+        Object.assign(task, changes);
+        saveTasks(tasks);
+        broadcast({ type: "tasks", tasks } as ServerMessage);
+      }
+      break;
+    }
+    case "delete_task": {
+      tasks = tasks.filter((t) => t.id !== cmd.id);
+      saveTasks(tasks);
+      broadcast({ type: "tasks", tasks } as ServerMessage);
       break;
     }
     case "create_room":
@@ -127,44 +143,138 @@ const UI_DIST = join(import.meta.dir, "..", "ui", "dist");
 
 const PORT = parseInt(process.env.PORT || "4000");
 
-// Detect Tailscale FQDN for HTTPS redirect (via `tailscale serve`)
-let tailscaleHttpsUrl: string | null = null;
-let tailscaleFqdn: string | null = null;
-try {
-  const tsStatus = JSON.parse(execSync("tailscale status --json", { timeout: 3000 }).toString());
-  const fqdn = tsStatus?.Self?.DNSName?.replace(/\.$/, "");
-  if (fqdn) {
-    // Check if `tailscale serve` is configured for HTTPS
-    const serveStatus = execSync("tailscale serve status --json", { timeout: 3000 }).toString();
-    const serveConfig = JSON.parse(serveStatus);
-    if (serveConfig?.TCP?.["443"]) {
-      tailscaleFqdn = fqdn;
-      tailscaleHttpsUrl = `https://${fqdn}`;
-      console.log(`Tailscale HTTPS redirect enabled → ${tailscaleHttpsUrl}`);
-    }
-  }
-} catch {
-  // Tailscale not available or not configured — no redirect
-}
-
 const server = Bun.serve({
   port: PORT,
   async fetch(req, server) {
     const url = new URL(req.url);
 
-    // Redirect to Tailscale HTTPS for direct browser requests (not proxied ones)
-    if (tailscaleHttpsUrl && url.pathname !== "/ws") {
-      const host = req.headers.get("host") || "";
-      // Tailscale proxy sets Host to the FQDN; direct requests use the raw hostname:port
-      if (!host.includes(tailscaleFqdn!)) {
-        return Response.redirect(`${tailscaleHttpsUrl}${url.pathname}${url.search}`, 302);
-      }
-    }
-
     // WebSocket upgrade
     if (url.pathname === "/ws") {
       if (server.upgrade(req)) return;
       return new Response("WebSocket upgrade failed", { status: 400 });
+    }
+
+    // CORS preflight for task API
+    if (req.method === "OPTIONS" && url.pathname.startsWith("/tasks")) {
+      return new Response(null, {
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type",
+        },
+      });
+    }
+
+    // Task HTTP API
+    if (url.pathname.startsWith("/tasks")) {
+      const corsHeaders = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" };
+      const parts = url.pathname.split("/").filter(Boolean); // ["tasks"] or ["tasks", id] or ["tasks", id, action]
+      const taskId = parts[1];
+      const action = parts[2]; // "claim" or "done"
+
+      // DELETE blocked at HTTP level
+      if (req.method === "DELETE") {
+        return new Response(JSON.stringify({ error: "DELETE not allowed via HTTP" }), { status: 405, headers: corsHeaders });
+      }
+
+      // GET /tasks — list (excludes done by default)
+      if (req.method === "GET" && !taskId) {
+        const status = url.searchParams.get("status");
+        const assignee = url.searchParams.get("assignee");
+        const titleRegex = url.searchParams.get("title");
+        let filtered = tasks;
+        if (!status) {
+          filtered = filtered.filter((t) => t.status !== "done");
+        } else if (status !== "all") {
+          filtered = filtered.filter((t) => t.status === status);
+        }
+        if (assignee) {
+          filtered = filtered.filter((t) => t.assignee === assignee);
+        }
+        if (titleRegex) {
+          try {
+            const re = new RegExp(titleRegex, "i");
+            filtered = filtered.filter((t) => re.test(t.title));
+          } catch {}
+        }
+        return new Response(JSON.stringify(filtered), { headers: corsHeaders });
+      }
+
+      // GET /tasks/:id — detail
+      if (req.method === "GET" && taskId && !action) {
+        const task = tasks.find((t) => t.id === taskId);
+        if (!task) return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: corsHeaders });
+        return new Response(JSON.stringify(task), { headers: corsHeaders });
+      }
+
+      // POST /tasks — create
+      if (req.method === "POST" && !taskId) {
+        const body = await req.json() as Record<string, unknown>;
+        if (!body.title || !body.createdBy) {
+          return new Response(JSON.stringify({ error: "title and createdBy required" }), { status: 400, headers: corsHeaders });
+        }
+        if (body.priority !== undefined && !isValidPriority(body.priority)) {
+          return new Response(JSON.stringify({ error: "invalid priority, must be P0-P3" }), { status: 400, headers: corsHeaders });
+        }
+        const task: TaskItem = {
+          id: generateTaskId(tasks.map(t => t.id)),
+          title: String(body.title).trim(),
+          description: body.description ? String(body.description) : undefined,
+          priority: body.priority as TaskItem["priority"],
+          status: "open",
+          assignee: body.assignee ? String(body.assignee) : undefined,
+          createdBy: String(body.createdBy),
+          createdAt: Date.now(),
+        };
+        tasks.push(task);
+        saveTasks(tasks);
+        broadcast({ type: "tasks", tasks } as ServerMessage);
+        return new Response(JSON.stringify(task), { status: 201, headers: corsHeaders });
+      }
+
+      // PATCH /tasks/:id — update
+      if (req.method === "PATCH" && taskId && !action) {
+        const task = tasks.find((t) => t.id === taskId);
+        if (!task) return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: corsHeaders });
+        const body = await req.json() as Record<string, unknown>;
+        if (body.status !== undefined && !isValidStatus(body.status)) {
+          return new Response(JSON.stringify({ error: "invalid status, must be open|in_progress|done" }), { status: 400, headers: corsHeaders });
+        }
+        if (body.priority !== undefined && !isValidPriority(body.priority)) {
+          return new Response(JSON.stringify({ error: "invalid priority, must be P0-P3" }), { status: 400, headers: corsHeaders });
+        }
+        const allowed = ["title", "description", "priority", "status", "assignee"];
+        for (const key of allowed) {
+          if (key in body) (task as any)[key] = body[key];
+        }
+        saveTasks(tasks);
+        broadcast({ type: "tasks", tasks } as ServerMessage);
+        return new Response(JSON.stringify(task), { headers: corsHeaders });
+      }
+
+      // POST /tasks/:id/claim
+      if (req.method === "POST" && taskId && action === "claim") {
+        const task = tasks.find((t) => t.id === taskId);
+        if (!task) return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: corsHeaders });
+        const body = await req.json() as Record<string, unknown>;
+        task.assignee = body.assignee ? String(body.assignee) : task.assignee;
+        task.status = "in_progress";
+        saveTasks(tasks);
+        broadcast({ type: "tasks", tasks } as ServerMessage);
+        return new Response(JSON.stringify(task), { headers: corsHeaders });
+      }
+
+      // POST /tasks/:id/done
+      if (req.method === "POST" && taskId && action === "done") {
+        const task = tasks.find((t) => t.id === taskId);
+        if (!task) return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: corsHeaders });
+        task.status = "done";
+        saveTasks(tasks);
+        broadcast({ type: "tasks", tasks } as ServerMessage);
+        return new Response(JSON.stringify(task), { headers: corsHeaders });
+      }
+
+      return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: corsHeaders });
     }
 
     // Static file serving
@@ -189,8 +299,8 @@ const server = Bun.serve({
       ws.send(JSON.stringify({ type: "full_state", agents, recentCwds, roomCount: AgentManager.getRoomCount() } as ServerMessage));
       // Send office prompt
       ws.send(JSON.stringify({ type: "office_prompt", text: AgentManager.getOfficePrompt() } as ServerMessage));
-      // Send todos
-      ws.send(JSON.stringify({ type: "todos", todos } as ServerMessage));
+      // Send tasks
+      ws.send(JSON.stringify({ type: "tasks", tasks } as ServerMessage));
       // Send update status
       const update = getUpdateStatus();
       if (update.updateAvailable) {

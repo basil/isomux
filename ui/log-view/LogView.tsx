@@ -136,6 +136,7 @@ export function LogView({
   onBack,
   onEditAgent,
   username,
+  onOpenTasks,
   onSwipeLeft,
   onSwipeRight,
 }: {
@@ -144,6 +145,7 @@ export function LogView({
   onBack: () => void;
   onEditAgent: () => void;
   username: string;
+  onOpenTasks?: () => void;
   onSwipeLeft?: () => void;
   onSwipeRight?: () => void;
 }) {
@@ -674,6 +676,23 @@ export function LogView({
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+            {onOpenTasks && (
+              <button
+                onClick={onOpenTasks}
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: 6,
+                  border: "1px solid var(--border-medium)",
+                  background: "var(--btn-surface)",
+                  color: "var(--text-dim)",
+                  fontSize: 11,
+                  cursor: "pointer",
+                  fontFamily: "'DM Sans',sans-serif",
+                }}
+              >
+                Tasks
+              </button>
+            )}
             {logs.length > 0 && <CopyButton getText={getConversationText} />}
             <button
               onClick={toggleAvatar}

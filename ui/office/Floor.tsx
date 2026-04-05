@@ -50,7 +50,7 @@ export function Floor() {
   );
 }
 
-export function Walls({ onToggleTheme, onEditOfficePrompt, hasOfficePrompt, onOpenTodos, todoCount = 0, leftDoor, rightDoor }: { onToggleTheme?: () => void; onEditOfficePrompt?: () => void; hasOfficePrompt?: boolean; onOpenTodos?: () => void; todoCount?: number; leftDoor?: { label: string; onClick: () => void } | null; rightDoor?: { label: string; onClick: () => void } | null }) {
+export function Walls({ onToggleTheme, onEditOfficePrompt, hasOfficePrompt, onOpenTasks, taskCount = 0, leftDoor, rightDoor }: { onToggleTheme?: () => void; onEditOfficePrompt?: () => void; hasOfficePrompt?: boolean; onOpenTasks?: () => void; taskCount?: number; leftDoor?: { label: string; onClick: () => void } | null; rightDoor?: { label: string; onClick: () => void } | null }) {
   const { currentRoom } = useAppState();
   const neon = NEON_COLORS[currentRoom % NEON_COLORS.length];
   const [now, setNow] = useState(new Date());
@@ -160,7 +160,7 @@ export function Walls({ onToggleTheme, onEditOfficePrompt, hasOfficePrompt, onOp
       <path d="M-285 70 L-145 0" stroke="var(--wall-decor)" strokeWidth="2" fill="none" />
 
       {/* Corkboard on left wall — casual, mutable feel */}
-      <g transform="translate(-55, -30) skewY(-27)" onClick={onOpenTodos} style={{ cursor: "pointer", pointerEvents: "auto" }}>
+      <g transform="translate(-55, -30) skewY(-27)" onClick={onOpenTasks} style={{ cursor: "pointer", pointerEvents: "auto" }}>
         {/* Board frame */}
         <rect x="-50" y="-40" width="95" height="70" rx="2" fill="#5a4430" stroke="#4a3620" strokeWidth="1" />
         {/* Cork surface */}
@@ -176,7 +176,7 @@ export function Walls({ onToggleTheme, onEditOfficePrompt, hasOfficePrompt, onOp
         {/* Index card 1 — slightly tilted, top-left */}
         <g transform="translate(-32, -22) rotate(-3)">
           <rect x="0" y="0" width="28" height="20" rx="1" fill="#f5f0e0" stroke="#e0d8c4" strokeWidth="0.3" />
-          {todoCount >= 1 && (
+          {taskCount >= 1 && (
             <>
               <line x1="3" y1="6" x2="25" y2="6" stroke="#ccc" strokeWidth="0.3" />
               <line x1="3" y1="10" x2="22" y2="10" stroke="#ccc" strokeWidth="0.3" />
@@ -191,7 +191,7 @@ export function Walls({ onToggleTheme, onEditOfficePrompt, hasOfficePrompt, onOp
         {/* Index card 2 — slightly tilted other way, center-right */}
         <g transform="translate(5, -18) rotate(2)">
           <rect x="0" y="0" width="30" height="22" rx="1" fill="#eef4ff" stroke="#d0d8e8" strokeWidth="0.3" />
-          {todoCount >= 2 && (
+          {taskCount >= 2 && (
             <>
               <line x1="3" y1="6" x2="27" y2="6" stroke="#bbc" strokeWidth="0.3" />
               <line x1="3" y1="10" x2="25" y2="10" stroke="#bbc" strokeWidth="0.3" />
@@ -207,7 +207,7 @@ export function Walls({ onToggleTheme, onEditOfficePrompt, hasOfficePrompt, onOp
         {/* Index card 3 — bottom left, slight tilt */}
         <g transform="translate(-28, 4) rotate(1.5)">
           <rect x="0" y="0" width="26" height="18" rx="1" fill="#fff8e0" stroke="#e8dcc0" strokeWidth="0.3" />
-          {todoCount >= 3 && (
+          {taskCount >= 3 && (
             <>
               <line x1="3" y1="5" x2="23" y2="5" stroke="#dda" strokeWidth="0.3" />
               <line x1="3" y1="9" x2="20" y2="9" stroke="#dda" strokeWidth="0.3" />

@@ -185,7 +185,20 @@ function deduplicateSkills(skills: SkillInfo[]): SkillInfo[] {
 // Create a launcher script that sets cwd and injects system prompt before running the CLI
 function createLauncher(agentId: string, cwd: string, agentName: string, officePrompt?: string, customInstructions?: string | null): string {
   const launcherPath = join(LAUNCHERS_DIR, `${agentId}.mjs`);
-  let systemPrompt = `You are ${agentName}, one of the agents in the Isomux office. Your goal is to help the office bosses, who talk to you in this chat. Messages are prefixed with the sender's name in brackets.\n\nTo discover other office agents and their conversation logs, read ~/.isomux/agents-summary.json.`;
+  let systemPrompt = `You are ${agentName}, one of the agents in the Isomux office. Your goal is to help the office bosses, who talk to you in this chat. Messages are prefixed with the sender's name in brackets.
+
+To discover other office agents and their conversation logs, read ~/.isomux/agents-summary.json.
+
+Task board (localhost:4000/tasks): Agents can read and create tasks via curl.
+  curl -s localhost:4000/tasks                                          # list open tasks
+  curl -s localhost:4000/tasks?status=all                               # include done
+  curl -s -X POST localhost:4000/tasks -H 'Content-Type: application/json' \\
+    -d '{"title":"...","createdBy":"${agentName}"}'                     # create
+  curl -s -X POST localhost:4000/tasks/ID/claim -H 'Content-Type: application/json' \\
+    -d '{"assignee":"${agentName}"}'                                    # claim
+  curl -s -X POST localhost:4000/tasks/ID/done -d '{}'                  # mark done
+Optional fields on create/update: description, priority (P0-P3), assignee.
+Don't read or update the task board unless the boss mentions it.`;
   if (officePrompt) {
     systemPrompt += `\n\n${officePrompt}`;
   }

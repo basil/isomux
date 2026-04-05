@@ -7,14 +7,13 @@ import { EmptySlot } from "./EmptySlot.tsx";
 import { StatusLight } from "./StatusLight.tsx";
 import { SCENE_W, SCENE_H } from "./grid.ts";
 import { send } from "../ws.ts";
-import { TodoButton } from "../components/TodoPanel.tsx";
 import { SunIcon, MoonIcon } from "../components/ThemeIcons.tsx";
 import { MobileHeader, getRoomCounts } from "../components/MobileHeader.tsx";
 import { useSwipeLeftRight } from "../hooks/useSwipeLeftRight.ts";
 import type { AgentInfo } from "../../shared/types.ts";
 
-export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, onEditOfficePrompt, onOpenTodos, onOpenUpdate, onSwipeLeft, onSwipeRight }: { onSpawn: (deskIndex: number) => void; onContextMenu: (x: number, y: number, agent: AgentInfo) => void; username: string; onEditUsername: () => void; onEditOfficePrompt: () => void; onOpenTodos: () => void; onOpenUpdate: () => void; onSwipeLeft?: () => void; onSwipeRight?: () => void }) {
-  const { agents, needsAttention, stateChangedAt, officePrompt, todos, currentRoom, roomCount, isMobile, updateAvailable } = useAppState();
+export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, onEditOfficePrompt, onOpenTasks, onOpenUpdate, onSwipeLeft, onSwipeRight }: { onSpawn: (deskIndex: number) => void; onContextMenu: (x: number, y: number, agent: AgentInfo) => void; username: string; onEditUsername: () => void; onEditOfficePrompt: () => void; onOpenTasks: () => void; onOpenUpdate: () => void; onSwipeLeft?: () => void; onSwipeRight?: () => void }) {
+  const { agents, needsAttention, stateChangedAt, officePrompt, tasks, currentRoom, roomCount, isMobile, updateAvailable } = useAppState();
   const dispatch = useDispatch();
   const { theme, toggleTheme } = useTheme();
   const { embed } = useFeatures();
@@ -44,7 +43,7 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
           viewMode="office"
           onToggleView={() => dispatch({ type: "toggle_mobile_view" })}
           counts={counts}
-          onOpenTodos={onOpenTodos}
+          onOpenTasks={onOpenTasks}
           onEditOfficePrompt={onEditOfficePrompt}
           updateAvailable={updateAvailable}
           onOpenUpdate={onOpenUpdate}
@@ -124,7 +123,21 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
               ))}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <TodoButton onOpen={onOpenTodos} />
+            <button
+              onClick={onOpenTasks}
+              style={{
+                padding: "4px 10px",
+                borderRadius: 8,
+                border: "1px solid var(--border-medium)",
+                background: "var(--btn-surface)",
+                color: "var(--text-dim)",
+                fontSize: 11,
+                cursor: "pointer",
+                fontFamily: "'DM Sans',sans-serif",
+              }}
+            >
+              Tasks
+            </button>
             <button
               onClick={onEditOfficePrompt}
               style={{
@@ -195,8 +208,8 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
             onToggleTheme={toggleTheme}
             onEditOfficePrompt={onEditOfficePrompt}
             hasOfficePrompt={!!officePrompt}
-            onOpenTodos={onOpenTodos}
-            todoCount={todos.length}
+            onOpenTasks={onOpenTasks}
+            taskCount={tasks.filter(t => t.status !== "done").length}
             leftDoor={currentRoom > 0 ? { label: `Room ${currentRoom}`, onClick: () => dispatch({ type: "set_current_room", room: currentRoom - 1 }) } : null}
             rightDoor={currentRoom < roomCount - 1 ? { label: `Room ${currentRoom + 2}`, onClick: () => dispatch({ type: "set_current_room", room: currentRoom + 1 }) } : null}
           />
