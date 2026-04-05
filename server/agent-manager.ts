@@ -1246,7 +1246,7 @@ const commandHandlers: Record<string, HandlerFn> = {
     lines.push("  \u2022 Use voice-to-text for faster prompting. The shortcut is ctrl+space.");
     lines.push("  \u2022 Use `/isomux-all-hands` to check what every agent is up to.");
     lines.push("  \u2022 Use `/report-isomux-bug` if you find any issues.");
-    lines.push("  \u2022 Use `/grill-me` to make your feature designs more robust.");
+    lines.push("  \u2022 Use `/isomux-grill-me` to make your feature designs more robust.");
 
     addLogEntry(agentId, "system", lines.join("\n"));
     updateState(agentId, "waiting_for_response");
