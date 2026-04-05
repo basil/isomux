@@ -758,6 +758,7 @@ export function LogView({
       {/* Input */}
       <div
         style={{
+          flexShrink: 0,
           padding: isMobile ? "10px 12px" : "10px 24px",
           paddingBottom: isMobile ? "calc(10px + env(safe-area-inset-bottom, 0px))" : undefined,
           borderTop: "1px solid var(--border-strong)",
@@ -850,7 +851,12 @@ export function LogView({
               value={input}
               onChange={(e) => {
                 setInput(e.target.value);
+                const prevHeight = e.target.offsetHeight;
                 autoResize(e.target);
+                if (e.target.offsetHeight > prevHeight && scrollRef.current) {
+                  const el = scrollRef.current;
+                  requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+                }
               }}
               onKeyDown={(e) => {
                 // Autocomplete navigation
