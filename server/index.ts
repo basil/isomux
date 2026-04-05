@@ -112,9 +112,9 @@ async function handleCommand(cmd: ClientCommand) {
       const task = tasks.find((t) => t.id === cmd.id);
       if (task) {
         const c = cmd.changes;
-        if (c.title !== undefined) task.title = c.title;
-        if (c.description !== undefined) task.description = c.description;
-        if (c.assignee !== undefined) task.assignee = c.assignee;
+        if (c.title !== undefined) task.title = String(c.title);
+        if (c.description !== undefined) task.description = c.description ? String(c.description) : undefined;
+        if (c.assignee !== undefined) task.assignee = c.assignee ? String(c.assignee) : undefined;
         if (c.status !== undefined && isValidStatus(c.status)) task.status = c.status;
         if (c.priority !== undefined && isValidPriority(c.priority)) task.priority = c.priority;
         saveTasks(tasks);
@@ -278,7 +278,8 @@ const server = Bun.serve({
       if (req.method === "POST" && taskId && action === "done") {
         const task = tasks.find((t) => t.id === taskId);
         if (!task) return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: corsHeaders });
-        try { await req.json(); } catch {} // consume body if present
+        // Agents send `curl -d '{}'` — consume the body so Bun doesn't warn
+        try { await req.json(); } catch {}
         task.status = "done";
         saveTasks(tasks);
         broadcast({ type: "tasks", tasks } as ServerMessage);

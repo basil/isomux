@@ -46,6 +46,9 @@ function TaskDetailPanel({ task, onClose, username, mode = "edit", agents = [], 
   const [status, setStatus] = useState<TaskStatus>(task?.status || "open");
   const [assignee, setAssignee] = useState(task?.assignee || "");
 
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   useEffect(() => {
     if (task) {
       setTitle(task.title);
@@ -60,6 +63,8 @@ function TaskDetailPanel({ task, onClose, username, mode = "edit", agents = [], 
       setStatus("open");
       setAssignee("");
     }
+    setConfirmDelete(false);
+    setConfirmDiscard(false);
   }, [task]);
 
   function isDirty(): boolean {
@@ -76,8 +81,6 @@ function TaskDetailPanel({ task, onClose, username, mode = "edit", agents = [], 
     );
   }
 
-  const [confirmDiscard, setConfirmDiscard] = useState(false);
-
   function requestClose() {
     if (isDirty()) {
       setConfirmDiscard(true);
@@ -86,6 +89,8 @@ function TaskDetailPanel({ task, onClose, username, mode = "edit", agents = [], 
     }
   }
 
+  // No deps — must run every render so the ref always has a fresh closure
+  // that captures the current form state for the dirty check.
   useEffect(() => {
     if (closeRef) closeRef.current = requestClose;
     return () => { if (closeRef) closeRef.current = null; };
@@ -117,8 +122,6 @@ function TaskDetailPanel({ task, onClose, username, mode = "edit", agents = [], 
     }
     onClose();
   }
-
-  const [confirmDelete, setConfirmDelete] = useState(false);
 
   function handleDelete() {
     if (!confirmDelete) { setConfirmDelete(true); return; }
@@ -335,6 +338,7 @@ export function TaskView({ username, onClose, onFocusAgent }: { username: string
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const closeRef = useRef<(() => void) | null>(null);
+  const pendingSelectRef = useRef<string | null>(null);
 
   const selectedTask = selectedId ? tasks.find((t) => t.id === selectedId) : null;
   const panelOpen = !!(selectedTask || creating);
@@ -344,6 +348,15 @@ export function TaskView({ username, onClose, onFocusAgent }: { username: string
       closeRef.current();
     }
   }
+
+  // After a panel closes, apply any pending row selection from a click that triggered the close
+  useEffect(() => {
+    if (!panelOpen && pendingSelectRef.current) {
+      const id = pendingSelectRef.current;
+      pendingSelectRef.current = null;
+      setSelectedId(id);
+    }
+  }, [panelOpen]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -623,7 +636,7 @@ export function TaskView({ username, onClose, onFocusAgent }: { username: string
                       key={task.id}
                       onClick={() => {
                         if (task.id === selectedId) { tryClosePanel(); return; }
-                        if (panelOpen && closeRef.current) { closeRef.current(); return; }
+                        if (panelOpen) { tryClosePanel(); pendingSelectRef.current = task.id; return; }
                         setSelectedId(task.id); setCreating(false);
                       }}
                       style={{
