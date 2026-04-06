@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback, type RefCallback } from "react";
-import type { AgentInfo, AgentState, LogEntry, SkillInfo } from "../../shared/types.ts";
+import type { AgentInfo, AgentState, LogEntry, SkillInfo, Attachment } from "../../shared/types.ts";
 import { CLAUDE_MODELS, type ClaudeModel } from "../../shared/types.ts";
 import { StatusLight } from "../office/StatusLight.tsx";
 import { Character } from "../office/Character.tsx";
@@ -172,6 +172,11 @@ export function LogView({
   const isListeningRef = useRef(false);
   const [showMicHint, setShowMicHint] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  type StagedAttachment = Attachment & { id: string; uploading: boolean; error?: string };
+  const [stagedAttachments, setStagedAttachments] = useState<StagedAttachment[]>([]);
+  const hasUploading = stagedAttachments.some((a) => a.uploading);
+  const validAttachments = stagedAttachments.filter((a) => !a.error);
   const swipeRef = useSwipeLeftRight(onSwipeLeft ?? (() => {}), onSwipeRight ?? (() => {}), isMobile);
   const messagesRef: RefCallback<HTMLDivElement> = useCallback((node: HTMLDivElement | null) => {
     (scrollRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
@@ -414,12 +419,59 @@ export function LogView({
     };
   }, []);
 
+  function handleFileSelect(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    for (const file of Array.from(files)) {
+      if (file.size > 10 * 1024 * 1024) {
+        const id = Math.random().toString(36).slice(2, 10);
+        setStagedAttachments((prev) => [...prev, {
+          id, filename: "", originalName: file.name, mediaType: file.type || "application/octet-stream", size: file.size,
+          uploading: false, error: "File too large (max 10MB)",
+        }]);
+        continue;
+      }
+      const id = Math.random().toString(36).slice(2, 10);
+      setStagedAttachments((prev) => [...prev, {
+        id, filename: "", originalName: file.name, mediaType: file.type || "application/octet-stream", size: file.size,
+        uploading: true,
+      }]);
+      const formData = new FormData();
+      formData.append("file", file);
+      fetch(`/api/upload/${agent.id}`, { method: "POST", body: formData })
+        .then((res) => {
+          if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+          return res.json();
+        })
+        .then((data: { attachments: Attachment[] }) => {
+          const att = data.attachments[0];
+          setStagedAttachments((prev) => prev.map((s) =>
+            s.id === id ? { ...s, ...att, uploading: false } : s
+          ));
+        })
+        .catch((err) => {
+          setStagedAttachments((prev) => prev.map((s) =>
+            s.id === id ? { ...s, uploading: false, error: err.message } : s
+          ));
+        });
+    }
+    // Reset file input so the same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function removeStaged(id: string) {
+    setStagedAttachments((prev) => prev.filter((a) => a.id !== id));
+  }
+
   function handleSend() {
     const text = input.trim();
-    if (!text) return;
-    if (isBusy) return;
-    send({ type: "send_message", agentId: agent.id, text, username });
+    if (!text && validAttachments.length === 0) return;
+    if (isBusy || hasUploading) return;
+    const attachments = validAttachments.length > 0
+      ? validAttachments.map(({ id: _id, uploading: _u, error: _e, ...att }) => att as Attachment)
+      : undefined;
+    send({ type: "send_message", agentId: agent.id, text, username, attachments });
     setInput("");
+    setStagedAttachments([]);
     stopListening();
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -870,7 +922,66 @@ export function LogView({
           background: "var(--bg-surface)",
         }}
       >
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          style={{ display: "none" }}
+          onChange={(e) => handleFileSelect(e.target.files)}
+        />
+        {stagedAttachments.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+            {stagedAttachments.map((att) => (
+              <div
+                key={att.id}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                  background: att.error ? "var(--red-bg)" : "var(--bg-hover)",
+                  border: `1px solid ${att.error ? "var(--red)" : "var(--border)"}`,
+                  fontSize: isMobile ? 13 : 11,
+                  fontFamily: "'JetBrains Mono',monospace",
+                  color: att.error ? "var(--red)" : "var(--text-secondary)",
+                  maxWidth: "100%",
+                }}
+              >
+                {att.mediaType.startsWith("image/") ? "🖼️" : att.mediaType === "application/pdf" ? "📄" : "📎"}
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 150 }}>{att.originalName}</span>
+                {att.uploading && <span style={{ color: "var(--text-ghost)" }}>uploading…</span>}
+                {att.error && <span style={{ fontSize: isMobile ? 11 : 9 }}>{att.error}</span>}
+                <button
+                  onClick={() => removeStaged(att.id)}
+                  style={{
+                    background: "none", border: "none", color: att.error ? "var(--red)" : "var(--text-ghost)",
+                    cursor: "pointer", padding: "0 2px", fontSize: 14, lineHeight: 1, flexShrink: 0,
+                  }}
+                >×</button>
+              </div>
+            ))}
+          </div>
+        )}
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isBusy}
+            style={{
+              background: "none", border: "none", padding: 0,
+              color: isBusy ? "var(--text-ghost)" : "var(--text-muted)",
+              cursor: isBusy ? "default" : "pointer",
+              lineHeight: "20px", position: "relative", top: -2,
+              fontSize: 16, flexShrink: 0,
+              opacity: isBusy ? 0.4 : 0.7,
+              transition: "opacity 0.15s",
+            }}
+            title="Attach files"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+            </svg>
+          </button>
           <span style={{ color: isBusy ? "var(--text-ghost)" : "var(--green)", fontWeight: 600, lineHeight: "20px", position: "relative", top: -2 }}>&#10095;</span>
           <div style={{ flex: 1, position: "relative", top: -2 }}>
             {showAutocomplete && filteredCommands.length > 0 && (
@@ -1181,7 +1292,7 @@ export function LogView({
             ) : (
               <button
                 onClick={handleSend}
-                disabled={!input.trim()}
+                disabled={(!input.trim() && validAttachments.length === 0) || hasUploading}
                 style={{
                   flexShrink: 0,
                   alignSelf: "flex-end",
@@ -1189,10 +1300,10 @@ export function LogView({
                   height: 36,
                   borderRadius: 8,
                   border: "none",
-                  background: input.trim() ? "var(--green)" : "var(--bg-hover)",
-                  color: input.trim() ? "var(--bg-base)" : "var(--text-ghost)",
+                  background: (input.trim() || validAttachments.length > 0) && !hasUploading ? "var(--green)" : "var(--bg-hover)",
+                  color: (input.trim() || validAttachments.length > 0) && !hasUploading ? "var(--bg-base)" : "var(--text-ghost)",
                   fontSize: 16,
-                  cursor: input.trim() ? "pointer" : "default",
+                  cursor: (input.trim() || validAttachments.length > 0) && !hasUploading ? "pointer" : "default",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
