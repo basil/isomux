@@ -54,6 +54,8 @@ export function useSwipeLeftRight(
       startRef.current = null;
 
       if (dy > MAX_VERTICAL) return;
+      const sel = window.getSelection();
+      if (sel && sel.type === "Range") return;
       if (dx <= -TRIGGER_THRESHOLD) {
         onSwipeLeftRef.current();
       } else if (dx >= TRIGGER_THRESHOLD) {
