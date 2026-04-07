@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAppState, useDispatch, useTheme, useFeatures } from "../store.tsx";
 import { Floor, Walls } from "./Floor.tsx";
 import { RoomProps } from "./RoomProps.tsx";
@@ -12,6 +13,33 @@ import { MobileHeader, getRoomCounts } from "../components/MobileHeader.tsx";
 import { useSwipeLeftRight } from "../hooks/useSwipeLeftRight.ts";
 import type { AgentInfo } from "../../shared/types.ts";
 
+/** HTML drop zone positioned over an SVG door — SVG elements are unreliable drag-and-drop targets */
+function DoorDropZone({ side, onDrop, onDragOverChange, onClick }: { side: "left" | "right"; onDrop: (deskIndex: number) => boolean; onDragOverChange: (over: boolean) => void; onClick: () => void }) {
+  const [reject, setReject] = useState(false);
+  // Pixel positions within the 950×700 scene container, derived from the SVG door transforms
+  const style: React.CSSProperties = side === "left"
+    ? { position: "absolute", left: 0, top: 225, width: 85, height: 155, zIndex: 200 }
+    : { position: "absolute", right: 0, top: 225, width: 85, height: 155, zIndex: 200 };
+  return (
+    <div
+      style={{ ...style, cursor: "pointer", background: reject ? "rgba(255,60,60,0.08)" : "transparent" }}
+      onClick={onClick}
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
+      onDragEnter={() => onDragOverChange(true)}
+      onDragLeave={() => onDragOverChange(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDragOverChange(false);
+        const src = parseInt(e.dataTransfer.getData("text/plain"), 10);
+        if (!isNaN(src)) {
+          const ok = onDrop(src);
+          if (!ok) { setReject(true); setTimeout(() => setReject(false), 400); }
+        }
+      }}
+    />
+  );
+}
+
 export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, onEditOfficePrompt, onOpenTasks, onOpenUpdate, onSwipeLeft, onSwipeRight }: { onSpawn: (deskIndex: number) => void; onContextMenu: (x: number, y: number, agent: AgentInfo) => void; username: string; onEditUsername: () => void; onEditOfficePrompt: () => void; onOpenTasks: () => void; onOpenUpdate: () => void; onSwipeLeft?: () => void; onSwipeRight?: () => void }) {
   const { agents, needsAttention, stateChangedAt, officePrompt, tasks, currentRoom, roomCount, isMobile, updateAvailable } = useAppState();
   const dispatch = useDispatch();
@@ -22,6 +50,10 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
 
   // Filter agents to current room for rendering
   const roomAgents = agents.filter((a) => a.room === currentRoom);
+  const [leftDoorDragOver, setLeftDoorDragOver] = useState(false);
+  const [rightDoorDragOver, setRightDoorDragOver] = useState(false);
+  const [leftDoorReject, setLeftDoorReject] = useState(false);
+  const [rightDoorReject, setRightDoorReject] = useState(false);
 
   const counts = getRoomCounts(roomAgents);
 
@@ -210,11 +242,41 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
             hasOfficePrompt={!!officePrompt}
             onOpenTasks={onOpenTasks}
             taskCount={tasks.filter(t => t.status !== "done").length}
-            leftDoor={currentRoom > 0 ? { label: `Room ${currentRoom}`, onClick: () => dispatch({ type: "set_current_room", room: currentRoom - 1 }) } : null}
-            rightDoor={currentRoom < roomCount - 1 ? { label: `Room ${currentRoom + 2}`, onClick: () => dispatch({ type: "set_current_room", room: currentRoom + 1 }) } : null}
+            leftDoor={currentRoom > 0 ? { label: `Room ${currentRoom}`, onClick: () => dispatch({ type: "set_current_room", room: currentRoom - 1 }), dragOver: leftDoorDragOver, reject: leftDoorReject } : null}
+            rightDoor={currentRoom < roomCount - 1 ? { label: `Room ${currentRoom + 2}`, onClick: () => dispatch({ type: "set_current_room", room: currentRoom + 1 }), dragOver: rightDoorDragOver, reject: rightDoorReject } : null}
           />
           <Floor />
           <RoomProps />
+          {currentRoom > 0 && (
+            <DoorDropZone
+              side="left"
+              onClick={() => dispatch({ type: "set_current_room", room: currentRoom - 1 })}
+              onDragOverChange={(over) => setLeftDoorDragOver(over)}
+              onDrop={(deskIndex) => {
+                const a = roomAgents.find((a) => a.desk === deskIndex);
+                if (!a) { setLeftDoorReject(true); setTimeout(() => setLeftDoorReject(false), 400); return false; }
+                const targetRoom = currentRoom - 1;
+                if (agents.filter((x) => x.room === targetRoom).length >= 8) { setLeftDoorReject(true); setTimeout(() => setLeftDoorReject(false), 400); return false; }
+                send({ type: "move_agent", agentId: a.id, targetRoom });
+                return true;
+              }}
+            />
+          )}
+          {currentRoom < roomCount - 1 && (
+            <DoorDropZone
+              side="right"
+              onClick={() => dispatch({ type: "set_current_room", room: currentRoom + 1 })}
+              onDragOverChange={(over) => setRightDoorDragOver(over)}
+              onDrop={(deskIndex) => {
+                const a = roomAgents.find((a) => a.desk === deskIndex);
+                if (!a) { setRightDoorReject(true); setTimeout(() => setRightDoorReject(false), 400); return false; }
+                const targetRoom = currentRoom + 1;
+                if (agents.filter((x) => x.room === targetRoom).length >= 8) { setRightDoorReject(true); setTimeout(() => setRightDoorReject(false), 400); return false; }
+                send({ type: "move_agent", agentId: a.id, targetRoom });
+                return true;
+              }}
+            />
+          )}
           {Array.from({ length: 8 }, (_, i) => {
             const agent = roomAgents.find((a) => a.desk === i);
             if (agent) {
@@ -263,7 +325,7 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
       >
         {(isMobile
           ? ["TAP → open", "LONG-PRESS → actions"]
-          : ["CLICK → open agent", "DRAG → swap desks", "RIGHT-CLICK → actions", "ESC → back"]
+          : ["CLICK → open agent", "DRAG → swap desks or move to door", "RIGHT-CLICK → actions", "ESC → back"]
         ).map((h, i) => (
           <span
             key={i}
