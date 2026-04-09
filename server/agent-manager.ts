@@ -14,7 +14,7 @@ import { createSafetyHooks } from "./safety-hooks.ts";
 import { commands, autocompleteCommands, unsupportedMessage, type CommandConfig } from "./commands.ts";
 import { resolve, join } from "path";
 import { homedir } from "os";
-import { writeFileSync, mkdirSync, readdirSync, existsSync, readFileSync, rmSync } from "fs";
+import { writeFileSync, mkdirSync, readdirSync, existsSync, readFileSync, rmSync, statSync } from "fs";
 
 // Directory for per-agent launcher scripts
 const LAUNCHERS_DIR = join(homedir(), ".isomux", "launchers");
@@ -1035,15 +1035,25 @@ function buildUserMessage(agentId: string, text: string, attachments: Attachment
         },
       });
     } else if (att.mediaType === "application/pdf") {
-      const data = readFileSync(filePath).toString("base64");
-      content.push({
-        type: "document",
-        source: {
-          type: "base64",
-          media_type: "application/pdf",
-          data,
-        },
-      });
+      // Claude API limits: 100 pages, ~32MB base64. Check file size as a proxy.
+      const stats = statSync(filePath);
+      if (stats.size > 10 * 1024 * 1024) {
+        // Too large to send inline — give the agent the file path instead
+        content.push({
+          type: "text",
+          text: `Attached PDF "${att.originalName}" (${(stats.size / 1024 / 1024).toFixed(1)}MB) is too large to display inline. The file is saved at: ${filePath}`,
+        });
+      } else {
+        const data = readFileSync(filePath).toString("base64");
+        content.push({
+          type: "document",
+          source: {
+            type: "base64",
+            media_type: "application/pdf",
+            data,
+          },
+        });
+      }
     } else {
       const ext = att.originalName.includes(".") ? att.originalName.split(".").pop()!.toLowerCase() : "";
       if (TEXT_FILE_EXTENSIONS.has(ext)) {

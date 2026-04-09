@@ -301,9 +301,9 @@ const server = Bun.serve({
       try {
         const formData = await req.formData();
         const attachments: Attachment[] = [];
-        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+        const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
         const MAX_FILES = 5;
-        const MAX_TOTAL = 20 * 1024 * 1024; // 20MB
+        const MAX_TOTAL = 40 * 1024 * 1024; // 40MB
         let totalSize = 0;
         let fileCount = 0;
 
@@ -316,13 +316,13 @@ const server = Bun.serve({
             });
           }
           if (value.size > MAX_FILE_SIZE) {
-            return new Response(JSON.stringify({ error: `File "${value.name}" exceeds 10MB limit` }), {
+            return new Response(JSON.stringify({ error: `File "${value.name}" exceeds 20MB limit` }), {
               status: 400, headers: { "Content-Type": "application/json" },
             });
           }
           totalSize += value.size;
           if (totalSize > MAX_TOTAL) {
-            return new Response(JSON.stringify({ error: "Total upload exceeds 20MB limit" }), {
+            return new Response(JSON.stringify({ error: "Total upload exceeds 40MB limit" }), {
               status: 400, headers: { "Content-Type": "application/json" },
             });
           }
