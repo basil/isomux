@@ -210,6 +210,10 @@ const READ_ONLY_COMMANDS = [
   "stat", "wc", "file", "diff", "bat", "jq", "tree",
 ];
 
+// Copy-like commands where only the last argument (destination) is a write target.
+// Reading from ~/.isomux/ via these is fine; only writing to it should be blocked.
+const COPY_COMMANDS = ["cp", "rsync", "scp", "install"];
+
 // Commands that can modify files — if these target ~/.isomux/, block them
 const WRITE_COMMANDS = [
   "cp", "mv", "rm", "mkdir", "rmdir", "touch", "chmod", "chown",
@@ -231,7 +235,18 @@ function commandWritesToIsomux(command: string): boolean {
   for (const sub of subCommands) {
     if (!sub.includes(ISOMUX_DIR) && !sub.includes("~/.isomux")) continue;
     const firstToken = sub.split(/\s+/)[0]?.replace(/^.*\//, "") ?? "";
-    if (WRITE_COMMANDS.includes(firstToken)) return true;
+    if (!WRITE_COMMANDS.includes(firstToken)) continue;
+
+    // For copy-like commands, only the destination (last arg) is a write target.
+    // Reading *from* ~/.isomux/ is fine — only block if writing *to* it.
+    if (COPY_COMMANDS.includes(firstToken)) {
+      const args = sub.split(/\s+/).filter(a => !a.startsWith("-"));
+      const dest = args[args.length - 1] ?? "";
+      if (dest.includes(ISOMUX_DIR) || dest.includes("~/.isomux")) return true;
+      continue;
+    }
+
+    return true;
   }
 
   return false;
