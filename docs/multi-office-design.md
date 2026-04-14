@@ -110,6 +110,32 @@ On first startup after this change, if `~/.isomux/offices/` does not exist:
 
 The absence of the `offices/` directory is the migration trigger. No marker file needed. The move is atomic per file (rename within the same filesystem).
 
+### Per-Office Environment Variables
+
+Each office can define environment variables that are set on all Claude Code processes spawned within it. This allows per-office Git identity and GitHub credentials without OS-level user separation.
+
+Office config (`~/.isomux/offices/alice/config.json`):
+
+```json
+{
+  "env": {
+    "GIT_AUTHOR_NAME": "Alice",
+    "GIT_AUTHOR_EMAIL": "alice@example.com",
+    "GIT_COMMITTER_NAME": "Alice",
+    "GIT_COMMITTER_EMAIL": "alice@example.com",
+    "GH_TOKEN": "ghp_..."
+  }
+}
+```
+
+Git and the GitHub CLI (`gh`) both respect these standard environment variables over global config. Claude credentials are inherited from the parent process and are unaffected.
+
+This cleanly separates the two credential concerns:
+- **Claude API auth** — shared, inherited from the isomux process environment
+- **Git/GitHub identity** — per-office, injected into child processes at spawn time
+
+Security note: tokens in `config.json` are readable by the isomux process user. On a trusted network this is acceptable. For stronger guarantees, the deployer can restrict file permissions on individual office config files.
+
 ## Alternatives Considered
 
 ### Separate Linux User Per Person
