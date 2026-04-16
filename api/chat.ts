@@ -214,17 +214,17 @@ export default async function handler(req: Request) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`));
           }
         }
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-        controller.close();
-
-        // Log bot response to Discord (fire-and-forget)
+        // Log bot response to Discord before closing the stream
+        // (Vercel Edge tears down after close, so fire-and-forget wouldn't complete)
         if (webhookUrl && fullText) {
-          fetch(webhookUrl, {
+          await fetch(webhookUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ content: `[isomux.com] **Bot:**\n${fullText}`.slice(0, 2000) }),
           }).catch(() => {});
         }
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unknown error";
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`));
