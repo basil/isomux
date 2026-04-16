@@ -112,7 +112,7 @@ For persistent server setup (systemd + Tailscale) and voice input configuration,
 ### Mobile Support
 - **Open from your phone** — same Tailscale URL, touch-optimized UI
 - **Instant sync** — laptop and phone see the same state in real time over WebSocket
-- **Agent list view** replaces isometric office on small screens
+- **Agent list view** as an alternative to the isometric office on small screens
 - **Full conversation view** with readable font sizes and two-row header
 - **Send & abort buttons** for touch input
 - Safe area insets for notch/home bar devices
