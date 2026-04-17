@@ -224,7 +224,8 @@ export type ServerMessage =
   | SettingsValidationResponse
   | AgentSaveResponse
   | CwdValidationResponse
-  | { type: "update_status"; updateAvailable: boolean; current: { sha: string; message: string; date: string }; latest: { sha: string; message: string; date: string } };
+  | { type: "update_status"; updateAvailable: boolean; current: { sha: string; message: string; date: string }; latest: { sha: string; message: string; date: string } }
+  | { type: "pong" };
 
 // Browser → Server commands
 export type ClientCommand =
@@ -255,7 +256,8 @@ export type ClientCommand =
   | { type: "rename_room"; roomId: string; name: string }
   | { type: "move_agent"; agentId: string; targetRoomId: string }
   | { type: "reorder_rooms"; order: string[] }
-  | { type: "edit_message"; agentId: string; logEntryId: string; newText: string; username?: string };
+  | { type: "edit_message"; agentId: string; logEntryId: string; newText: string; username?: string }
+  | { type: "ping" };
 
 // Generate a stable 8-char hex room ID (used at room creation and during migration)
 export function generateRoomId(existing?: string[]): string {

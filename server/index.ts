@@ -25,6 +25,9 @@ AgentManager.onEvent((event) => {
 
 async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
   switch (cmd.type) {
+    case "ping":
+      ws.send(JSON.stringify({ type: "pong" } as ServerMessage));
+      break;
     case "spawn": {
       try {
         AgentManager.validateCwd(cmd.cwd);
