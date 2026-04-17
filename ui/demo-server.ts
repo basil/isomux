@@ -259,6 +259,9 @@ export function handleCommand(cmd: ClientCommand) {
         const entry = makeLogEntry(result.agent.id, "system", `Agent "${cmd.name}" ready. Working in ${cmd.cwd}. (Demo mode)`);
         shimEmit({ type: "log_entry", entry });
       }
+      if (cmd.requestId) {
+        shimEmit({ type: "agent_save_response", requestId: cmd.requestId, ok: true });
+      }
       break;
     }
     case "kill": {
@@ -273,6 +276,9 @@ export function handleCommand(cmd: ClientCommand) {
         customInstructions: cmd.customInstructions,
         permissionMode: cmd.permissionMode,
       }));
+      if (cmd.requestId) {
+        shimEmit({ type: "agent_save_response", requestId: cmd.requestId, ok: true });
+      }
       break;
     }
     case "swap_desks": {
@@ -313,6 +319,11 @@ export function handleCommand(cmd: ClientCommand) {
       const envFile = cmd.envFile && cmd.envFile.trim() ? cmd.envFile.trim() : null;
       emitEvents(state.setRoomSettings(cmd.roomId, cmd.prompt, envFile));
       shimEmit({ type: "settings_save_response", requestId: cmd.requestId, ok: true });
+      break;
+    }
+    case "request_cwd_validation": {
+      // Demo mode: assume all paths are valid (no filesystem access).
+      shimEmit({ type: "cwd_validation", requestId: cmd.requestId, ok: true });
       break;
     }
     case "request_settings_validation": {

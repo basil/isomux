@@ -1049,6 +1049,20 @@ function resolveCwd(cwd: string): string {
   return resolve(cwd);
 }
 
+// Resolve and verify a cwd. Throws if the directory does not exist or is not a directory.
+export function validateCwd(cwd: string): string {
+  const resolved = resolveCwd(cwd);
+  let stat;
+  try {
+    stat = statSync(resolved);
+  } catch (err: any) {
+    if (err.code === "ENOENT") throw new Error(`Directory does not exist: ${resolved}`);
+    throw new Error(`Cannot access ${resolved}: ${err.message}`);
+  }
+  if (!stat.isDirectory()) throw new Error(`Not a directory: ${resolved}`);
+  return resolved;
+}
+
 // Merge process.env with office and room env files.
 // Room overrides office; office overrides process.env. Spawn-time failure mode:
 // if a configured env file is missing or fails to parse, throw — the caller is

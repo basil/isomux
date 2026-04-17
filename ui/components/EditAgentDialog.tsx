@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AgentInfo, AgentOutfit, ModelFamily } from "../../shared/types.ts";
 import { MODEL_FAMILIES, modelVersionLabel } from "../../shared/types.ts";
 import { SHIRT_COLORS, HAIR_COLORS, SKIN_COLORS, HAIR_STYLES, BEARDS, HATS, ACCESSORIES } from "../../shared/outfit-options.ts";
 import { Character } from "../office/Character.tsx";
-import { send } from "../ws.ts";
+import { send, addRawListener, removeRawListener } from "../ws.ts";
 import { useAppState } from "../store.tsx";
 
 const HAIR_STYLE_LABELS: Record<AgentOutfit["hairStyle"], string> = {
@@ -77,13 +77,64 @@ export function EditAgentDialog(props: EditAgentDialogProps) {
       ? "bypassPermissions"
       : (agent?.permissionMode ?? "auto");
   const [permissionMode, setPermissionMode] = useState<AgentInfo["permissionMode"]>(initialPermissionMode);
+  const [saving, setSaving] = useState(false);
+  const [cwdError, setCwdError] = useState<string | null>(null);
+  const pendingListener = useRef<((data: string) => void) | null>(null);
   const recentCwds = allRecentCwds.filter((c) => c !== cwd);
 
+  useEffect(() => {
+    return () => {
+      if (pendingListener.current) removeRawListener(pendingListener.current);
+    };
+  }, []);
+
+  // Validate the existing cwd when the edit dialog opens, so the user sees
+  // immediately if the stored directory is gone.
+  useEffect(() => {
+    if (isSpawn || !agent) return;
+    const initialCwd = agent.cwd;
+    const reqId = `cwd-check-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const listener = (data: string) => {
+      try {
+        const msg = JSON.parse(data);
+        if (msg.type === "cwd_validation" && msg.requestId === reqId) {
+          removeRawListener(listener);
+          if (!msg.ok) setCwdError(msg.error || "Invalid directory");
+        }
+      } catch {}
+    };
+    addRawListener(listener);
+    send({ type: "request_cwd_validation", requestId: reqId, cwd: initialCwd });
+    return () => removeRawListener(listener);
+  }, [isSpawn, agent]);
+
   function handleSave() {
+    const reqId = `agent-save-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const listener = (data: string) => {
+      try {
+        const msg = JSON.parse(data);
+        if (msg.type === "agent_save_response" && msg.requestId === reqId) {
+          removeRawListener(listener);
+          pendingListener.current = null;
+          setSaving(false);
+          if (msg.ok) {
+            onClose();
+          } else {
+            setCwdError(msg.error || "Save failed");
+          }
+        }
+      } catch {}
+    };
+
     if (isSpawn) {
       const targetRoomId = rooms[props.room!]?.id;
+      setCwdError(null);
+      setSaving(true);
+      addRawListener(listener);
+      pendingListener.current = listener;
       send({
         type: "spawn",
+        requestId: reqId,
         name: name || `Agent ${props.deskIndex! + 1}`,
         cwd,
         permissionMode,
@@ -102,9 +153,24 @@ export function EditAgentDialog(props: EditAgentDialogProps) {
       if (trimmedInstructions !== (agent!.customInstructions ?? "")) cmd.customInstructions = trimmedInstructions;
       if (modelFamily !== agent!.modelFamily) cmd.modelFamily = modelFamily;
       if (permissionMode !== agent!.permissionMode) cmd.permissionMode = permissionMode;
-      if (cmd.name || cmd.cwd || cmd.outfit || cmd.customInstructions !== undefined || cmd.modelFamily || cmd.permissionMode) send(cmd);
+      if (!(cmd.name || cmd.cwd || cmd.outfit || cmd.customInstructions !== undefined || cmd.modelFamily || cmd.permissionMode)) {
+        onClose();
+        return;
+      }
+      setCwdError(null);
+      // Only round-trip through the server when we need cwd validation; other
+      // edits have no failure mode worth blocking the dialog on.
+      if (cmd.cwd) {
+        cmd.requestId = reqId;
+        setSaving(true);
+        addRawListener(listener);
+        pendingListener.current = listener;
+        send(cmd);
+      } else {
+        send(cmd);
+        onClose();
+      }
     }
-    onClose();
   }
 
   return (
@@ -157,13 +223,18 @@ export function EditAgentDialog(props: EditAgentDialogProps) {
         />
 
         <label style={{ ...labelStyle, marginTop: 12 }}>Working Directory</label>
-        <input value={cwd} onChange={(e) => setCwd(e.target.value)} style={inputStyle} />
+        <input
+          value={cwd}
+          onChange={(e) => { setCwd(e.target.value); if (cwdError) setCwdError(null); }}
+          style={{ ...inputStyle, borderColor: cwdError ? "#ff6b6b" : inputStyle.border as string }}
+        />
+        {cwdError && <p style={{ fontSize: 10, color: "#ff6b6b", margin: "4px 0 0" }}>{cwdError}</p>}
         {recentCwds.length > 0 && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
             {recentCwds.map((c) => (
               <button
                 key={c}
-                onClick={() => setCwd(c)}
+                onClick={() => { setCwd(c); if (cwdError) setCwdError(null); }}
                 style={chipStyle}
               >
                 {c.replace(/^\/home\/[^/]+/, "~")}
@@ -381,8 +452,8 @@ export function EditAgentDialog(props: EditAgentDialogProps) {
           borderTop: "1px solid var(--border)",
           flexShrink: 0,
         }}>
-          <button onClick={onClose} style={cancelBtnStyle}>Cancel</button>
-          <button onClick={handleSave} style={saveBtnStyle}>{isSpawn ? "Spawn" : "Save"}</button>
+          <button onClick={onClose} style={cancelBtnStyle} disabled={saving}>Cancel</button>
+          <button onClick={handleSave} style={saveBtnStyle} disabled={saving}>{saving ? "Saving…" : (isSpawn ? "Spawn" : "Save")}</button>
         </div>
       </div>
     </div>

@@ -25,10 +25,22 @@ AgentManager.onEvent((event) => {
 
 async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
   switch (cmd.type) {
-    case "spawn":
+    case "spawn": {
+      try {
+        AgentManager.validateCwd(cmd.cwd);
+      } catch (err: any) {
+        if (cmd.requestId) {
+          ws.send(JSON.stringify({ type: "agent_save_response", requestId: cmd.requestId, ok: false, error: err.message || "Invalid directory" } as ServerMessage));
+        }
+        break;
+      }
       saveRecentCwd(cmd.cwd);
       await AgentManager.spawn(cmd.name, cmd.cwd, cmd.permissionMode, cmd.desk, cmd.customInstructions, cmd.roomId, cmd.outfit, cmd.modelFamily);
+      if (cmd.requestId) {
+        ws.send(JSON.stringify({ type: "agent_save_response", requestId: cmd.requestId, ok: true } as ServerMessage));
+      }
       break;
+    }
     case "kill":
       await AgentManager.kill(cmd.agentId);
       break;
@@ -45,10 +57,24 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
     case "resume":
       await AgentManager.resume(cmd.agentId, cmd.sessionId);
       break;
-    case "edit_agent":
-      if (cmd.cwd) saveRecentCwd(cmd.cwd);
+    case "edit_agent": {
+      if (cmd.cwd) {
+        try {
+          AgentManager.validateCwd(cmd.cwd);
+        } catch (err: any) {
+          if (cmd.requestId) {
+            ws.send(JSON.stringify({ type: "agent_save_response", requestId: cmd.requestId, ok: false, error: err.message || "Invalid directory" } as ServerMessage));
+          }
+          break;
+        }
+        saveRecentCwd(cmd.cwd);
+      }
       AgentManager.editAgent(cmd.agentId, { name: cmd.name, cwd: cmd.cwd, outfit: cmd.outfit, customInstructions: cmd.customInstructions, modelFamily: cmd.modelFamily, permissionMode: cmd.permissionMode });
+      if (cmd.requestId) {
+        ws.send(JSON.stringify({ type: "agent_save_response", requestId: cmd.requestId, ok: true } as ServerMessage));
+      }
       break;
+    }
     case "swap_desks":
       AgentManager.swapDesks(cmd.deskA, cmd.deskB, cmd.roomId);
       break;
@@ -91,25 +117,23 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
       break;
     case "update_office_settings": {
       const envFile = cmd.envFile && cmd.envFile.trim() ? cmd.envFile.trim() : null;
-      let keyCount: number | undefined;
       if (envFile) {
         try {
-          keyCount = AgentManager.validateEnvPath(envFile);
+          AgentManager.validateEnvPath(envFile);
         } catch (err: any) {
           ws.send(JSON.stringify({ type: "settings_save_response", requestId: cmd.requestId, ok: false, error: err.message || "Invalid env file" } as ServerMessage));
           break;
         }
       }
       AgentManager.setOfficeSettings(cmd.prompt, envFile);
-      ws.send(JSON.stringify({ type: "settings_save_response", requestId: cmd.requestId, ok: true, keyCount } as ServerMessage));
+      ws.send(JSON.stringify({ type: "settings_save_response", requestId: cmd.requestId, ok: true } as ServerMessage));
       break;
     }
     case "update_room_settings": {
       const envFile = cmd.envFile && cmd.envFile.trim() ? cmd.envFile.trim() : null;
-      let keyCount: number | undefined;
       if (envFile) {
         try {
-          keyCount = AgentManager.validateEnvPath(envFile);
+          AgentManager.validateEnvPath(envFile);
         } catch (err: any) {
           ws.send(JSON.stringify({ type: "settings_save_response", requestId: cmd.requestId, ok: false, error: err.message || "Invalid env file" } as ServerMessage));
           break;
@@ -119,7 +143,16 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
       if (!ok) {
         ws.send(JSON.stringify({ type: "settings_save_response", requestId: cmd.requestId, ok: false, error: "Room not found" } as ServerMessage));
       } else {
-        ws.send(JSON.stringify({ type: "settings_save_response", requestId: cmd.requestId, ok: true, keyCount } as ServerMessage));
+        ws.send(JSON.stringify({ type: "settings_save_response", requestId: cmd.requestId, ok: true } as ServerMessage));
+      }
+      break;
+    }
+    case "request_cwd_validation": {
+      try {
+        AgentManager.validateCwd(cmd.cwd);
+        ws.send(JSON.stringify({ type: "cwd_validation", requestId: cmd.requestId, ok: true } as ServerMessage));
+      } catch (err: any) {
+        ws.send(JSON.stringify({ type: "cwd_validation", requestId: cmd.requestId, ok: false, error: err.message || "Invalid directory" } as ServerMessage));
       }
       break;
     }

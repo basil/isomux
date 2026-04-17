@@ -170,7 +170,6 @@ export interface SettingsSaveResponse {
   type: "settings_save_response";
   requestId: string;
   ok: boolean;
-  keyCount?: number;
   error?: string;
 }
 
@@ -183,6 +182,22 @@ export interface SettingsValidationResponse {
   envFile: string | null;
   ok: boolean;
   keyCount?: number;
+  error?: string;
+}
+
+// Response to spawn / edit_agent (sent only to the requesting client, when requestId provided)
+export interface AgentSaveResponse {
+  type: "agent_save_response";
+  requestId: string;
+  ok: boolean;
+  error?: string;
+}
+
+// Response to request_cwd_validation (sent only to the requesting client)
+export interface CwdValidationResponse {
+  type: "cwd_validation";
+  requestId: string;
+  ok: boolean;
   error?: string;
 }
 
@@ -207,18 +222,20 @@ export type ServerMessage =
   | { type: "rooms_reordered"; order: string[] }
   | SettingsSaveResponse
   | SettingsValidationResponse
+  | AgentSaveResponse
+  | CwdValidationResponse
   | { type: "update_status"; updateAvailable: boolean; current: { sha: string; message: string; date: string }; latest: { sha: string; message: string; date: string } };
 
 // Browser → Server commands
 export type ClientCommand =
-  | { type: "spawn"; name: string; cwd: string; permissionMode: AgentInfo["permissionMode"]; desk: number; roomId?: string; customInstructions?: string; outfit?: AgentOutfit; modelFamily?: ModelFamily }
+  | { type: "spawn"; requestId?: string; name: string; cwd: string; permissionMode: AgentInfo["permissionMode"]; desk: number; roomId?: string; customInstructions?: string; outfit?: AgentOutfit; modelFamily?: ModelFamily }
   | { type: "kill"; agentId: string }
   | { type: "abort"; agentId: string }
   | { type: "send_message"; agentId: string; text: string; username?: string; attachments?: Attachment[] }
   | { type: "new_conversation"; agentId: string }
   | { type: "resume"; agentId: string; sessionId: string }
   | { type: "list_sessions"; agentId: string }
-  | { type: "edit_agent"; agentId: string; name?: string; cwd?: string; outfit?: AgentOutfit; customInstructions?: string; modelFamily?: ModelFamily; permissionMode?: AgentInfo["permissionMode"] }
+  | { type: "edit_agent"; requestId?: string; agentId: string; name?: string; cwd?: string; outfit?: AgentOutfit; customInstructions?: string; modelFamily?: ModelFamily; permissionMode?: AgentInfo["permissionMode"] }
   | { type: "swap_desks"; deskA: number; deskB: number; roomId: string }
   | { type: "set_topic"; agentId: string; topic: string }
   | { type: "reset_topic"; agentId: string }
@@ -229,6 +246,7 @@ export type ClientCommand =
   | { type: "update_office_settings"; requestId: string; prompt: string | null; envFile: string | null }
   | { type: "update_room_settings"; requestId: string; roomId: string; prompt: string | null; envFile: string | null }
   | { type: "request_settings_validation"; requestId: string; scope: "office" | "room"; roomId?: string }
+  | { type: "request_cwd_validation"; requestId: string; cwd: string }
   | { type: "add_task"; title: string; description?: string; priority?: TaskPriority; assignee?: string; username: string }
   | { type: "update_task"; id: string; changes: Partial<Pick<TaskItem, "title" | "description" | "priority" | "status" | "assignee">> }
   | { type: "delete_task"; id: string }
