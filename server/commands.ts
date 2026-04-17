@@ -104,6 +104,14 @@ export const commands: Record<string, CommandConfig> = {
     handler: "isomuxSystemPrompt",
     description: "Show the full system prompt this agent receives",
   },
+  "isomux-diff": {
+    type: "hardcoded",
+    supported: true,
+    autocomplete: true,
+    overridable: false,
+    handler: "isomuxDiff",
+    description: "Peek uncommitted changes in the agent's cwd",
+  },
 
   // =========================================================================
   // Unsupported hardcoded commands (non-overridable)

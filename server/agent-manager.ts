@@ -20,6 +20,7 @@ import { commands, autocompleteCommands, unsupportedMessage, type CommandConfig 
 import { resolve, join } from "path";
 import { homedir } from "os";
 import { writeFileSync, mkdirSync, readdirSync, existsSync, readFileSync, rmSync, statSync } from "fs";
+import { execSync } from "child_process";
 
 // Directory for per-agent launcher scripts
 const LAUNCHERS_DIR = join(homedir(), ".isomux", "launchers");
@@ -1771,6 +1772,83 @@ const commandHandlers: Record<string, HandlerFn> = {
     const fence = "`".repeat(Math.max(3, longestRun + 1));
     const header = "**Full system prompt** *(reflects current settings; takes effect on next conversation)*";
     emitEphemeralLog(agentId, "system", `${header}\n\n${fence}plaintext\n${prompt}\n${fence}`);
+    updateState(agentId, "waiting_for_response");
+    return true;
+  },
+
+  async isomuxDiff(agentId, managed, _args, rawText, username) {
+    const userMeta = username ? { username } : undefined;
+    emitEphemeralLog(agentId, "user_message", rawText, userMeta);
+    const cwd = managed.info.cwd;
+
+    const runGit = (args: string, maxBuffer = 10 * 1024 * 1024) =>
+      execSync(`git ${args}`, { cwd, timeout: 10000, maxBuffer, stdio: ["ignore", "pipe", "pipe"] }).toString();
+
+    try {
+      runGit("rev-parse --is-inside-work-tree", 1024);
+    } catch {
+      emitEphemeralLog(agentId, "system", `\`${cwd}\` is not a git repository.`);
+      updateState(agentId, "waiting_for_response");
+      return true;
+    }
+
+    let stat = "";
+    let diff = "";
+    let untracked: string[] = [];
+    try {
+      // Prefer HEAD (includes staged+unstaged). Fall back to workdir-only if HEAD is missing (fresh repo).
+      try {
+        stat = runGit("diff HEAD --stat").trim();
+        diff = runGit("diff HEAD", 50 * 1024 * 1024);
+      } catch {
+        stat = runGit("diff --stat").trim();
+        diff = runGit("diff", 50 * 1024 * 1024);
+      }
+      const untrackedOut = runGit("ls-files --others --exclude-standard").trim();
+      if (untrackedOut) untracked = untrackedOut.split("\n");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      emitEphemeralLog(agentId, "system", `Failed to run git diff in \`${cwd}\`:\n\n\`\`\`\n${msg}\n\`\`\``);
+      updateState(agentId, "waiting_for_response");
+      return true;
+    }
+
+    const parts: string[] = [];
+    parts.push(`**Uncommitted changes in** \`${cwd}\``);
+    parts.push("");
+
+    if (!stat && untracked.length === 0) {
+      parts.push("*Working tree clean — no uncommitted changes.*");
+    } else {
+      if (stat) {
+        parts.push("```");
+        parts.push(stat);
+        parts.push("```");
+      }
+      if (diff.trim()) {
+        const MAX = 500_000;
+        let body = diff;
+        let truncated = false;
+        if (body.length > MAX) {
+          body = body.slice(0, MAX);
+          truncated = true;
+        }
+        const longestRun = (body.match(/`+/g) ?? []).reduce((m, s) => Math.max(m, s.length), 0);
+        const fence = "`".repeat(Math.max(3, longestRun + 1));
+        parts.push("");
+        parts.push(`${fence}diff`);
+        parts.push(body);
+        parts.push(fence);
+        if (truncated) parts.push(`\n*Diff truncated at ${MAX.toLocaleString()} bytes — run \`git diff HEAD\` for the full patch.*`);
+      }
+      if (untracked.length > 0) {
+        parts.push("");
+        parts.push(`**Untracked files (${untracked.length}):**`);
+        for (const f of untracked) parts.push(`- \`${f}\``);
+      }
+    }
+
+    emitEphemeralLog(agentId, "system", parts.join("\n"));
     updateState(agentId, "waiting_for_response");
     return true;
   },
