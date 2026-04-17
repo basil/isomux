@@ -14,7 +14,7 @@ import type { ContentBlockParam } from "@anthropic-ai/sdk/resources/messages/mes
 import type { AgentInfo, AgentOutfit, AgentState, Attachment, ClaudeModel, LogEntry, ModelFamily, OfficeSettings, RoomWire, SkillInfo, SkillOrigin } from "../shared/types.ts";
 import { MODEL_FAMILIES, FAMILY_TO_MODEL, familyDisplayLabel, generateRoomId } from "../shared/types.ts";
 import { generateOutfit } from "./outfit.ts";
-import { appendLog, loadLog, loadLogWithAncestors, loadSessionsMap, loadAgents, saveAgents, listAgentSessions, writeManifest, persistSessionTopic, persistSessionFork, loadOfficeConfig, saveOfficeConfig, readEnvFile, saveFile, getFilePath, type PersistedAgent, type Room, type OfficeConfig } from "./persistence.ts";
+import { appendLog, loadLog, loadLogWithAncestors, loadSessionsMap, loadAgents, saveAgents, listAgentSessions, writeManifest, persistSessionTopic, persistSessionFork, persistSessionUsage, appendSessionUsageSnapshot, loadOfficeConfig, saveOfficeConfig, readEnvFile, saveFile, getFilePath, type PersistedAgent, type PersistedUsage, type Room, type OfficeConfig } from "./persistence.ts";
 import { createSafetyHooks } from "./safety-hooks.ts";
 import { commands, autocompleteCommands, unsupportedMessage, type CommandConfig } from "./commands.ts";
 import { resolve, join } from "path";
@@ -279,6 +279,12 @@ interface ManagedAgent {
   // Terminal PTY sidecar (spawned on demand via Node.js)
   ptySidecar: import("bun").Subprocess | null;
   ptyBuffer: string; // buffered output for reconnecting browsers
+  // /usage tracking. The SDK's `result` reports session-cumulative totals,
+  // which are written to sessions.json on every turn (`usage` field) along
+  // with a per-turn snapshot (`usageSnapshots`). /usage reads those entries
+  // and aggregates per agent. Forked sessions subtract the parent's
+  // cumulative-at-the-fork-point so shared turns aren't double-counted.
+  lastWrittenEntryId: string | null;
 }
 
 type AgentEvent =
@@ -670,6 +676,7 @@ export async function restoreAgents() {
         pendingPermission: null,
         ptySidecar: null,
         ptyBuffer: "",
+        lastWrittenEntryId: null,
       };
       agents.set(p.id, managed);
 
@@ -740,6 +747,9 @@ function addLogEntry(agentId: string, kind: LogEntry["kind"], content: string, m
   const managed = agents.get(agentId);
   if (managed?.sessionId) {
     appendLog(agentId, managed.sessionId, entry);
+    // Track the last entry actually written to this session's JSONL so that
+    // /usage's per-turn snapshots have a stable anchor inside the log.
+    managed.lastWrittenEntryId = entry.id;
   }
 
   // Track topicStale: new text entries after topic was generated
@@ -994,6 +1004,30 @@ function processMessage(agentId: string, msg: SDKMessage) {
       break;
     }
     case "result": {
+      // SDK reports session-cumulative totals on every `result`. Write them
+      // verbatim into sessions.json (`usage`) and append a snapshot anchored
+      // to the most recently written log entry. The snapshots let /usage's
+      // fork accounting subtract the parent's cumulative-at-the-fork-point
+      // exactly, instead of double-counting the resumed prefix.
+      // Only trust usage from success results. Error-subtype results may omit
+      // `usage` entirely, and `?? 0` would overwrite the accurate cumulative
+      // with zeros.
+      const managed = agents.get(agentId);
+      const usageField = (msg as any).usage;
+      if (managed?.sessionId && usageField) {
+        const cost = (msg as any).total_cost_usd ?? 0;
+        const cumulative: PersistedUsage = {
+          inputTokens: usageField.input_tokens ?? 0,
+          outputTokens: usageField.output_tokens ?? 0,
+          cacheReadInputTokens: usageField.cache_read_input_tokens ?? 0,
+          cacheCreationInputTokens: usageField.cache_creation_input_tokens ?? 0,
+          costUSD: cost,
+        };
+        persistSessionUsage(agentId, managed.sessionId, cumulative);
+        if (managed.lastWrittenEntryId) {
+          appendSessionUsageSnapshot(agentId, managed.sessionId, managed.lastWrittenEntryId, cumulative);
+        }
+      }
       const subtype = (msg as any).subtype;
       if (subtype !== "success") {
         const errors = (msg as any).errors;
@@ -1232,6 +1266,7 @@ export async function spawn(name: string, cwd: string, permissionMode: AgentInfo
     pendingPermission: null,
     ptySidecar: null,
     ptyBuffer: "",
+    lastWrittenEntryId: null,
   };
   agents.set(id, managed);
   emit({ type: "agent_added", agent: info });
@@ -1503,6 +1538,136 @@ function formatRelativeTime(timestamp: number): string {
   if (diffDays < 7) return `${diffDays}d ago`;
   const date = new Date(timestamp);
   return date.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+function formatTokenCount(n: number): string {
+  if (n === 0) return "—";
+  // 999_500 rounds to "1000k" under naive thresholds; promote to M.
+  if (n >= 999_500) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}k`;
+  return n.toLocaleString();
+}
+
+function renderUsageReport(): string {
+  const lines: string[] = [];
+
+  lines.push(
+    `_Subscription plan limits aren't shown here — open the embedded terminal (desktop only), run \`claude\`, then \`/usage\`._`,
+  );
+  lines.push("");
+
+  // Office-wide table: per-agent session and lifetime usage. "In" is all
+  // input tiers summed (raw + cache read + cache creation); the inline "%
+  // hit" is cache hit rate over cacheable input. Markdown only supports a
+  // single header row, so session/lifetime groupings are encoded as
+  // parenthesised suffixes on each column.
+  lines.push(`## Agent usage`);
+  lines.push("");
+  lines.push(`| Agent | Room | In (sess) | Out (sess) | $ (sess) | In (life) | Out (life) | $ (life) |`);
+  lines.push(`| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |`);
+  const rows = [...agents.values()].map((a) => {
+    const usage = readAgentUsage(a.info.id, a.sessionId);
+    const roomName = rooms[a.info.room]?.name ?? "?";
+    return { id: a.info.id, name: a.info.name, room: roomName, sess: usage.session, life: usage.lifetime };
+  });
+  rows.sort((a, b) => b.life.costUSD - a.life.costUSD);
+  for (const r of rows) {
+    lines.push(
+      `| ${r.name} | ${r.room} | ${formatInCell(r.sess)} | ${formatTokenCount(r.sess.totalOut)} | ${formatUsd(r.sess.costUSD)} | ${formatInCell(r.life)} | ${formatTokenCount(r.life.totalOut)} | ${formatUsd(r.life.costUSD)} |`,
+    );
+  }
+
+  return lines.join("\n");
+}
+
+// `cacheRead` is discounted cache hits; `cacheCreation` is the 1.25x write
+// tier. Raw `input_tokens` (uncached) is usually ~10 — just the new user
+// message — so "cached as a % of totalIn" is always ~100% and meaningless.
+// The useful signal is hit-rate over *cacheable* input: cacheRead / (cacheRead
+// + cacheCreation), which drops when the cache expires and gets rewritten.
+interface UsageBucket { totalIn: number; cacheRead: number; cacheCreation: number; totalOut: number; costUSD: number; }
+
+function emptyBucket(): UsageBucket {
+  return { totalIn: 0, cacheRead: 0, cacheCreation: 0, totalOut: 0, costUSD: 0 };
+}
+
+// Read an agent's per-session usage off disk and aggregate into:
+//   - session: usage for `currentSessionId` (the agent's active conversation)
+//   - lifetime: sum of (entry.usage - entry.forkBaseUsage) across all entries
+// `forkBaseUsage` is captured at fork creation by walking the parent's log to
+// find the cumulative usage at the exact fork point, so each fork contributes
+// only its own new work — no double-counting of the shared parent prefix.
+function readAgentUsage(agentId: string, currentSessionId: string | null): { session: UsageBucket; lifetime: UsageBucket } {
+  const map = loadSessionsMap(agentId);
+  const lifetime = emptyBucket();
+  for (const entry of Object.values(map)) {
+    if (!entry.usage) continue;
+    const base = entry.forkBaseUsage;
+    const totalIn =
+      entry.usage.inputTokens + entry.usage.cacheReadInputTokens + entry.usage.cacheCreationInputTokens
+      - ((base?.inputTokens ?? 0) + (base?.cacheReadInputTokens ?? 0) + (base?.cacheCreationInputTokens ?? 0));
+    const cacheRead = entry.usage.cacheReadInputTokens - (base?.cacheReadInputTokens ?? 0);
+    const cacheCreation = entry.usage.cacheCreationInputTokens - (base?.cacheCreationInputTokens ?? 0);
+    const totalOut = entry.usage.outputTokens - (base?.outputTokens ?? 0);
+    const costDelta = entry.usage.costUSD - (base?.costUSD ?? 0);
+    lifetime.totalIn += totalIn;
+    lifetime.cacheRead += cacheRead;
+    lifetime.cacheCreation += cacheCreation;
+    lifetime.totalOut += totalOut;
+    lifetime.costUSD += costDelta;
+  }
+  const session = emptyBucket();
+  const sessUsage = currentSessionId ? map[currentSessionId]?.usage : undefined;
+  if (sessUsage) {
+    session.totalIn = sessUsage.inputTokens + sessUsage.cacheReadInputTokens + sessUsage.cacheCreationInputTokens;
+    session.cacheRead = sessUsage.cacheReadInputTokens;
+    session.cacheCreation = sessUsage.cacheCreationInputTokens;
+    session.totalOut = sessUsage.outputTokens;
+    session.costUSD = sessUsage.costUSD;
+  }
+  return { session, lifetime };
+}
+
+// Locate a parent's cumulative usage at a fork point. Walks the parent's log
+// to find `forkMessageId`'s position, then returns the latest snapshot whose
+// anchor entry sits before that position. When the parent has no snapshots
+// (e.g. it predates snapshot tracking), fall back to the parent's current
+// cumulative `usage` — best-effort, slightly over-subtracts if the parent
+// continued past the fork, but bounded and avoids a full prefix double-count
+// in lifetime totals.
+function findUsageAtFork(agentId: string, parentSessionId: string, forkMessageId: string): PersistedUsage | undefined {
+  const entries = loadLog(agentId, parentSessionId);
+  const positions = new Map<string, number>();
+  entries.forEach((e, i) => positions.set(e.id, i));
+  const forkPos = positions.get(forkMessageId);
+  if (forkPos === undefined) return undefined;
+  const parentMeta = loadSessionsMap(agentId)[parentSessionId];
+  const snapshots = parentMeta?.usageSnapshots ?? [];
+  let best: PersistedUsage | undefined;
+  let bestPos = -1;
+  for (const snap of snapshots) {
+    const p = positions.get(snap.entryId);
+    if (p === undefined) continue;
+    if (p < forkPos && p > bestPos) {
+      bestPos = p;
+      best = snap.usage;
+    }
+  }
+  return best ?? parentMeta?.usage;
+}
+
+function formatInCell(b: UsageBucket): string {
+  if (b.totalIn === 0) return "—";
+  const cacheable = b.cacheRead + b.cacheCreation;
+  if (cacheable === 0) return formatTokenCount(b.totalIn);
+  const pct = Math.round((b.cacheRead / cacheable) * 100);
+  return `${formatTokenCount(b.totalIn)} (${pct}% hit)`;
+}
+
+function formatUsd(n: number): string {
+  if (n === 0) return "—";
+  if (n >= 100) return `$${n.toFixed(0)}`;
+  return `$${n.toFixed(2)}`;
 }
 
 const commandHandlers: Record<string, HandlerFn> = {
@@ -1849,6 +2014,14 @@ const commandHandlers: Record<string, HandlerFn> = {
     }
 
     emitEphemeralLog(agentId, "system", parts.join("\n"));
+    updateState(agentId, "waiting_for_response");
+    return true;
+  },
+
+  async usage(agentId, _managed, _args, rawText, username) {
+    const userMeta = username ? { username } : undefined;
+    emitEphemeralLog(agentId, "user_message", rawText, userMeta);
+    emitEphemeralLog(agentId, "system", renderUsageReport());
     updateState(agentId, "waiting_for_response");
     return true;
   },
@@ -2216,7 +2389,13 @@ export async function editMessage(agentId: string, logEntryId: string, newText: 
           walk = sessMap[walk]?.forkedFrom;
         }
       }
-      persistSessionFork(agentId, newSessionId, forkFromSessionId, logEntryId, oldTopic);
+      // Find the parent's cumulative usage at the exact fork point (not the
+      // parent's *current* cumulative, which may include later turns the user
+      // continued in the original branch). Walk parent's log to find the fork
+      // entry's position, then look up the latest snapshot whose anchor entry
+      // sits before that position.
+      const parentBase = findUsageAtFork(agentId, forkFromSessionId, logEntryId);
+      persistSessionFork(agentId, newSessionId, forkFromSessionId, logEntryId, oldTopic, parentBase);
     }
 
     // 5. Create new session from fork (or fresh session for first-message edit), then close old

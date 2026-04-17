@@ -282,15 +282,17 @@ export const CSS = `
     border-left: 3px solid var(--border-light); margin: 8px 0; padding: 4px 12px; color: var(--text-dim);
   }
   .md-content hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
-  .md-content table { border-collapse: collapse; margin: 8px 0; width: 100%; }
+  .md-content .table-wrapper { overflow-x: auto; margin: 8px 0; max-width: 100%; }
+  .md-content table { border-collapse: collapse; }
   .md-content th, .md-content td {
-    border: 1px solid var(--border); padding: 6px 10px; text-align: left; font-size: 12px;
+    border: 1px solid var(--border); padding: 6px 10px; text-align: left; font-size: 12px; white-space: nowrap;
   }
   .md-content th { background: var(--bg-subtle); color: var(--text-primary); font-weight: 600; }
 
   /* Mobile: ensure code blocks don't overflow horizontally */
   @media (max-width: 767px) {
     .md-content pre { max-width: calc(100vw - 48px); }
+    .md-content .table-wrapper { max-width: calc(100vw - 48px); }
     .md-content code { word-break: break-all; }
     .md-content pre code { word-break: normal; }
   }

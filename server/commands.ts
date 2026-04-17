@@ -135,7 +135,14 @@ export const commands: Record<string, CommandConfig> = {
 
   // --- Cost & usage ---
   cost:       { ...UNSUPPORTED_HARDCODED, description: "Token usage and cost estimate", message: "`/cost` is a Claude Code command for API users. Isomux uses subscription-based billing." },
-  usage:      { ...UNSUPPORTED_HARDCODED, description: "Plan-level limits and rate limit status" },
+  usage: {
+    type: "hardcoded",
+    supported: true,
+    autocomplete: true,
+    overridable: false,
+    handler: "usage",
+    description: "Per-agent token usage",
+  },
   stats:      { ...UNSUPPORTED_HARDCODED, description: "Usage patterns over time" },
   "extra-usage": { ...UNSUPPORTED_HARDCODED, description: "Extra usage options" },
   "rate-limit-options": { ...UNSUPPORTED_HARDCODED, description: "Rate limit configuration" },

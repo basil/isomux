@@ -94,8 +94,16 @@ export function loadLogWithAncestors(agentId: string, sessionId: string): LogEnt
   return result;
 }
 
-// Per-session topic storage: ~/.isomux/logs/<agentId>/sessions.json
-type SessionsMap = Record<string, { topic: string | null; lastModified: number; forkedFrom?: string; forkMessageId?: string }>;
+// Per-session metadata storage: ~/.isomux/logs/<agentId>/sessions.json.
+// - `usage` is session-cumulative, replaced on every `result` from the SDK.
+// - `usageSnapshots` records cumulative usage after each turn, anchored to the
+//   id of the last log entry written at that moment. /usage walks the parent's
+//   log to find the snapshot at-or-before a fork point and subtracts it from
+//   the fork's own cumulative — exact fork accounting with no double-count.
+// - `forkBaseUsage` is the parent's cumulative-at-the-fork-point captured at
+//   fork creation (resolved via the snapshots above).
+type UsageSnapshot = { entryId: string; usage: PersistedUsage };
+type SessionsMap = Record<string, { topic: string | null; lastModified: number; forkedFrom?: string; forkMessageId?: string; usage?: PersistedUsage; forkBaseUsage?: PersistedUsage; usageSnapshots?: UsageSnapshot[] }>;
 
 export function loadSessionsMap(agentId: string): SessionsMap {
   try {
@@ -124,9 +132,33 @@ export function persistSessionTopic(agentId: string, sessionId: string, topic: s
   saveSessionsMap(agentId, map);
 }
 
-export function persistSessionFork(agentId: string, sessionId: string, forkedFrom: string, forkMessageId: string, topic: string | null) {
+export function persistSessionFork(agentId: string, sessionId: string, forkedFrom: string, forkMessageId: string, topic: string | null, forkBaseUsage?: PersistedUsage) {
   const map = loadSessionsMap(agentId);
-  map[sessionId] = { topic, lastModified: Date.now(), forkedFrom, forkMessageId };
+  const existing = map[sessionId] ?? { topic: null, lastModified: 0 };
+  map[sessionId] = { ...existing, topic, lastModified: Date.now(), forkedFrom, forkMessageId, ...(forkBaseUsage ? { forkBaseUsage } : {}) };
+  saveSessionsMap(agentId, map);
+}
+
+export function persistSessionUsage(agentId: string, sessionId: string, usage: PersistedUsage) {
+  const map = loadSessionsMap(agentId);
+  const existing = map[sessionId] ?? { topic: null, lastModified: 0 };
+  map[sessionId] = { ...existing, usage, lastModified: Date.now() };
+  saveSessionsMap(agentId, map);
+}
+
+export function appendSessionUsageSnapshot(agentId: string, sessionId: string, entryId: string, usage: PersistedUsage) {
+  const map = loadSessionsMap(agentId);
+  const existing = map[sessionId] ?? { topic: null, lastModified: 0 };
+  const snapshots = existing.usageSnapshots ?? [];
+  // Coalesce snapshots that share an entryId (multiple results with no log
+  // activity between them — shouldn't happen, but keep the list compact).
+  const last = snapshots[snapshots.length - 1];
+  if (last && last.entryId === entryId) {
+    last.usage = usage;
+  } else {
+    snapshots.push({ entryId, usage });
+  }
+  map[sessionId] = { ...existing, usageSnapshots: snapshots, lastModified: Date.now() };
   saveSessionsMap(agentId, map);
 }
 
@@ -192,6 +224,14 @@ export interface PersistedAgent {
   lastSessionId: string | null;
   topic: string | null;
   customInstructions: string | null;
+}
+
+export interface PersistedUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+  costUSD: number;
 }
 
 // Migrate a persisted agent that may have the legacy `model: "claude-opus-4-6"`

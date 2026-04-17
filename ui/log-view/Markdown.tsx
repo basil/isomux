@@ -77,7 +77,9 @@ export function Markdown({ content }: { content: string }) {
     try {
       const raw = marked.parse(content) as string;
       // Wrap <pre> blocks in a container so the copy button stays fixed outside the scroll area
-      return raw.replace(/<pre>/g, `<div class="code-block-wrapper">${COPY_BTN_HTML}<pre>`).replace(/<\/pre>/g, `</pre></div>`);
+      const withCode = raw.replace(/<pre>/g, `<div class="code-block-wrapper">${COPY_BTN_HTML}<pre>`).replace(/<\/pre>/g, `</pre></div>`);
+      // Wrap <table> blocks so they scroll horizontally on narrow viewports instead of overflowing
+      return withCode.replace(/<table>/g, `<div class="table-wrapper"><table>`).replace(/<\/table>/g, `</table></div>`);
     } catch {
       return content;
     }
