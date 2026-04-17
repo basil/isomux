@@ -194,6 +194,7 @@ function deduplicateSkills(skills: SkillInfo[]): SkillInfo[] {
 // Pure function so it can be reused by /isomux-system-prompt for inspection.
 export function buildSystemPrompt(
   agentName: string,
+  roomName: string,
   officePrompt?: string | null,
   roomPrompt?: string | null,
   customInstructions?: string | null,
@@ -214,9 +215,9 @@ Optional fields on create/update: description, priority (P0-P3), assignee.
 Don't read or update the task board unless the boss mentions it.
 
 To show an image to the boss, read the image file with the Read tool — it renders inline in the conversation.`;
-  if (officePrompt) systemPrompt += `\n\n${officePrompt}`;
-  if (roomPrompt) systemPrompt += `\n\n${roomPrompt}`;
-  if (customInstructions) systemPrompt += `\n\n${customInstructions}`;
+  if (officePrompt) systemPrompt += `\n\n## Office Instructions\n\n${officePrompt}`;
+  if (roomPrompt) systemPrompt += `\n\n## Instructions For Your Room: ${roomName}\n\n${roomPrompt}`;
+  if (customInstructions) systemPrompt += `\n\n## Personal Instructions For You: ${agentName}\n\n${customInstructions}`;
   return systemPrompt;
 }
 
@@ -225,12 +226,13 @@ function createLauncher(
   agentId: string,
   cwd: string,
   agentName: string,
+  roomName: string,
   officePrompt?: string | null,
   roomPrompt?: string | null,
   customInstructions?: string | null,
 ): string {
   const launcherPath = join(LAUNCHERS_DIR, `${agentId}.mjs`);
-  const systemPrompt = buildSystemPrompt(agentName, officePrompt, roomPrompt, customInstructions);
+  const systemPrompt = buildSystemPrompt(agentName, roomName, officePrompt, roomPrompt, customInstructions);
   writeFileSync(
     launcherPath,
     `process.chdir(${JSON.stringify(cwd)});\n` +
@@ -330,7 +332,7 @@ export function setOfficeSettings(prompt: string | null, envFile: string | null)
   // (Env is read fresh at every createSession, but the prompt is baked into the .mjs launcher file.)
   for (const managed of agents.values()) {
     const room = rooms[managed.info.room];
-    managed.launcherPath = createLauncher(managed.info.id, managed.info.cwd, managed.info.name, officeConfig.prompt, room?.prompt ?? null, managed.info.customInstructions);
+    managed.launcherPath = createLauncher(managed.info.id, managed.info.cwd, managed.info.name, room?.name ?? "", officeConfig.prompt, room?.prompt ?? null, managed.info.customInstructions);
   }
   eventHandler({ type: "office_settings_updated", prompt: officeConfig.prompt, envFile: officeConfig.envFile });
 }
@@ -345,7 +347,7 @@ export function setRoomSettings(roomId: string, prompt: string | null, envFile: 
   // Regenerate launchers for agents in this room so the new room prompt takes effect next conversation.
   for (const managed of agents.values()) {
     if (managed.info.room === idx) {
-      managed.launcherPath = createLauncher(managed.info.id, managed.info.cwd, managed.info.name, officeConfig.prompt, room.prompt, managed.info.customInstructions);
+      managed.launcherPath = createLauncher(managed.info.id, managed.info.cwd, managed.info.name, room.name, officeConfig.prompt, room.prompt, managed.info.customInstructions);
     }
   }
   eventHandler({ type: "room_settings_updated", roomId, prompt: room.prompt, envFile: room.envFile });
@@ -424,7 +426,7 @@ export function editAgent(agentId: string, changes: { name?: string; cwd?: strin
   // Regenerate launcher if name, cwd, or customInstructions changed (takes effect on next conversation)
   if (updated.name !== undefined || updated.cwd !== undefined || updated.customInstructions !== undefined) {
     const room = rooms[managed.info.room];
-    managed.launcherPath = createLauncher(agentId, managed.info.cwd, managed.info.name, officeConfig.prompt, room?.prompt ?? null, managed.info.customInstructions);
+    managed.launcherPath = createLauncher(agentId, managed.info.cwd, managed.info.name, room?.name ?? "", officeConfig.prompt, room?.prompt ?? null, managed.info.customInstructions);
   }
 
   // Recreate session if model or permission mode changed so it takes effect immediately
@@ -495,6 +497,13 @@ export function renameRoom(roomId: string, name: string): boolean {
   const trimmed = name.trim().slice(0, 40);
   if (!trimmed) return false;
   rooms[roomIdx].name = trimmed;
+  // Room name appears in the system prompt header, so regenerate launchers
+  // for agents in this room (takes effect on their next conversation).
+  for (const managed of agents.values()) {
+    if (managed.info.room === roomIdx) {
+      managed.launcherPath = createLauncher(managed.info.id, managed.info.cwd, managed.info.name, trimmed, officeConfig.prompt, rooms[roomIdx].prompt, managed.info.customInstructions);
+    }
+  }
   persistAll();
   eventHandler({ type: "room_renamed", roomId, name: trimmed });
   return true;
@@ -555,7 +564,7 @@ export function moveAgent(agentId: string, targetRoomId: string): boolean {
   managed.info.desk = newDesk;
   // Moving rooms changes room prompt context — regenerate launcher so the
   // agent sees the new room's prompt on the next conversation.
-  managed.launcherPath = createLauncher(agentId, managed.info.cwd, managed.info.name, officeConfig.prompt, rooms[targetIdx].prompt, managed.info.customInstructions);
+  managed.launcherPath = createLauncher(agentId, managed.info.cwd, managed.info.name, rooms[targetIdx].name, officeConfig.prompt, rooms[targetIdx].prompt, managed.info.customInstructions);
   eventHandler({ type: "agent_updated", agentId, changes: { room: targetIdx, desk: newDesk } });
   persistAll();
   return true;
@@ -619,8 +628,9 @@ export async function restoreAgents() {
 
   for (let roomIdx = 0; roomIdx < loaded.length; roomIdx++) {
     const roomPrompt = loaded[roomIdx].prompt;
+    const roomName = loaded[roomIdx].name;
     for (const p of loaded[roomIdx].agents) {
-      const launcherPath = createLauncher(p.id, p.cwd, p.name, officeConfig.prompt, roomPrompt, p.customInstructions);
+      const launcherPath = createLauncher(p.id, p.cwd, p.name, roomName, officeConfig.prompt, roomPrompt, p.customInstructions);
       const info: AgentInfo = {
         id: p.id,
         name: p.name,
@@ -1180,7 +1190,8 @@ export async function spawn(name: string, cwd: string, permissionMode: AgentInfo
   const resolvedCwd = resolveCwd(cwd);
   const id = `agent-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const roomPrompt = rooms[targetRoom]?.prompt ?? null;
-  const launcherPath = createLauncher(id, resolvedCwd, name, officeConfig.prompt, roomPrompt, customInstructions);
+  const roomName = rooms[targetRoom]?.name ?? "";
+  const launcherPath = createLauncher(id, resolvedCwd, name, roomName, officeConfig.prompt, roomPrompt, customInstructions);
 
   const info: AgentInfo = {
     id,
@@ -1747,6 +1758,7 @@ const commandHandlers: Record<string, HandlerFn> = {
     const room = rooms[managed.info.room];
     const prompt = buildSystemPrompt(
       managed.info.name,
+      room?.name ?? "",
       officeConfig.prompt,
       room?.prompt ?? null,
       managed.info.customInstructions,
@@ -1756,7 +1768,7 @@ const commandHandlers: Record<string, HandlerFn> = {
     const longestRun = (prompt.match(/`+/g) ?? []).reduce((m, s) => Math.max(m, s.length), 0);
     const fence = "`".repeat(Math.max(3, longestRun + 1));
     const header = "**Full system prompt** *(reflects current settings; takes effect on next conversation)*";
-    emitEphemeralLog(agentId, "system", `${header}\n\n${fence}\n${prompt}\n${fence}`);
+    emitEphemeralLog(agentId, "system", `${header}\n\n${fence}plaintext\n${prompt}\n${fence}`);
     updateState(agentId, "waiting_for_response");
     return true;
   },

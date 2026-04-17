@@ -15,6 +15,7 @@ import sql from "highlight.js/lib/languages/sql";
 import diff from "highlight.js/lib/languages/diff";
 import yaml from "highlight.js/lib/languages/yaml";
 import markdown from "highlight.js/lib/languages/markdown";
+import plaintext from "highlight.js/lib/languages/plaintext";
 
 hljs.registerLanguage("javascript", javascript);
 hljs.registerLanguage("js", javascript);
@@ -37,6 +38,9 @@ hljs.registerLanguage("yaml", yaml);
 hljs.registerLanguage("yml", yaml);
 hljs.registerLanguage("markdown", markdown);
 hljs.registerLanguage("md", markdown);
+hljs.registerLanguage("plaintext", plaintext);
+hljs.registerLanguage("text", plaintext);
+hljs.registerLanguage("txt", plaintext);
 
 const marked = new Marked(
   markedHighlight({
