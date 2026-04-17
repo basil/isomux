@@ -402,7 +402,10 @@ export function EditAgentDialog(props: EditAgentDialogProps) {
           rows={3}
           style={{ ...inputStyle, resize: "vertical" }}
         />
-        {!isSpawn && <p style={{ fontSize: 10, color: "var(--text-ghost)", margin: "3px 0 0" }}>Changes take effect on next conversation.</p>}
+        <p style={{ fontSize: 10, color: "var(--text-ghost)", margin: "3px 0 0" }}>
+          Run <code>/isomux-system-prompt</code> in a chat to see the agent's full system prompt.
+          {!isSpawn && " Changes take effect on next conversation."}
+        </p>
 
         {/* Move to Room — only show when multiple rooms exist and editing */}
         {!isSpawn && roomCount > 1 && (
