@@ -158,7 +158,7 @@ export class OfficeState {
     return [{ type: "agent_removed", agentId }];
   }
 
-  editAgent(agentId: string, changes: { name?: string; cwd?: string; outfit?: AgentOutfit; customInstructions?: string }): OfficeEvent[] {
+  editAgent(agentId: string, changes: { name?: string; cwd?: string; outfit?: AgentOutfit; customInstructions?: string; permissionMode?: AgentInfo["permissionMode"] }): OfficeEvent[] {
     const agent = this.agents.get(agentId);
     if (!agent) return [];
 
@@ -184,6 +184,10 @@ export class OfficeState {
     if (changes.customInstructions !== undefined && changes.customInstructions !== agent.customInstructions) {
       agent.customInstructions = changes.customInstructions || null;
       updated.customInstructions = agent.customInstructions;
+    }
+    if (changes.permissionMode && changes.permissionMode !== agent.permissionMode) {
+      agent.permissionMode = changes.permissionMode;
+      updated.permissionMode = changes.permissionMode;
     }
 
     if (Object.keys(updated).length === 0) return [];

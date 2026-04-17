@@ -66,7 +66,7 @@ export interface AgentInfo {
   room: number; // 0-based room index
   cwd: string;
   outfit: AgentOutfit;
-  permissionMode: "default" | "acceptEdits" | "bypassPermissions";
+  permissionMode: "default" | "acceptEdits" | "bypassPermissions" | "auto";
   modelFamily: ModelFamily;
   state: AgentState;
   topic: string | null;
@@ -218,7 +218,7 @@ export type ClientCommand =
   | { type: "new_conversation"; agentId: string }
   | { type: "resume"; agentId: string; sessionId: string }
   | { type: "list_sessions"; agentId: string }
-  | { type: "edit_agent"; agentId: string; name?: string; cwd?: string; outfit?: AgentOutfit; customInstructions?: string; modelFamily?: ModelFamily }
+  | { type: "edit_agent"; agentId: string; name?: string; cwd?: string; outfit?: AgentOutfit; customInstructions?: string; modelFamily?: ModelFamily; permissionMode?: AgentInfo["permissionMode"] }
   | { type: "swap_desks"; deskA: number; deskB: number; roomId: string }
   | { type: "set_topic"; agentId: string; topic: string }
   | { type: "reset_topic"; agentId: string }

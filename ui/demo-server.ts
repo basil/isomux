@@ -105,7 +105,7 @@ function seedOffice() {
       room: char.room,
       cwd: char.cwd,
       outfit: char.outfit,
-      permissionMode: "bypassPermissions",
+      permissionMode: "auto",
       modelFamily: char.modelFamily,
       state: char.state,
       topic: char.topic,
@@ -271,6 +271,7 @@ export function handleCommand(cmd: ClientCommand) {
         cwd: cmd.cwd,
         outfit: cmd.outfit,
         customInstructions: cmd.customInstructions,
+        permissionMode: cmd.permissionMode,
       }));
       break;
     }

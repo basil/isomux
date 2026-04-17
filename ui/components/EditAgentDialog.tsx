@@ -71,7 +71,7 @@ export function EditAgentDialog(props: EditAgentDialogProps) {
   const [cwd, setCwd] = useState(agent?.cwd ?? props.defaultCwd ?? "~");
   const [outfit, setOutfit] = useState<AgentOutfit>(agent ? { ...agent.outfit } : makeRandomOutfit);
   const [customInstructions, setCustomInstructions] = useState(agent?.customInstructions ?? "");
-  const [permissionMode, setPermissionMode] = useState<AgentInfo["permissionMode"]>("bypassPermissions");
+  const [permissionMode, setPermissionMode] = useState<AgentInfo["permissionMode"]>(agent?.permissionMode ?? "auto");
   const [modelFamily, setModelFamily] = useState<ModelFamily>(agent?.modelFamily ?? MODEL_FAMILIES[0].family);
   const recentCwds = allRecentCwds.filter((c) => c !== cwd);
 
@@ -97,7 +97,8 @@ export function EditAgentDialog(props: EditAgentDialogProps) {
       const trimmedInstructions = customInstructions.trim();
       if (trimmedInstructions !== (agent!.customInstructions ?? "")) cmd.customInstructions = trimmedInstructions;
       if (modelFamily !== agent!.modelFamily) cmd.modelFamily = modelFamily;
-      if (cmd.name || cmd.cwd || cmd.outfit || cmd.customInstructions !== undefined || cmd.modelFamily) send(cmd);
+      if (permissionMode !== agent!.permissionMode) cmd.permissionMode = permissionMode;
+      if (cmd.name || cmd.cwd || cmd.outfit || cmd.customInstructions !== undefined || cmd.modelFamily || cmd.permissionMode) send(cmd);
     }
     onClose();
   }
@@ -168,25 +169,26 @@ export function EditAgentDialog(props: EditAgentDialogProps) {
         )}
         {!isSpawn && <p style={{ fontSize: 10, color: "var(--text-ghost)", margin: "3px 0 0" }}>Changes take effect on next conversation.</p>}
 
-        {isSpawn && (
-          <>
-            <label style={{ ...labelStyle, marginTop: 12 }}>Permission Mode</label>
-            <select
-              value={permissionMode}
-              onChange={(e) => setPermissionMode(e.target.value as AgentInfo["permissionMode"])}
-              style={{ ...inputStyle, appearance: "none", cursor: "pointer" }}
-            >
-              <option value="default" disabled>Default (ask for everything) — not supported yet</option>
-              <option value="acceptEdits" disabled>Accept Edits (auto-approve file changes) — not supported yet</option>
-              <option value="bypassPermissions">Bypass (auto-approve all)</option>
-            </select>
-          </>
-        )}
+        <label style={{ ...labelStyle, marginTop: 12 }}>Permission Mode</label>
+        <select
+          value={permissionMode}
+          onChange={(e) => setPermissionMode(e.target.value as AgentInfo["permissionMode"])}
+          style={{ ...inputStyle, appearance: "none", cursor: "pointer" }}
+        >
+          {modelFamily === "opus" && <option value="auto">Auto (classifier auto-approves safe actions)</option>}
+          <option value="default">Default (ask for everything)</option>
+          <option value="acceptEdits">Accept Edits (auto-approve file changes)</option>
+          <option value="bypassPermissions">Bypass (auto-approve all)</option>
+        </select>
 
         <label style={{ ...labelStyle, marginTop: 12 }}>Model</label>
         <select
           value={modelFamily}
-          onChange={(e) => setModelFamily(e.target.value as ModelFamily)}
+          onChange={(e) => {
+            const next = e.target.value as ModelFamily;
+            setModelFamily(next);
+            if (next !== "opus" && permissionMode === "auto") setPermissionMode("bypassPermissions");
+          }}
           style={{ ...inputStyle, appearance: "none", cursor: "pointer" }}
         >
           {MODEL_FAMILIES.map((m) => (

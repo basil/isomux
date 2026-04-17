@@ -6,6 +6,9 @@ import {
   getSessionMessages,
   type SDKMessage,
   type SDKUserMessage,
+  type CanUseTool,
+  type PermissionResult,
+  type PermissionUpdate,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { ContentBlockParam } from "@anthropic-ai/sdk/resources/messages/messages.mjs";
 import type { AgentInfo, AgentOutfit, AgentState, Attachment, ClaudeModel, LogEntry, ModelFamily, OfficeSettings, RoomWire, SkillInfo, SkillOrigin } from "../shared/types.ts";
@@ -255,6 +258,13 @@ interface ManagedAgent {
   pendingResumeSessions: { sessionId: string; lastModified: number; topic: string | null }[];
   // /model two-step state
   pendingModelPick: boolean;
+  // Auto-mode permission prompt two-step state
+  pendingPermission: {
+    toolUseID: string;
+    input: Record<string, unknown>;
+    suggestions?: PermissionUpdate[];
+    resolve: (r: PermissionResult) => void;
+  } | null;
   // Terminal PTY sidecar (spawned on demand via Node.js)
   ptySidecar: import("bun").Subprocess | null;
   ptyBuffer: string; // buffered output for reconnecting browsers
@@ -368,7 +378,7 @@ export function getCurrentSessionId(agentId: string): string | null {
   return agents.get(agentId)?.sessionId ?? null;
 }
 
-export function editAgent(agentId: string, changes: { name?: string; cwd?: string; outfit?: AgentInfo["outfit"]; customInstructions?: string; modelFamily?: ModelFamily }) {
+export function editAgent(agentId: string, changes: { name?: string; cwd?: string; outfit?: AgentInfo["outfit"]; customInstructions?: string; modelFamily?: ModelFamily; permissionMode?: AgentInfo["permissionMode"] }) {
   const managed = agents.get(agentId);
   if (!managed) return;
 
@@ -399,6 +409,10 @@ export function editAgent(agentId: string, changes: { name?: string; cwd?: strin
     managed.info.modelFamily = changes.modelFamily;
     updated.modelFamily = changes.modelFamily;
   }
+  if (changes.permissionMode && changes.permissionMode !== managed.info.permissionMode) {
+    managed.info.permissionMode = changes.permissionMode;
+    updated.permissionMode = changes.permissionMode;
+  }
 
   if (Object.keys(updated).length === 0) return;
 
@@ -408,8 +422,8 @@ export function editAgent(agentId: string, changes: { name?: string; cwd?: strin
     managed.launcherPath = createLauncher(agentId, managed.info.cwd, managed.info.name, officeConfig.prompt, room?.prompt ?? null, managed.info.customInstructions);
   }
 
-  // Recreate session if model family changed so it takes effect immediately
-  if (updated.modelFamily) {
+  // Recreate session if model or permission mode changed so it takes effect immediately
+  if (updated.modelFamily || updated.permissionMode) {
     const sessionId = managed.sessionId;
     try { managed.session?.close(); } catch {}
     managed.session = sessionId ? createSession(managed, sessionId) : createSession(managed);
@@ -634,6 +648,7 @@ export async function restoreAgents() {
         pendingResume: false,
         pendingResumeSessions: [],
         pendingModelPick: false,
+        pendingPermission: null,
         ptySidecar: null,
         ptyBuffer: "",
       };
@@ -1062,12 +1077,56 @@ function buildSessionEnv(managed: ManagedAgent): { [key: string]: string | undef
   return merged;
 }
 
+function requestPermission(managed: ManagedAgent, toolName: string, input: Record<string, unknown>, opts: Parameters<CanUseTool>[2]): Promise<PermissionResult> {
+  const agentId = managed.info.id;
+  return new Promise<PermissionResult>((resolve) => {
+    const title = opts.title ?? `Claude wants to use ${toolName}`;
+    const lines: string[] = [`**${title}**`];
+    if (opts.description) lines.push(opts.description);
+    if (opts.decisionReason) lines.push(`\n_${opts.decisionReason}_`);
+    lines.push("");
+    lines.push("Reply:");
+    lines.push("  1. Allow — and don't ask again for similar calls this session");
+    lines.push("  2. Allow — just this time");
+    lines.push("  3. Deny");
+    lines.push("");
+    lines.push("Or type any other message to deny with that as the reason.");
+    emitEphemeralLog(agentId, "system", lines.join("\n"));
+
+    // If a prior pending permission was never resolved, deny it now so we don't leak.
+    if (managed.pendingPermission) {
+      try { managed.pendingPermission.resolve({ behavior: "deny", message: "Superseded by newer request." }); } catch {}
+    }
+    managed.pendingPermission = {
+      toolUseID: opts.toolUseID,
+      input,
+      suggestions: opts.suggestions,
+      resolve,
+    };
+    updateState(agentId, "waiting_for_response");
+
+    opts.signal.addEventListener("abort", () => {
+      if (managed.pendingPermission?.toolUseID === opts.toolUseID) {
+        managed.pendingPermission = null;
+        resolve({ behavior: "deny", message: "Request aborted." });
+      }
+    });
+  });
+}
+
 function createSession(managed: ManagedAgent, resumeSessionId?: string) {
+  // Drop any pending permission prompt from a prior (now-closed) session so the
+  // next user message isn't swallowed by a dead request.
+  if (managed.pendingPermission) {
+    try { managed.pendingPermission.resolve({ behavior: "deny", message: "Session restarted." }); } catch {}
+    managed.pendingPermission = null;
+  }
   const opts: any = {
     model: FAMILY_TO_MODEL[managed.info.modelFamily],
     permissionMode: sdkPermissionMode(managed.info.permissionMode),
     pathToClaudeCodeExecutable: managed.launcherPath,
     hooks: createSafetyHooks(),
+    canUseTool: ((toolName, input, options) => requestPermission(managed, toolName, input, options)) as CanUseTool,
   };
   const env = buildSessionEnv(managed);
   if (env) opts.env = env;
@@ -1141,6 +1200,7 @@ export async function spawn(name: string, cwd: string, permissionMode: AgentInfo
     pendingResume: false,
     pendingResumeSessions: [],
     pendingModelPick: false,
+    pendingPermission: null,
     ptySidecar: null,
     ptyBuffer: "",
   };
@@ -1248,6 +1308,31 @@ function buildUserMessage(agentId: string, text: string, attachments: Attachment
 export async function sendMessage(agentId: string, text: string, username?: string, attachments?: Attachment[]) {
   const managed = agents.get(agentId);
   if (!managed?.session) return;
+
+  // Handle pending auto-mode permission prompt: interpret reply as allow/deny.
+  if (managed.pendingPermission) {
+    const pending = managed.pendingPermission;
+    managed.pendingPermission = null;
+    const userMeta = username ? { username } : undefined;
+    emitEphemeralLog(agentId, "user_message", text, userMeta);
+    const trimmed = text.trim();
+    if (trimmed === "1") {
+      // Scope suggested rules to this session only so they don't leak across sessions.
+      const sessionScoped = pending.suggestions?.map((s) => ({ ...s, destination: "session" as const }));
+      emitEphemeralLog(agentId, "system", "Permission granted (rule added for this session).");
+      pending.resolve({ behavior: "allow", updatedInput: pending.input, updatedPermissions: sessionScoped });
+    } else if (trimmed === "2") {
+      emitEphemeralLog(agentId, "system", "Permission granted (once).");
+      pending.resolve({ behavior: "allow", updatedInput: pending.input });
+    } else if (trimmed === "3") {
+      emitEphemeralLog(agentId, "system", "Permission denied.");
+      pending.resolve({ behavior: "deny", message: "User denied." });
+    } else {
+      emitEphemeralLog(agentId, "system", "Permission denied with reason forwarded to agent.");
+      pending.resolve({ behavior: "deny", message: text });
+    }
+    return;
+  }
 
   // Handle /resume two-step: if pendingResume, check if input is a number pick
   if (managed.pendingResume) {
