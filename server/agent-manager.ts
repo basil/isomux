@@ -239,7 +239,12 @@ function createLauncher(
   const systemPrompt = buildSystemPrompt(agentName, roomName, officePrompt, roomPrompt, customInstructions);
   writeFileSync(
     launcherPath,
-    `process.chdir(${JSON.stringify(cwd)});\n` +
+    `try { process.chdir(${JSON.stringify(cwd)}); }\n` +
+    `catch (err) {\n` +
+    `  console.error("isomux launcher: cannot cd into " + ${JSON.stringify(cwd)} + ": " + err.message);\n` +
+    `  console.error("Fix the agent's cwd via /edit or in the UI, then send a message again.");\n` +
+    `  process.exit(1);\n` +
+    `}\n` +
     `process.argv.push("--append-system-prompt", ${JSON.stringify(systemPrompt)});\n` +
     `await import(${JSON.stringify(CLI_PATH)});\n`
   );
@@ -699,6 +704,17 @@ export async function restoreAgents() {
       } catch (err: any) {
         console.error(`Failed to restore session for ${p.name}:`, err.message);
         managed.info.state = "error";
+        // Surface to the UI so the user sees why the agent can't respond.
+        const entry: LogEntry = {
+          id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          agentId: p.id,
+          timestamp: Date.now(),
+          kind: "error",
+          content: `Failed to restore on startup: ${err.message}`,
+        };
+        const cached = logCache.get(p.id) ?? [];
+        cached.push(entry);
+        logCache.set(p.id, cached);
       }
     }
   }
@@ -1078,6 +1094,9 @@ async function consumeStream(agentId: string, managed: ManagedAgent) {
         console.error(`Agent ${agentId} stream error:`, err.message);
         const errorText = `Stream error: ${err.message}`;
         addLogEntry(agentId, "error", errorText);
+        // The SDK's "process exited with code 1" is opaque; diagnose common causes.
+        const hints = diagnoseProcessExit(managed);
+        if (hints) emitEphemeralLog(agentId, "system", hints);
         if (isAuthError(errorText)) {
           emitEphemeralLog(agentId, "system", LOGIN_INSTRUCTIONS);
         }
@@ -1100,6 +1119,37 @@ function resolveCwd(cwd: string): string {
   if (cwd.startsWith("~/")) return resolve(homedir(), cwd.slice(2));
   if (cwd === "~") return homedir();
   return resolve(cwd);
+}
+
+// Directory where Claude CLI stores per-project session JSONLs.
+// Sanitization observed: any non-alphanumeric, non-hyphen char becomes "-".
+// Ex: /home/nil/nilmamano.com -> -home-nil-nilmamano-com
+function claudeProjectDir(cwd: string): string {
+  return join(homedir(), ".claude", "projects", cwd.replace(/[^a-zA-Z0-9-]/g, "-"));
+}
+
+function claudeSessionFileExists(cwd: string, sessionId: string): boolean {
+  return existsSync(join(claudeProjectDir(cwd), `${sessionId}.jsonl`));
+}
+
+// Produce a human-readable hint for why the Claude CLI subprocess may have died,
+// to go alongside the SDK's generic "process exited with code 1". Returns null if
+// no specific cause is identifiable.
+function diagnoseProcessExit(managed: ManagedAgent): string | null {
+  const cwd = managed.info.cwd;
+  try {
+    validateCwd(cwd);
+  } catch {
+    return `Likely cause: cwd \`${cwd}\` no longer exists. Use /edit to point the agent at a valid directory.`;
+  }
+  if (managed.sessionId && !claudeSessionFileExists(cwd, managed.sessionId)) {
+    return (
+      `Likely cause: session \`${managed.sessionId.slice(0, 8)}…\` was not found in \`${claudeProjectDir(cwd)}\`. ` +
+      `This usually happens after cwd was moved/renamed — the Claude CLI locates session files by a path derived from cwd. ` +
+      `Use /resume to pick another session, or move the session .jsonl into the new project dir.`
+    );
+  }
+  return null;
 }
 
 // Resolve and verify a cwd. Throws if the directory does not exist or is not a directory.
@@ -1183,6 +1233,20 @@ function createSession(managed: ManagedAgent, resumeSessionId?: string) {
   if (managed.pendingPermission) {
     try { managed.pendingPermission.resolve({ behavior: "deny", message: "Session restarted." }); } catch {}
     managed.pendingPermission = null;
+  }
+  // Preflight checks so failures surface as readable errors instead of the SDK's
+  // opaque "Claude Code process exited with code 1".
+  try {
+    validateCwd(managed.info.cwd);
+  } catch (err: any) {
+    throw new Error(`cwd is invalid: ${err.message}. Fix via /edit.`);
+  }
+  if (resumeSessionId && !claudeSessionFileExists(managed.info.cwd, resumeSessionId)) {
+    throw new Error(
+      `Cannot resume session ${resumeSessionId.slice(0, 8)}…: its file is missing from ${claudeProjectDir(managed.info.cwd)}. ` +
+      `Most commonly this happens after the agent's cwd was moved or renamed — the Claude CLI stores sessions under a path derived from cwd. ` +
+      `Use /resume to pick a different session, or move the session .jsonl into the new project dir.`
+    );
   }
   const opts: any = {
     model: FAMILY_TO_MODEL[managed.info.modelFamily],
@@ -1371,7 +1435,22 @@ function buildUserMessage(agentId: string, text: string, attachments: Attachment
 
 export async function sendMessage(agentId: string, text: string, username?: string, attachments?: Attachment[]) {
   const managed = agents.get(agentId);
-  if (!managed?.session) return;
+  if (!managed) return;
+  if (!managed.session) {
+    // Try to create a fresh session so the user's next message doesn't silently vanish.
+    try {
+      managed.session = createSession(managed);
+      managed.sessionId = null;
+      addLogEntry(agentId, "system", "Started a fresh session (previous one could not be restored).");
+      updateState(agentId, "waiting_for_response");
+      // Fall through so the message is actually sent on the new session.
+    } catch (err: any) {
+      addLogEntry(agentId, "user_message", text, username ? { username } : undefined, attachments);
+      addLogEntry(agentId, "error", `Cannot start session: ${err.message}`);
+      updateState(agentId, "error");
+      return;
+    }
+  }
 
   // Handle pending permission prompt: interpret reply as allow/deny.
   // Runs before slash-command interception by design — any typed slash command
@@ -1656,11 +1735,17 @@ function findUsageAtFork(agentId: string, parentSessionId: string, forkMessageId
   return best ?? parentMeta?.usage;
 }
 
+// Hide the (N% hit) suffix above 80% since typical usage hovers 92-100% and the
+// clutter drowns out the signal. Showing only low hit rates turns absence into
+// the default and presence into a cache-thrash canary.
+const CACHE_HIT_WARN_THRESHOLD = 80;
+
 function formatInCell(b: UsageBucket): string {
   if (b.totalIn === 0) return "—";
   const cacheable = b.cacheRead + b.cacheCreation;
   if (cacheable === 0) return formatTokenCount(b.totalIn);
   const pct = Math.round((b.cacheRead / cacheable) * 100);
+  if (pct >= CACHE_HIT_WARN_THRESHOLD) return formatTokenCount(b.totalIn);
   return `${formatTokenCount(b.totalIn)} (${pct}% hit)`;
 }
 
@@ -2162,7 +2247,16 @@ function resolveSkillPrompt(name: string, cwd: string): string | null {
 export async function abort(agentId: string) {
   const managed = agents.get(agentId);
   if (!managed) return;
-  if (!managed.streaming) return; // nothing to abort
+  // If the SDK's stream already died (e.g. subprocess exited) but the UI still
+  // shows "thinking", normal consumeStream cleanup ran but the state may not
+  // reflect what the user sees. Reset it here so Stop is never a no-op.
+  if (!managed.streaming) {
+    if (managed.info.state === "thinking" || managed.info.state === "tool_executing") {
+      updateState(agentId, "waiting_for_response");
+      addLogEntry(agentId, "system", "Agent interrupted (stream was already dead — state reset).");
+    }
+    return;
+  }
   managed.aborting = true;
   managed.streamGeneration++; // invalidate old consumeStream's finally cleanup
   const sessionId = managed.sessionId;
