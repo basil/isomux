@@ -96,12 +96,13 @@ export function loadLogWithAncestors(agentId: string, sessionId: string): LogEnt
 }
 
 // Per-session metadata storage: ~/.isomux/logs/<agentId>/sessions.json.
-// - `usage` is current-run cumulative, replaced on every `result` from the SDK.
-//   The SDK reports cost cumulative-per-process, so when a session is resumed
-//   in a new process this counter starts over from zero.
-// - `priorRunsUsage` is the sum of all completed process-runs for this session,
-//   captured at resume time by rolling the current `usage` forward. Session
-//   lifetime = priorRunsUsage + usage.
+// - `usage` holds current-run accumulated usage. Token fields are summed as
+//   each SDK `result` arrives (SDK reports tokens per-turn). `costUSD` is
+//   overwritten (SDK reports cost cumulative-per-process). On resume, the
+//   SDK's per-process counters restart, so this struct is rolled into
+//   `priorRunsUsage` and reset to zero.
+// - `priorRunsUsage` accumulates completed process-runs' final values.
+//   Session lifetime = priorRunsUsage + usage.
 // - `usageSnapshots` records cumulative usage after each turn, anchored to the
 //   id of the last log entry written at that moment. /usage walks the parent's
 //   log to find the snapshot at-or-before a fork point and subtracts it from
@@ -145,11 +146,24 @@ export function persistSessionFork(agentId: string, sessionId: string, forkedFro
   saveSessionsMap(agentId, map);
 }
 
-export function persistSessionUsage(agentId: string, sessionId: string, usage: PersistedUsage) {
+// Accumulate a turn's usage into the session's current-run bucket. Token
+// fields (per-turn from the SDK) are summed; cost (cumulative-per-process
+// from the SDK) overwrites. Returns the resulting cumulative so callers can
+// use it for downstream bookkeeping (e.g. snapshots).
+export function accumulateSessionUsage(agentId: string, sessionId: string, turnTokens: Omit<PersistedUsage, "costUSD">, runCostUSD: number): PersistedUsage {
   const map = loadSessionsMap(agentId);
   const existing = map[sessionId] ?? { topic: null, lastModified: 0 };
-  map[sessionId] = { ...existing, usage, lastModified: Date.now() };
+  const prev = existing.usage;
+  const next: PersistedUsage = {
+    inputTokens: (prev?.inputTokens ?? 0) + turnTokens.inputTokens,
+    outputTokens: (prev?.outputTokens ?? 0) + turnTokens.outputTokens,
+    cacheReadInputTokens: (prev?.cacheReadInputTokens ?? 0) + turnTokens.cacheReadInputTokens,
+    cacheCreationInputTokens: (prev?.cacheCreationInputTokens ?? 0) + turnTokens.cacheCreationInputTokens,
+    costUSD: runCostUSD,
+  };
+  map[sessionId] = { ...existing, usage: next, lastModified: Date.now() };
   saveSessionsMap(agentId, map);
+  return next;
 }
 
 // Called at resume time to roll the current-run usage into the prior-runs

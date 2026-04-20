@@ -14,7 +14,7 @@ import type { ContentBlockParam } from "@anthropic-ai/sdk/resources/messages/mes
 import type { AgentInfo, AgentOutfit, AgentState, Attachment, ClaudeModel, LogEntry, ModelFamily, OfficeSettings, RoomWire, SkillInfo, SkillOrigin } from "../shared/types.ts";
 import { MODEL_FAMILIES, FAMILY_TO_MODEL, familyDisplayLabel, generateRoomId } from "../shared/types.ts";
 import { generateOutfit } from "./outfit.ts";
-import { appendLog, loadLog, loadLogWithAncestors, loadSessionsMap, loadAgents, saveAgents, listAgentSessions, listAllAgentIdsOnDisk, writeManifest, persistSessionTopic, persistSessionFork, persistSessionUsage, appendSessionUsageSnapshot, rollSessionUsageOnResume, loadOfficeConfig, saveOfficeConfig, readEnvFile, saveFile, getFilePath, loadAgentHistory, saveAgentHistory, type PersistedAgent, type PersistedUsage, type Room, type OfficeConfig, type AgentHistory } from "./persistence.ts";
+import { appendLog, loadLog, loadLogWithAncestors, loadSessionsMap, loadAgents, saveAgents, listAgentSessions, listAllAgentIdsOnDisk, writeManifest, persistSessionTopic, persistSessionFork, accumulateSessionUsage, appendSessionUsageSnapshot, rollSessionUsageOnResume, loadOfficeConfig, saveOfficeConfig, readEnvFile, saveFile, getFilePath, loadAgentHistory, saveAgentHistory, type PersistedAgent, type PersistedUsage, type Room, type OfficeConfig, type AgentHistory } from "./persistence.ts";
 import { createSafetyHooks } from "./safety-hooks.ts";
 import { commands, autocompleteCommands, unsupportedMessage, type CommandConfig } from "./commands.ts";
 import { resolve, join } from "path";
@@ -1037,8 +1037,9 @@ function processMessage(agentId: string, msg: SDKMessage) {
       break;
     }
     case "result": {
-      // SDK reports session-cumulative totals on every `result`. Write them
-      // verbatim into sessions.json (`usage`) and append a snapshot anchored
+      // SDK reports tokens per-turn and cost cumulative-per-process on every
+      // `result`. We accumulate tokens and overwrite cost into sessions.json
+      // (`usage`) and append the resulting cumulative as a snapshot anchored
       // to the most recently written log entry. The snapshots let /usage's
       // fork accounting subtract the parent's cumulative-at-the-fork-point
       // exactly, instead of double-counting the resumed prefix.
@@ -1049,14 +1050,12 @@ function processMessage(agentId: string, msg: SDKMessage) {
       const usageField = (msg as any).usage;
       if (managed?.sessionId && usageField) {
         const cost = (msg as any).total_cost_usd ?? 0;
-        const cumulative: PersistedUsage = {
+        const cumulative = accumulateSessionUsage(agentId, managed.sessionId, {
           inputTokens: usageField.input_tokens ?? 0,
           outputTokens: usageField.output_tokens ?? 0,
           cacheReadInputTokens: usageField.cache_read_input_tokens ?? 0,
           cacheCreationInputTokens: usageField.cache_creation_input_tokens ?? 0,
-          costUSD: cost,
-        };
-        persistSessionUsage(agentId, managed.sessionId, cumulative);
+        }, cost);
         if (managed.lastWrittenEntryId) {
           appendSessionUsageSnapshot(agentId, managed.sessionId, managed.lastWrittenEntryId, cumulative);
         }
@@ -1864,7 +1863,21 @@ function findUsageAtFork(agentId: string, parentSessionId: string, forkMessageId
       best = snap.usage;
     }
   }
-  return best ?? parentMeta?.usage;
+  // Fallback when no snapshot sits before the fork point: use the parent's
+  // current cumulative (priorRunsUsage + usage). After a resume with no new
+  // results yet, `usage` may be undefined while priorRunsUsage holds the real
+  // value — sum both so forks off just-resumed parents still get a base.
+  if (best) return best;
+  const u = parentMeta?.usage;
+  const p = parentMeta?.priorRunsUsage;
+  if (!u && !p) return undefined;
+  return {
+    inputTokens: (u?.inputTokens ?? 0) + (p?.inputTokens ?? 0),
+    outputTokens: (u?.outputTokens ?? 0) + (p?.outputTokens ?? 0),
+    cacheReadInputTokens: (u?.cacheReadInputTokens ?? 0) + (p?.cacheReadInputTokens ?? 0),
+    cacheCreationInputTokens: (u?.cacheCreationInputTokens ?? 0) + (p?.cacheCreationInputTokens ?? 0),
+    costUSD: (u?.costUSD ?? 0) + (p?.costUSD ?? 0),
+  };
 }
 
 // Hide the (N% hit) suffix above 80% since typical usage hovers 92-100% and the
