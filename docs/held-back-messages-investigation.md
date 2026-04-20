@@ -1,8 +1,9 @@
 # Held-Back Messages Bug Investigation
 
-**Date**: 2026-04-01
+**Date**: 2026-04-01 (updated 2026-04-20)
 **Status**: Unresolved (SDK limitation)
 **Related commits**: `4b7ba76` (abort-race fix), `9c7600e` (stuck-thinking fix)
+**Related upstream**: `anthropics/claude-agent-sdk-python#425` (same root cause, different trigger — MCP tool calls degrading into hallucinated text blocks when the internal queue saturates during background subagent streaming). The Python SDK reference also documents the same hazard for `interrupt()`: "Messages already produced by the interrupted task, including its ResultMessage, remain in the stream. You must drain them with receive_response() before reading the response to a new query." Our background-event case is a third instance of the same architectural choice.
 
 ## The Bug
 
@@ -121,3 +122,12 @@ Log the user message immediately (instant UI feedback), then when `consumeStream
 - Task notifications are **lazily drained** — they only flow when the print loop runs
 - No public API to peek at pending messages
 - Only `SDKUserMessage` has an original `timestamp` field
+
+## Before Filing Upstream: Re-test on Latest SDK
+
+Our prior investigation (including approach #1, the persistent stream consumer) was done on an earlier SDK version. We're currently pinned to `@anthropic-ai/claude-agent-sdk@0.2.111`; latest at time of writing is `0.2.114`. A scan of the changelog from `0.2.111` through `0.2.114` found no entries about eager draining, `task_notification` delivery timing, or the print-loop queue — but the underlying CLI has moved forward too, and behavior may have shifted.
+
+Before filing an issue:
+1. Bump to latest `@anthropic-ai/claude-agent-sdk` and re-run the reproduction (Monitor with a short-lived event, agent reply, idle, new user message — confirm the reply still lands as a response to the new message).
+2. Re-attempt approach #1 (persistent consumer) instrumented with per-yield timestamps, so we can definitively say "messages arrive at send() time, not event time" in the bug report.
+3. Only then file the issue; cross-link `claude-agent-sdk-python#425` and frame it as a third manifestation of the lazy-drain pathology (distinct trigger surface: background-event-driven rather than subagent-streaming- or interrupt-driven).
