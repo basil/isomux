@@ -242,7 +242,7 @@ function createLauncher(
     `try { process.chdir(${JSON.stringify(cwd)}); }\n` +
     `catch (err) {\n` +
     `  console.error("isomux launcher: cannot cd into " + ${JSON.stringify(cwd)} + ": " + err.message);\n` +
-    `  console.error("Fix the agent's cwd via /edit or in the UI, then send a message again.");\n` +
+    `  console.error("Fix the agent's cwd by clicking the agent name in the log view header, then send a message again.");\n` +
     `  process.exit(1);\n` +
     `}\n` +
     `process.argv.push("--append-system-prompt", ${JSON.stringify(systemPrompt)});\n` +
@@ -1186,7 +1186,7 @@ function diagnoseProcessExit(managed: ManagedAgent): string | null {
   try {
     validateCwd(cwd);
   } catch {
-    return `Likely cause: cwd \`${cwd}\` no longer exists. Use /edit to point the agent at a valid directory.`;
+    return `Likely cause: cwd \`${cwd}\` no longer exists. Click the agent name in the log view header to point it at a valid directory.`;
   }
   if (managed.sessionId && !claudeSessionFileExists(cwd, managed.sessionId)) {
     return (
@@ -1285,7 +1285,7 @@ function createSession(managed: ManagedAgent, resumeSessionId?: string) {
   try {
     validateCwd(managed.info.cwd);
   } catch (err: any) {
-    throw new Error(`cwd is invalid: ${err.message}. Fix via /edit.`);
+    throw new Error(`cwd is invalid: ${err.message}. Click the agent name in the log view header to fix it.`);
   }
   if (resumeSessionId && !claudeSessionFileExists(managed.info.cwd, resumeSessionId)) {
     throw new Error(
