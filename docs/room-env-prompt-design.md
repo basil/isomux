@@ -31,7 +31,7 @@ Isomux does not own or manage an env directory. The user creates env files where
 
 Example:
 
-```
+```dotenv
 # /home/nil/.secrets/marc.env
 GH_TOKEN=ghp_...
 GIT_AUTHOR_NAME=Marc
@@ -44,7 +44,7 @@ GIT_COMMITTER_EMAIL=marc@example.com
 
 At spawn time:
 
-```
+```text
 merged = { ...process.env, ...officeEnv, ...roomEnv }
 ```
 
@@ -65,6 +65,7 @@ env?: { [envVar: string]: string | undefined };
 At spawn time, isomux reads the office and room env files, merges them, and passes the result via the SDK session options. Credentials never appear in launcher scripts or any isomux-managed file.
 
 Spawn path:
+
 1. Read office env file (if configured) → parse dotenv → `officeEnv`
 2. Read room env file (if configured) → parse dotenv → `roomEnv`
 3. Merge: `{ ...process.env, ...officeEnv, ...roomEnv }`

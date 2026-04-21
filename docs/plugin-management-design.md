@@ -27,7 +27,7 @@ for browsing and status display. Don't reimplement the Ink component tree.
 
 ### Architecture
 
-```
+```text
 ┌─────────────────────────────────────────┐
 │  Isomux Web UI (Plugin Manager panel)   │
 │                                         │
@@ -95,7 +95,7 @@ or rely on `claude plugin search` CLI output.
 ### Server Endpoints
 
 | Endpoint | Method | Action |
-|---|---|---|
+| --- | --- | --- |
 | `/api/plugins` | GET | List installed plugins with metadata and enabled state |
 | `/api/plugins/install` | POST | `claude plugin install <name> --scope <scope>` |
 | `/api/plugins/remove` | POST | `claude plugin remove <name>` |
@@ -136,6 +136,7 @@ agent's `sdkReportedCommands` and auto-send it.
 ### Scope
 
 Plugins can be installed at multiple scopes:
+
 - **user** — global, applies to all projects
 - **project** — per-project, shared with team via `.claude/settings.json`
 - **local** — per-project, personal override

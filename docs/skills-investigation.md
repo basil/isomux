@@ -3,6 +3,7 @@
 ## 1. Hardcoded Commands (fixed logic, not overridable)
 
 ### Session & Context
+
 - /clear — wipe conversation history
 - /compact [focus] — compress context (optionally with focus)
 - /context — visualize context window usage
@@ -12,24 +13,29 @@
 - /plan — toggle plan mode (also Shift+Tab)
 
 ### Model & Performance
+
 - /model [name] — switch model mid-session
 - /fast [on|off] — toggle speed-optimized API settings
 
 ### Cost & Usage
+
 - /cost — token usage + $ estimate (API users)
 - /usage — plan-level limits + rate limit status
 - /stats — usage patterns over time (subscription)
 
 ### Code & File Operations
+
 - /diff — interactive diff of all Claude's changes
 - /rewind — undo changes + revert conversation
 - /copy — copy last response (picker for code blocks)
 - /add-dir — add additional working directories
 
 ### Side Channel
+
 - /btw [question] — ask without polluting main context
 
 ### Configuration & Management
+
 - /config — open settings interface
 - /hooks — manage lifecycle hooks
 - /permissions — manage tool permissions
@@ -42,6 +48,7 @@
 - /plugin — manage plugin marketplace
 
 ### Background & System
+
 - /bashes — list/manage background tasks
 - /doctor — check installation health
 - /bug — report bugs to Anthropic
