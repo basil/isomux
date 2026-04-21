@@ -116,6 +116,7 @@ For persistent server setup (systemd + Tailscale) and voice input configuration,
 - **Full conversation view** with readable font sizes and two-row header
 - **Send & abort buttons** for touch input
 - Safe area insets for notch/home bar devices
+- **Installable as a PWA**: add to home screen for a native app feel (HTTPS or localhost)
 
 ### Notifications
 - **Sound notification** when agent finishes and tab is unfocused

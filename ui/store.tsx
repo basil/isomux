@@ -334,6 +334,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("isomux-theme", theme);
+    const color = theme === "dark" ? "#0a0e16" : "#f0f2f6";
+    let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.name = "theme-color";
+      document.head.appendChild(meta);
+    }
+    meta.content = color;
   }, [theme]);
 
   const toggleTheme = useCallback(() => {
