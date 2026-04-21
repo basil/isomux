@@ -31,7 +31,13 @@ export function UsernameModal({
 
   return (
     <div
-      onMouseDown={canClose ? (e) => { if (e.target === e.currentTarget) onClose!(); } : undefined}
+      onMouseDown={
+        canClose
+          ? (e) => {
+              if (e.target === e.currentTarget) onClose!();
+            }
+          : undefined
+      }
       style={{
         position: "fixed",
         inset: 0,

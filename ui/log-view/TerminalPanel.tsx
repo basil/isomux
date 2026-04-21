@@ -78,7 +78,7 @@ export function TerminalPanel({
         }
       } catch {}
     },
-    [agentId]
+    [agentId],
   );
 
   // Initialize terminal
@@ -149,7 +149,8 @@ export function TerminalPanel({
   // Update theme without re-creating terminal
   useEffect(() => {
     if (termRef.current) {
-      termRef.current.options.theme = theme === "dark" ? DARK_THEME : LIGHT_THEME;
+      termRef.current.options.theme =
+        theme === "dark" ? DARK_THEME : LIGHT_THEME;
     }
   }, [theme]);
 

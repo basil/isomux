@@ -35,7 +35,11 @@ export function AgentListView({
   const { agents, currentRoom, rooms, updateAvailable } = useAppState();
   const roomCount = rooms.length;
   const roomAgents = agents.filter((a) => a.room === currentRoom);
-  const swipeRef = useSwipeLeftRight(onSwipeLeft ?? (() => {}), onSwipeRight ?? (() => {}), true);
+  const swipeRef = useSwipeLeftRight(
+    onSwipeLeft ?? (() => {}),
+    onSwipeRight ?? (() => {}),
+    true,
+  );
 
   return (
     <div
@@ -83,7 +87,9 @@ export function AgentListView({
             }}
           >
             <span style={{ fontSize: 15, color: "var(--text-muted)" }}>
-              {roomCount > 1 ? `${rooms[currentRoom]?.name ?? `Room ${currentRoom + 1}`} is empty` : "No agents yet"}
+              {roomCount > 1
+                ? `${rooms[currentRoom]?.name ?? `Room ${currentRoom + 1}`} is empty`
+                : "No agents yet"}
             </span>
             <span style={{ fontSize: 13, color: "var(--text-faint)" }}>
               Tap + to spawn one
@@ -143,8 +149,14 @@ export function AgentListView({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  const rect = (e.target as HTMLElement).getBoundingClientRect();
-                  onContextMenu(Math.max(8, rect.right - 208), rect.bottom + 4, agent);
+                  const rect = (
+                    e.target as HTMLElement
+                  ).getBoundingClientRect();
+                  onContextMenu(
+                    Math.max(8, rect.right - 208),
+                    rect.bottom + 4,
+                    agent,
+                  );
                 }}
                 style={{
                   flexShrink: 0,
@@ -176,7 +188,8 @@ export function AgentListView({
           width: 56,
           height: 56,
           borderRadius: "50%",
-          background: roomAgents.length >= 8 ? "var(--text-muted)" : "var(--accent)",
+          background:
+            roomAgents.length >= 8 ? "var(--text-muted)" : "var(--accent)",
           color: "var(--bg-base)",
           border: "none",
           fontSize: 28,

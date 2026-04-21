@@ -8,7 +8,13 @@ type ValidationStatus =
   | { kind: "ok"; keyCount?: number }
   | { kind: "error"; message: string };
 
-export function RoomSettingsModal({ roomId, onClose }: { roomId: string; onClose: () => void }) {
+export function RoomSettingsModal({
+  roomId,
+  onClose,
+}: {
+  roomId: string;
+  onClose: () => void;
+}) {
   const { rooms, isMobile } = useAppState();
   const room = rooms.find((r) => r.id === roomId);
   const [prompt, setPrompt] = useState(room?.prompt ?? "");
@@ -31,13 +37,22 @@ export function RoomSettingsModal({ roomId, onClose }: { roomId: string; onClose
         const msg = JSON.parse(data);
         if (msg.type === "settings_validation" && msg.requestId === reqId) {
           if (msg.ok) setStatus({ kind: "ok", keyCount: msg.keyCount });
-          else setStatus({ kind: "error", message: msg.error || "Invalid env file" });
+          else
+            setStatus({
+              kind: "error",
+              message: msg.error || "Invalid env file",
+            });
           removeRawListener(listener);
         }
       } catch {}
     };
     addRawListener(listener);
-    send({ type: "request_settings_validation", requestId: reqId, scope: "room", roomId });
+    send({
+      type: "request_settings_validation",
+      requestId: reqId,
+      scope: "room",
+      roomId,
+    });
     return () => removeRawListener(listener);
   }, [room?.envFile, roomId]);
 
@@ -78,7 +93,10 @@ export function RoomSettingsModal({ roomId, onClose }: { roomId: string; onClose
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") { e.stopPropagation(); onClose(); }
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
     }
     window.addEventListener("keydown", handleKey, true);
     return () => window.removeEventListener("keydown", handleKey, true);
@@ -88,7 +106,9 @@ export function RoomSettingsModal({ roomId, onClose }: { roomId: string; onClose
 
   return (
     <div
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       style={{
         position: "fixed",
         inset: 0,
@@ -116,23 +136,57 @@ export function RoomSettingsModal({ roomId, onClose }: { roomId: string; onClose
           animation: "hudIn 0.2s ease-out",
         }}
       >
-        <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>
+        <h3
+          style={{
+            fontSize: 17,
+            fontWeight: 700,
+            margin: 0,
+            color: "var(--text-primary)",
+          }}
+        >
           {room.name} · Settings
         </h3>
 
-        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", marginTop: 18, marginBottom: 5 }}>
-          Env File Path <span style={{ fontWeight: 400, color: "var(--text-ghost)" }}>(optional, absolute path)</span>
+        <label
+          style={{
+            display: "block",
+            fontSize: 11,
+            fontWeight: 600,
+            color: "var(--text-muted)",
+            marginTop: 18,
+            marginBottom: 5,
+          }}
+        >
+          Env File Path{" "}
+          <span style={{ fontWeight: 400, color: "var(--text-ghost)" }}>
+            (optional, absolute path)
+          </span>
         </label>
         <input
           value={envFile}
-          onChange={(e) => { setEnvFile(e.target.value); setStatus({ kind: "idle" }); }}
+          onChange={(e) => {
+            setEnvFile(e.target.value);
+            setStatus({ kind: "idle" });
+          }}
           placeholder="/home/you/.secrets/room.env"
           style={inputStyle}
         />
         <ValidationLine status={status} />
 
-        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", marginTop: 14, marginBottom: 5 }}>
-          Room Prompt <span style={{ fontWeight: 400, color: "var(--text-ghost)" }}>(optional, appended after office prompt)</span>
+        <label
+          style={{
+            display: "block",
+            fontSize: 11,
+            fontWeight: 600,
+            color: "var(--text-muted)",
+            marginTop: 14,
+            marginBottom: 5,
+          }}
+        >
+          Room Prompt{" "}
+          <span style={{ fontWeight: 400, color: "var(--text-ghost)" }}>
+            (optional, appended after office prompt)
+          </span>
         </label>
         <textarea
           ref={textareaRef}
@@ -142,13 +196,30 @@ export function RoomSettingsModal({ roomId, onClose }: { roomId: string; onClose
           rows={8}
           style={{ ...inputStyle, resize: "vertical" }}
         />
-        <p style={{ fontSize: 10, color: "var(--text-ghost)", margin: "3px 0 0" }}>
+        <p
+          style={{
+            fontSize: 10,
+            color: "var(--text-ghost)",
+            margin: "3px 0 0",
+          }}
+        >
           Changes take effect on next conversation.
         </p>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
-          <button onClick={onClose} style={cancelBtnStyle} disabled={saving}>Cancel</button>
-          <button onClick={handleSave} style={saveBtnStyle} disabled={saving}>{saving ? "Saving…" : "Save"}</button>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 8,
+            marginTop: 20,
+          }}
+        >
+          <button onClick={onClose} style={cancelBtnStyle} disabled={saving}>
+            Cancel
+          </button>
+          <button onClick={handleSave} style={saveBtnStyle} disabled={saving}>
+            {saving ? "Saving…" : "Save"}
+          </button>
         </div>
       </div>
     </div>
@@ -158,12 +229,27 @@ export function RoomSettingsModal({ roomId, onClose }: { roomId: string; onClose
 function ValidationLine({ status }: { status: ValidationStatus }) {
   if (status.kind === "idle") return null;
   if (status.kind === "pending") {
-    return <p style={{ fontSize: 10, color: "var(--text-ghost)", margin: "4px 0 0" }}>Checking…</p>;
+    return (
+      <p
+        style={{ fontSize: 10, color: "var(--text-ghost)", margin: "4px 0 0" }}
+      >
+        Checking…
+      </p>
+    );
   }
   if (status.kind === "ok") {
-    return <p style={{ fontSize: 10, color: "var(--accent)", margin: "4px 0 0" }}>Loaded {status.keyCount ?? 0} variable{status.keyCount === 1 ? "" : "s"}.</p>;
+    return (
+      <p style={{ fontSize: 10, color: "var(--accent)", margin: "4px 0 0" }}>
+        Loaded {status.keyCount ?? 0} variable{status.keyCount === 1 ? "" : "s"}
+        .
+      </p>
+    );
   }
-  return <p style={{ fontSize: 10, color: "#ff6b6b", margin: "4px 0 0" }}>{status.message}</p>;
+  return (
+    <p style={{ fontSize: 10, color: "#ff6b6b", margin: "4px 0 0" }}>
+      {status.message}
+    </p>
+  );
 }
 
 const inputStyle: React.CSSProperties = {

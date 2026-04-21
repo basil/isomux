@@ -11,15 +11,72 @@ import {
   type PermissionUpdate,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { ContentBlockParam } from "@anthropic-ai/sdk/resources/messages/messages.mjs";
-import type { AgentInfo, AgentOutfit, AgentState, Attachment, ClaudeModel, LogEntry, ModelFamily, OfficeSettings, RoomWire, SkillInfo, SkillOrigin } from "../shared/types.ts";
-import { MODEL_FAMILIES, FAMILY_TO_MODEL, familyDisplayLabel, generateRoomId } from "../shared/types.ts";
+import type {
+  AgentInfo,
+  AgentOutfit,
+  AgentState,
+  Attachment,
+  ClaudeModel,
+  LogEntry,
+  ModelFamily,
+  OfficeSettings,
+  RoomWire,
+  SkillInfo,
+  SkillOrigin,
+} from "../shared/types.ts";
+import {
+  MODEL_FAMILIES,
+  FAMILY_TO_MODEL,
+  familyDisplayLabel,
+  generateRoomId,
+} from "../shared/types.ts";
 import { generateOutfit } from "./outfit.ts";
-import { appendLog, loadLog, loadLogWithAncestors, loadSessionsMap, loadAgents, saveAgents, listAgentSessions, listAllAgentIdsOnDisk, writeManifest, persistSessionTopic, persistSessionFork, accumulateSessionUsage, appendSessionUsageSnapshot, rollSessionUsageOnResume, loadOfficeConfig, saveOfficeConfig, readEnvFile, saveFile, getFilePath, loadAgentHistory, saveAgentHistory, type PersistedAgent, type PersistedUsage, type Room, type OfficeConfig, type AgentHistory } from "./persistence.ts";
+import {
+  appendLog,
+  loadLog,
+  loadLogWithAncestors,
+  loadSessionsMap,
+  loadAgents,
+  saveAgents,
+  listAgentSessions,
+  listAllAgentIdsOnDisk,
+  writeManifest,
+  persistSessionTopic,
+  persistSessionFork,
+  accumulateSessionUsage,
+  appendSessionUsageSnapshot,
+  rollSessionUsageOnResume,
+  loadOfficeConfig,
+  saveOfficeConfig,
+  readEnvFile,
+  saveFile,
+  getFilePath,
+  loadAgentHistory,
+  saveAgentHistory,
+  type PersistedAgent,
+  type PersistedUsage,
+  type Room,
+  type OfficeConfig,
+  type AgentHistory,
+} from "./persistence.ts";
 import { createSafetyHooks } from "./safety-hooks.ts";
-import { commands, autocompleteCommands, unsupportedMessage, type CommandConfig } from "./commands.ts";
+import {
+  commands,
+  autocompleteCommands,
+  unsupportedMessage,
+  type CommandConfig,
+} from "./commands.ts";
 import { resolve, join } from "path";
 import { homedir } from "os";
-import { mkdirSync, readdirSync, existsSync, readFileSync, rmSync, renameSync, statSync } from "fs";
+import {
+  mkdirSync,
+  readdirSync,
+  existsSync,
+  readFileSync,
+  rmSync,
+  renameSync,
+  statSync,
+} from "fs";
 import { execSync } from "child_process";
 
 // Skills bundled with isomux itself (available to all users regardless of their config)
@@ -33,7 +90,12 @@ const BUNDLED_SKILLS_DIR = join(import.meta.dir, "..", "skills");
 const CLAUDE_NATIVE_BIN = resolveClaudeNativeBinary();
 
 function resolveClaudeNativeBinary(): string {
-  const anthropicDir = join(import.meta.dir, "..", "node_modules", "@anthropic-ai");
+  const anthropicDir = join(
+    import.meta.dir,
+    "..",
+    "node_modules",
+    "@anthropic-ai",
+  );
   const binName = process.platform === "win32" ? "claude.exe" : "claude";
   if (process.platform === "linux") {
     const muslArch = process.arch === "arm64" ? "aarch64" : "x86_64";
@@ -46,7 +108,11 @@ function resolveClaudeNativeBinary(): string {
       if (existsSync(p)) return p;
     }
   }
-  return join(anthropicDir, `claude-agent-sdk-${process.platform}-${process.arch}`, binName);
+  return join(
+    anthropicDir,
+    `claude-agent-sdk-${process.platform}-${process.arch}`,
+    binName,
+  );
 }
 
 const LOGIN_INSTRUCTIONS = `To authenticate:
@@ -57,7 +123,8 @@ const LOGIN_INSTRUCTIONS = `To authenticate:
 
 Once complete, it takes effect immediately for all Isomux agents.`;
 
-const AUTH_ERROR_PATTERNS = /unauthori[zs]ed|not authenticated|authentication|auth.*expired|invalid.*token|login.*required|403|401/i;
+const AUTH_ERROR_PATTERNS =
+  /unauthori[zs]ed|not authenticated|authentication|auth.*expired|invalid.*token|login.*required|403|401/i;
 function isAuthError(text: string): boolean {
   return AUTH_ERROR_PATTERNS.test(text);
 }
@@ -82,9 +149,13 @@ function discoverUserSkills(): SkillInfo[] {
   const globalSkillsDir = join(homedir(), ".claude", "skills");
   if (existsSync(globalSkillsDir)) {
     try {
-      for (const entry of readdirSync(globalSkillsDir, { withFileTypes: true })) {
+      for (const entry of readdirSync(globalSkillsDir, {
+        withFileTypes: true,
+      })) {
         if (entry.isDirectory()) {
-          const description = extractSkillDescription(join(globalSkillsDir, entry.name, "SKILL.md"));
+          const description = extractSkillDescription(
+            join(globalSkillsDir, entry.name, "SKILL.md"),
+          );
           skills.push({ name: entry.name, origin: "user", description });
         }
       }
@@ -96,8 +167,14 @@ function discoverUserSkills(): SkillInfo[] {
     try {
       for (const entry of readdirSync(globalCmdsDir, { withFileTypes: true })) {
         if (entry.isFile() && entry.name.endsWith(".md")) {
-          const description = extractSkillDescription(join(globalCmdsDir, entry.name));
-          skills.push({ name: entry.name.replace(/\.md$/, ""), origin: "user", description });
+          const description = extractSkillDescription(
+            join(globalCmdsDir, entry.name),
+          );
+          skills.push({
+            name: entry.name.replace(/\.md$/, ""),
+            origin: "user",
+            description,
+          });
         }
       }
     } catch {}
@@ -110,9 +187,13 @@ function discoverBundledSkills(): SkillInfo[] {
   const skills: SkillInfo[] = [];
   if (existsSync(BUNDLED_SKILLS_DIR)) {
     try {
-      for (const entry of readdirSync(BUNDLED_SKILLS_DIR, { withFileTypes: true })) {
+      for (const entry of readdirSync(BUNDLED_SKILLS_DIR, {
+        withFileTypes: true,
+      })) {
         if (entry.isDirectory()) {
-          const description = extractSkillDescription(join(BUNDLED_SKILLS_DIR, entry.name, "SKILL.md"));
+          const description = extractSkillDescription(
+            join(BUNDLED_SKILLS_DIR, entry.name, "SKILL.md"),
+          );
           skills.push({ name: entry.name, origin: "isomux", description });
         }
       }
@@ -130,8 +211,14 @@ function discoverProjectSkills(cwd: string): SkillInfo[] {
     try {
       for (const entry of readdirSync(projCmdsDir, { withFileTypes: true })) {
         if (entry.isFile() && entry.name.endsWith(".md")) {
-          const description = extractSkillDescription(join(projCmdsDir, entry.name));
-          skills.push({ name: entry.name.replace(/\.md$/, ""), origin: "project", description });
+          const description = extractSkillDescription(
+            join(projCmdsDir, entry.name),
+          );
+          skills.push({
+            name: entry.name.replace(/\.md$/, ""),
+            origin: "project",
+            description,
+          });
         }
       }
     } catch {}
@@ -142,7 +229,12 @@ function discoverProjectSkills(cwd: string): SkillInfo[] {
 // Scan skills from installed Claude Code plugins (~/.claude/plugins/)
 function discoverPluginSkills(): SkillInfo[] {
   const skills: SkillInfo[] = [];
-  const manifestPath = join(homedir(), ".claude", "plugins", "installed_plugins.json");
+  const manifestPath = join(
+    homedir(),
+    ".claude",
+    "plugins",
+    "installed_plugins.json",
+  );
   if (!existsSync(manifestPath)) return skills;
 
   let manifest: any;
@@ -171,10 +263,15 @@ function discoverPluginSkills(): SkillInfo[] {
           try {
             const content = readFileSync(skillMd, "utf-8");
             const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
-            if (fmMatch && /user-invocable:\s*false/i.test(fmMatch[1])) continue;
+            if (fmMatch && /user-invocable:\s*false/i.test(fmMatch[1]))
+              continue;
           } catch {}
           const description = extractSkillDescription(skillMd);
-          skills.push({ name: `${pluginName}:${d.name}`, origin: "plugin", description });
+          skills.push({
+            name: `${pluginName}:${d.name}`,
+            origin: "plugin",
+            description,
+          });
         }
       } catch {}
     }
@@ -186,7 +283,11 @@ function discoverPluginSkills(): SkillInfo[] {
         for (const f of readdirSync(cmdsDir, { withFileTypes: true })) {
           if (f.isFile() && f.name.endsWith(".md")) {
             const description = extractSkillDescription(join(cmdsDir, f.name));
-            skills.push({ name: `${pluginName}:${f.name.replace(/\.md$/, "")}`, origin: "plugin", description });
+            skills.push({
+              name: `${pluginName}:${f.name.replace(/\.md$/, "")}`,
+              origin: "plugin",
+              description,
+            });
           }
         }
       } catch {}
@@ -237,9 +338,12 @@ Optional fields on create/update: description, priority (P0-P3), assignee.
 How to show an image to the boss: read the image file with the Read tool — it renders inline in the conversation.
 
 How to answer questions about Isomux itself: the source lives at https://github.com/nmamano/isomux. Read the README and the relevant code under server/, ui/, shared/, docs/ before answering.`;
-  if (officePrompt) systemPrompt += `\n\n## Office Instructions\n\n${officePrompt}`;
-  if (roomPrompt) systemPrompt += `\n\n## Instructions For Your Room: ${roomName}\n\n${roomPrompt}`;
-  if (customInstructions) systemPrompt += `\n\n## Personal Instructions For You: ${agentName}\n\n${customInstructions}`;
+  if (officePrompt)
+    systemPrompt += `\n\n## Office Instructions\n\n${officePrompt}`;
+  if (roomPrompt)
+    systemPrompt += `\n\n## Instructions For Your Room: ${roomName}\n\n${roomPrompt}`;
+  if (customInstructions)
+    systemPrompt += `\n\n## Personal Instructions For You: ${agentName}\n\n${customInstructions}`;
   return systemPrompt;
 }
 
@@ -267,7 +371,11 @@ interface ManagedAgent {
   topicMessageCount: number; // text entry count when topic was last generated
   // /resume two-step state
   pendingResume: boolean;
-  pendingResumeSessions: { sessionId: string; lastModified: number; topic: string | null }[];
+  pendingResumeSessions: {
+    sessionId: string;
+    lastModified: number;
+    topic: string | null;
+  }[];
   // /model two-step state
   pendingModelPick: boolean;
   // Auto-mode permission prompt two-step state
@@ -296,8 +404,17 @@ type AgentEvent =
   | { type: "room_created"; room: RoomWire }
   | { type: "room_closed"; roomId: string }
   | { type: "room_renamed"; roomId: string; name: string }
-  | { type: "room_settings_updated"; roomId: string; prompt: string | null; envFile: string | null }
-  | { type: "office_settings_updated"; prompt: string | null; envFile: string | null }
+  | {
+      type: "room_settings_updated";
+      roomId: string;
+      prompt: string | null;
+      envFile: string | null;
+    }
+  | {
+      type: "office_settings_updated";
+      prompt: string | null;
+      envFile: string | null;
+    }
   | { type: "rooms_reordered"; order: string[] };
 
 type EventHandler = (event: AgentEvent) => void;
@@ -316,10 +433,17 @@ const agents = new Map<string, ManagedAgent>();
 const logCache = new Map<string, LogEntry[]>(); // agentId → entries
 let eventHandler: EventHandler = () => {};
 let officeConfig: OfficeConfig = loadOfficeConfig();
-let rooms: InternalRoom[] = [{ id: generateRoomId(), name: "Room 1", prompt: null, envFile: null }];
+let rooms: InternalRoom[] = [
+  { id: generateRoomId(), name: "Room 1", prompt: null, envFile: null },
+];
 
 function roomsWire(): RoomWire[] {
-  return rooms.map((r) => ({ id: r.id, name: r.name, prompt: r.prompt, envFile: r.envFile }));
+  return rooms.map((r) => ({
+    id: r.id,
+    name: r.name,
+    prompt: r.prompt,
+    envFile: r.envFile,
+  }));
 }
 
 function findRoomIndex(roomId: string): number {
@@ -335,16 +459,27 @@ export function getOfficeSettings(): OfficeSettings {
 }
 
 // Update office settings. Caller is responsible for validating envFile (see validateEnvPath).
-export function setOfficeSettings(prompt: string | null, envFile: string | null) {
+export function setOfficeSettings(
+  prompt: string | null,
+  envFile: string | null,
+) {
   const normalizedPrompt = prompt && prompt.trim() ? prompt.trim() : null;
   officeConfig = { prompt: normalizedPrompt, envFile: envFile || null };
   saveOfficeConfig(officeConfig);
   // System prompt is rebuilt at every createSession from current office/room/agent
   // config, so the new office prompt automatically lands on the next conversation.
-  eventHandler({ type: "office_settings_updated", prompt: officeConfig.prompt, envFile: officeConfig.envFile });
+  eventHandler({
+    type: "office_settings_updated",
+    prompt: officeConfig.prompt,
+    envFile: officeConfig.envFile,
+  });
 }
 
-export function setRoomSettings(roomId: string, prompt: string | null, envFile: string | null): boolean {
+export function setRoomSettings(
+  roomId: string,
+  prompt: string | null,
+  envFile: string | null,
+): boolean {
   const idx = findRoomIndex(roomId);
   if (idx < 0) return false;
   const room = rooms[idx];
@@ -353,7 +488,12 @@ export function setRoomSettings(roomId: string, prompt: string | null, envFile: 
   persistAll();
   // System prompt is rebuilt at every createSession — next conversation picks up
   // the new room prompt automatically.
-  eventHandler({ type: "room_settings_updated", roomId, prompt: room.prompt, envFile: room.envFile });
+  eventHandler({
+    type: "room_settings_updated",
+    roomId,
+    prompt: room.prompt,
+    envFile: room.envFile,
+  });
   return true;
 }
 
@@ -372,7 +512,10 @@ export function getAgentLogs(agentId: string): LogEntry[] {
   return logCache.get(agentId) ?? [];
 }
 
-export function getAgentCommands(agentId: string): { commands: { name: string; description?: string }[]; skills: SkillInfo[] } {
+export function getAgentCommands(agentId: string): {
+  commands: { name: string; description?: string }[];
+  skills: SkillInfo[];
+} {
   const managed = agents.get(agentId);
   return {
     commands: managed?.slashCommands ?? [],
@@ -388,7 +531,17 @@ export function getCurrentSessionId(agentId: string): string | null {
   return agents.get(agentId)?.sessionId ?? null;
 }
 
-export async function editAgent(agentId: string, changes: { name?: string; cwd?: string; outfit?: AgentInfo["outfit"]; customInstructions?: string; modelFamily?: ModelFamily; permissionMode?: AgentInfo["permissionMode"] }) {
+export async function editAgent(
+  agentId: string,
+  changes: {
+    name?: string;
+    cwd?: string;
+    outfit?: AgentInfo["outfit"];
+    customInstructions?: string;
+    modelFamily?: ModelFamily;
+    permissionMode?: AgentInfo["permissionMode"];
+  },
+) {
   const managed = agents.get(agentId);
   if (!managed) return;
 
@@ -397,7 +550,9 @@ export async function editAgent(agentId: string, changes: { name?: string; cwd?:
   if (changes.name && changes.name !== managed.info.name) {
     // Reject duplicate names
     const nameLower = changes.name.trim().toLowerCase();
-    const duplicate = [...agents.values()].some((a) => a.info.id !== agentId && a.info.name.toLowerCase() === nameLower);
+    const duplicate = [...agents.values()].some(
+      (a) => a.info.id !== agentId && a.info.name.toLowerCase() === nameLower,
+    );
     if (!duplicate) {
       managed.info.name = changes.name;
       updated.name = changes.name;
@@ -413,7 +568,10 @@ export async function editAgent(agentId: string, changes: { name?: string; cwd?:
     managed.info.outfit = changes.outfit;
     updated.outfit = changes.outfit;
   }
-  if (changes.customInstructions !== undefined && changes.customInstructions !== managed.info.customInstructions) {
+  if (
+    changes.customInstructions !== undefined &&
+    changes.customInstructions !== managed.info.customInstructions
+  ) {
     managed.info.customInstructions = changes.customInstructions || null;
     updated.customInstructions = managed.info.customInstructions;
   }
@@ -421,7 +579,10 @@ export async function editAgent(agentId: string, changes: { name?: string; cwd?:
     managed.info.modelFamily = changes.modelFamily;
     updated.modelFamily = changes.modelFamily;
   }
-  if (changes.permissionMode && changes.permissionMode !== managed.info.permissionMode) {
+  if (
+    changes.permissionMode &&
+    changes.permissionMode !== managed.info.permissionMode
+  ) {
     managed.info.permissionMode = changes.permissionMode;
     updated.permissionMode = changes.permissionMode;
   }
@@ -434,7 +595,9 @@ export async function editAgent(agentId: string, changes: { name?: string; cwd?:
   // Recreate session if model or permission mode changed so it takes effect immediately
   if (updated.modelFamily || updated.permissionMode) {
     const sessionId = managed.sessionId;
-    const newSession = sessionId ? createSession(managed, sessionId) : createSession(managed);
+    const newSession = sessionId
+      ? createSession(managed, sessionId)
+      : createSession(managed);
     await replaceSession(agentId, managed, newSession);
   }
 
@@ -443,21 +606,34 @@ export async function editAgent(agentId: string, changes: { name?: string; cwd?:
 }
 
 export function swapDesks(deskA: number, deskB: number, roomId: string) {
-  if (deskA === deskB || deskA < 0 || deskA > 7 || deskB < 0 || deskB > 7) return;
+  if (deskA === deskB || deskA < 0 || deskA > 7 || deskB < 0 || deskB > 7)
+    return;
   const roomIdx = findRoomIndex(roomId);
   if (roomIdx < 0) return;
   const allManaged = [...agents.values()];
-  const agentA = allManaged.find((m) => m.info.desk === deskA && m.info.room === roomIdx);
-  const agentB = allManaged.find((m) => m.info.desk === deskB && m.info.room === roomIdx);
+  const agentA = allManaged.find(
+    (m) => m.info.desk === deskA && m.info.room === roomIdx,
+  );
+  const agentB = allManaged.find(
+    (m) => m.info.desk === deskB && m.info.room === roomIdx,
+  );
   if (!agentA && !agentB) return;
 
   if (agentA) {
     agentA.info.desk = deskB;
-    eventHandler({ type: "agent_updated", agentId: agentA.info.id, changes: { desk: deskB } });
+    eventHandler({
+      type: "agent_updated",
+      agentId: agentA.info.id,
+      changes: { desk: deskB },
+    });
   }
   if (agentB) {
     agentB.info.desk = deskA;
-    eventHandler({ type: "agent_updated", agentId: agentB.info.id, changes: { desk: deskA } });
+    eventHandler({
+      type: "agent_updated",
+      agentId: agentB.info.id,
+      changes: { desk: deskA },
+    });
   }
   persistAll();
 }
@@ -466,10 +642,23 @@ export function createRoom(name?: string): string {
   const existingIds = rooms.map((r) => r.id);
   const id = generateRoomId(existingIds);
   const displayName = (name || `Room ${rooms.length + 1}`).trim().slice(0, 40);
-  const room: InternalRoom = { id, name: displayName, prompt: null, envFile: null };
+  const room: InternalRoom = {
+    id,
+    name: displayName,
+    prompt: null,
+    envFile: null,
+  };
   rooms.push(room);
   persistAll();
-  eventHandler({ type: "room_created", room: { id: room.id, name: room.name, prompt: room.prompt, envFile: room.envFile } });
+  eventHandler({
+    type: "room_created",
+    room: {
+      id: room.id,
+      name: room.name,
+      prompt: room.prompt,
+      envFile: room.envFile,
+    },
+  });
   return id;
 }
 
@@ -477,7 +666,9 @@ export function closeRoom(roomId: string): boolean {
   const roomIdx = findRoomIndex(roomId);
   if (roomIdx <= 0) return false; // Room 1 is permanent, and unknown ids reject
   // Check room is empty
-  const roomAgents = [...agents.values()].filter((a) => a.info.room === roomIdx);
+  const roomAgents = [...agents.values()].filter(
+    (a) => a.info.room === roomIdx,
+  );
   if (roomAgents.length > 0) return false;
 
   rooms.splice(roomIdx, 1);
@@ -485,7 +676,11 @@ export function closeRoom(roomId: string): boolean {
   for (const managed of agents.values()) {
     if (managed.info.room > roomIdx) {
       managed.info.room--;
-      eventHandler({ type: "agent_updated", agentId: managed.info.id, changes: { room: managed.info.room } });
+      eventHandler({
+        type: "agent_updated",
+        agentId: managed.info.id,
+        changes: { room: managed.info.room },
+      });
     }
   }
   persistAll();
@@ -513,7 +708,8 @@ export function reorderRooms(order: string[]): boolean {
   const currentIds = new Set(rooms.map((r) => r.id));
   const seen = new Set<string>();
   for (const id of order) {
-    if (typeof id !== "string" || !currentIds.has(id) || seen.has(id)) return false;
+    if (typeof id !== "string" || !currentIds.has(id) || seen.has(id))
+      return false;
     seen.add(id);
   }
   // No-op check
@@ -549,12 +745,17 @@ export function moveAgent(agentId: string, targetRoomId: string): boolean {
   if (managed.info.room === targetIdx) return false;
 
   // Find first available desk in target room
-  const targetAgents = [...agents.values()].filter((a) => a.info.room === targetIdx);
+  const targetAgents = [...agents.values()].filter(
+    (a) => a.info.room === targetIdx,
+  );
   if (targetAgents.length >= 8) return false;
   const taken = new Set(targetAgents.map((a) => a.info.desk));
   let newDesk = -1;
   for (let i = 0; i < 8; i++) {
-    if (!taken.has(i)) { newDesk = i; break; }
+    if (!taken.has(i)) {
+      newDesk = i;
+      break;
+    }
   }
   if (newDesk === -1) return false;
 
@@ -562,7 +763,11 @@ export function moveAgent(agentId: string, targetRoomId: string): boolean {
   managed.info.desk = newDesk;
   // New room's prompt context is picked up on the agent's next conversation
   // since the system prompt is rebuilt at every createSession.
-  eventHandler({ type: "agent_updated", agentId, changes: { room: targetIdx, desk: newDesk } });
+  eventHandler({
+    type: "agent_updated",
+    agentId,
+    changes: { room: targetIdx, desk: newDesk },
+  });
   persistAll();
   return true;
 }
@@ -572,17 +777,19 @@ export function getAllAgents(): AgentInfo[] {
 }
 
 function updateManifest() {
-  writeManifest([...agents.values()].map((a) => ({
-    id: a.info.id,
-    name: a.info.name,
-    desk: a.info.desk,
-    room: a.info.room,
-    roomName: rooms[a.info.room]?.name ?? `Room ${a.info.room + 1}`,
-    topic: a.info.topic,
-    cwd: a.info.cwd,
-    modelFamily: a.info.modelFamily,
-    model: FAMILY_TO_MODEL[a.info.modelFamily],
-  })));
+  writeManifest(
+    [...agents.values()].map((a) => ({
+      id: a.info.id,
+      name: a.info.name,
+      desk: a.info.desk,
+      room: a.info.room,
+      roomName: rooms[a.info.room]?.name ?? `Room ${a.info.room + 1}`,
+      topic: a.info.topic,
+      cwd: a.info.cwd,
+      modelFamily: a.info.modelFamily,
+      model: FAMILY_TO_MODEL[a.info.modelFamily],
+    })),
+  );
 }
 
 function persistAll() {
@@ -624,7 +831,11 @@ function updateAgentHistory() {
   for (const a of agents.values()) {
     const room = rooms[a.info.room];
     if (!room) continue;
-    history[a.info.id] = { name: a.info.name, lastRoomId: room.id, lastRoomName: room.name };
+    history[a.info.id] = {
+      name: a.info.name,
+      lastRoomId: room.id,
+      lastRoomName: room.name,
+    };
   }
   saveAgentHistory(history);
 }
@@ -633,10 +844,20 @@ function updateAgentHistory() {
 export async function restoreAgents() {
   // Clean up the pre-0.2.116 per-agent launcher scripts. Isomux now passes the
   // native Claude binary directly, so these are orphaned.
-  try { rmSync(join(homedir(), ".isomux", "launchers"), { recursive: true, force: true }); } catch {}
+  try {
+    rmSync(join(homedir(), ".isomux", "launchers"), {
+      recursive: true,
+      force: true,
+    });
+  } catch {}
 
   const loaded = loadAgents();
-  rooms = loaded.map((r) => ({ id: r.id, name: r.name, prompt: r.prompt, envFile: r.envFile }));
+  rooms = loaded.map((r) => ({
+    id: r.id,
+    name: r.name,
+    prompt: r.prompt,
+    envFile: r.envFile,
+  }));
 
   for (let roomIdx = 0; roomIdx < loaded.length; roomIdx++) {
     for (const p of loaded[roomIdx].agents) {
@@ -662,7 +883,12 @@ export async function restoreAgents() {
         pendingTurn: null,
         aborting: false,
         slashCommands: autocompleteCommands(),
-        skills: deduplicateSkills([...discoverUserSkills(), ...discoverProjectSkills(p.cwd), ...discoverPluginSkills(), ...discoverBundledSkills()]),
+        skills: deduplicateSkills([
+          ...discoverUserSkills(),
+          ...discoverProjectSkills(p.cwd),
+          ...discoverPluginSkills(),
+          ...discoverBundledSkills(),
+        ]),
         sdkReportedCommands: [],
         thinkingStartedAt: 0,
         toolCallTimestamps: new Map(),
@@ -689,7 +915,9 @@ export async function restoreAgents() {
 
       // Auto-resume session
       try {
-        const session = p.lastSessionId ? createSession(managed, p.lastSessionId) : createSession(managed);
+        const session = p.lastSessionId
+          ? createSession(managed, p.lastSessionId)
+          : createSession(managed);
         installSession(p.id, managed, session);
       } catch (err: any) {
         console.error(`Failed to restore session for ${p.name}:`, err.message);
@@ -733,7 +961,13 @@ function updateState(agentId: string, state: AgentState) {
   emit({ type: "agent_updated", agentId, changes: { state } });
 }
 
-function addLogEntry(agentId: string, kind: LogEntry["kind"], content: string, metadata?: Record<string, unknown>, attachments?: Attachment[]) {
+function addLogEntry(
+  agentId: string,
+  kind: LogEntry["kind"],
+  content: string,
+  metadata?: Record<string, unknown>,
+  attachments?: Attachment[],
+) {
   const entry: LogEntry = {
     id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     agentId,
@@ -759,8 +993,15 @@ function addLogEntry(agentId: string, kind: LogEntry["kind"], content: string, m
   }
 
   // Track topicStale: new text entries after topic was generated
-  if ((kind === "text" || kind === "user_message") && managed && managed.info.topic !== null && managed.info.topic !== "...") {
-    const textCount = (logCache.get(agentId) ?? []).filter(e => e.kind === "user_message" || e.kind === "text").length;
+  if (
+    (kind === "text" || kind === "user_message") &&
+    managed &&
+    managed.info.topic !== null &&
+    managed.info.topic !== "..."
+  ) {
+    const textCount = (logCache.get(agentId) ?? []).filter(
+      (e) => e.kind === "user_message" || e.kind === "text",
+    ).length;
     if (textCount > managed.topicMessageCount) {
       managed.info.topicStale = true;
       emit({ type: "agent_updated", agentId, changes: { topicStale: true } });
@@ -772,7 +1013,12 @@ function addLogEntry(agentId: string, kind: LogEntry["kind"], content: string, m
 // Note: entries are still added to logCache for UI display. If sessionId is null when this is
 // called, the backfill logic in processMessage (system/init) would write them to disk. In practice
 // this doesn't happen because /resume requires existing sessions (sessionId already set).
-function emitEphemeralLog(agentId: string, kind: LogEntry["kind"], content: string, metadata?: Record<string, unknown>) {
+function emitEphemeralLog(
+  agentId: string,
+  kind: LogEntry["kind"],
+  content: string,
+  metadata?: Record<string, unknown>,
+) {
   const entry: LogEntry = {
     id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     agentId,
@@ -795,12 +1041,18 @@ async function generateTopic(agentId: string) {
   managed.topicGenerating = true;
   managed.info.topic = "...";
   managed.info.topicStale = false;
-  emit({ type: "agent_updated", agentId, changes: { topic: "...", topicStale: false } });
+  emit({
+    type: "agent_updated",
+    agentId,
+    changes: { topic: "...", topicStale: false },
+  });
 
   // Build context: first user message + last 5 text entries
   const logs = logCache.get(agentId) ?? [];
-  const textEntries = logs.filter(e => e.kind === "user_message" || e.kind === "text");
-  const firstUserMsg = textEntries.find(e => e.kind === "user_message");
+  const textEntries = logs.filter(
+    (e) => e.kind === "user_message" || e.kind === "text",
+  );
+  const firstUserMsg = textEntries.find((e) => e.kind === "user_message");
   if (!firstUserMsg) {
     managed.topicGenerating = false;
     managed.info.topic = null;
@@ -814,9 +1066,15 @@ async function generateTopic(agentId: string) {
     context = `User message: ${firstUserMsg.content}`;
   } else {
     // Deduplicate if first message is already in lastFive
-    const recent = lastFive.filter(e => e.id !== firstUserMsg.id);
-    context = `First message: ${firstUserMsg.content}\n\nRecent conversation:\n` +
-      recent.map(e => `${e.kind === "user_message" ? "User" : "Assistant"}: ${e.content.slice(0, 200)}`).join("\n");
+    const recent = lastFive.filter((e) => e.id !== firstUserMsg.id);
+    context =
+      `First message: ${firstUserMsg.content}\n\nRecent conversation:\n` +
+      recent
+        .map(
+          (e) =>
+            `${e.kind === "user_message" ? "User" : "Assistant"}: ${e.content.slice(0, 200)}`,
+        )
+        .join("\n");
   }
 
   const prompt = `${context}\n\nRespond with ONLY a short topic description for this conversation, max 8 words. No quotes, no punctuation at the end.`;
@@ -831,7 +1089,11 @@ async function generateTopic(agentId: string) {
       managed.info.topic = topic;
       managed.info.topicStale = false;
       managed.topicMessageCount = textEntries.length;
-      emit({ type: "agent_updated", agentId, changes: { topic, topicStale: false } });
+      emit({
+        type: "agent_updated",
+        agentId,
+        changes: { topic, topicStale: false },
+      });
       persistAll();
       // Persist topic to sessions.json for resume list
       if (managed.sessionId) {
@@ -855,7 +1117,10 @@ function deriveState(msg: SDKMessage): AgentState | null {
   switch (msg.type) {
     case "assistant": {
       const content = (msg as any).message?.content;
-      if (Array.isArray(content) && content.some((b: any) => b.type === "tool_use")) {
+      if (
+        Array.isArray(content) &&
+        content.some((b: any) => b.type === "tool_use")
+      ) {
         return "tool_executing";
       }
       return "thinking";
@@ -912,7 +1177,9 @@ function processMessage(agentId: string, msg: SDKMessage) {
         // Capture available slash commands and skills from init
         const sdkCommands: string[] = (msg as any).slash_commands ?? [];
         // Filter out MCP internal command names (mcp__...) — they clutter autocomplete
-        const filteredSdkCommands = sdkCommands.filter((c) => !c.startsWith("mcp__"));
+        const filteredSdkCommands = sdkCommands.filter(
+          (c) => !c.startsWith("mcp__"),
+        );
         // Store SDK-reported commands for pass-through resolution (step 4)
         if (managed) {
           managed.sdkReportedCommands = filteredSdkCommands;
@@ -921,7 +1188,12 @@ function processMessage(agentId: string, msg: SDKMessage) {
         // SDK-reported commands are NOT added to autocomplete (per design)
         // Skills are listed in priority order; deduplicate by name (highest priority wins)
         const discoveredSkills = managed
-          ? [...discoverUserSkills(), ...discoverProjectSkills(managed.info.cwd), ...discoverPluginSkills(), ...discoverBundledSkills()]
+          ? [
+              ...discoverUserSkills(),
+              ...discoverProjectSkills(managed.info.cwd),
+              ...discoverPluginSkills(),
+              ...discoverBundledSkills(),
+            ]
           : [];
         const uniqueSkills = deduplicateSkills(discoveredSkills);
         const configCommands = autocompleteCommands();
@@ -963,7 +1235,12 @@ function processMessage(agentId: string, msg: SDKMessage) {
           const duration_ms = managed?.thinkingStartedAt
             ? Date.now() - managed.thinkingStartedAt
             : undefined;
-          addLogEntry(agentId, "thinking", block.thinking, duration_ms != null ? { duration_ms } : undefined);
+          addLogEntry(
+            agentId,
+            "thinking",
+            block.thinking,
+            duration_ms != null ? { duration_ms } : undefined,
+          );
         }
       }
       break;
@@ -989,7 +1266,12 @@ function processMessage(agentId: string, msg: SDKMessage) {
             for (const c of block.content as any[]) {
               if (c.type === "image" && c.source?.type === "base64") {
                 const decoded = Buffer.from(c.source.data, "base64");
-                const att = saveFile(agentId, decoded, c.source.media_type, `image.${c.source.media_type.split("/")[1] ?? "png"}`);
+                const att = saveFile(
+                  agentId,
+                  decoded,
+                  c.source.media_type,
+                  `image.${c.source.media_type.split("/")[1] ?? "png"}`,
+                );
                 if (att) atts.push(att);
               }
             }
@@ -1001,10 +1283,16 @@ function processMessage(agentId: string, msg: SDKMessage) {
           if (managed && callStart) {
             managed.toolCallTimestamps.delete(block.tool_use_id);
           }
-          addLogEntry(agentId, "tool_result", resultText.slice(0, 10000), {
-            toolUseId: block.tool_use_id,
-            ...(duration_ms != null ? { duration_ms } : {}),
-          }, resultAttachments);
+          addLogEntry(
+            agentId,
+            "tool_result",
+            resultText.slice(0, 10000),
+            {
+              toolUseId: block.tool_use_id,
+              ...(duration_ms != null ? { duration_ms } : {}),
+            },
+            resultAttachments,
+          );
         }
       }
       break;
@@ -1023,14 +1311,25 @@ function processMessage(agentId: string, msg: SDKMessage) {
       const usageField = (msg as any).usage;
       if (managed?.sessionId && usageField) {
         const cost = (msg as any).total_cost_usd ?? 0;
-        const cumulative = accumulateSessionUsage(agentId, managed.sessionId, {
-          inputTokens: usageField.input_tokens ?? 0,
-          outputTokens: usageField.output_tokens ?? 0,
-          cacheReadInputTokens: usageField.cache_read_input_tokens ?? 0,
-          cacheCreationInputTokens: usageField.cache_creation_input_tokens ?? 0,
-        }, cost);
+        const cumulative = accumulateSessionUsage(
+          agentId,
+          managed.sessionId,
+          {
+            inputTokens: usageField.input_tokens ?? 0,
+            outputTokens: usageField.output_tokens ?? 0,
+            cacheReadInputTokens: usageField.cache_read_input_tokens ?? 0,
+            cacheCreationInputTokens:
+              usageField.cache_creation_input_tokens ?? 0,
+          },
+          cost,
+        );
         if (managed.lastWrittenEntryId) {
-          appendSessionUsageSnapshot(agentId, managed.sessionId, managed.lastWrittenEntryId, cumulative);
+          appendSessionUsageSnapshot(
+            agentId,
+            managed.sessionId,
+            managed.lastWrittenEntryId,
+            cumulative,
+          );
         }
       }
       const subtype = (msg as any).subtype;
@@ -1071,11 +1370,16 @@ function createTurnDeferred(managed: ManagedAgent): Promise<void> {
   const stale = managed.pendingTurn;
   if (stale) {
     managed.pendingTurn = null;
-    try { stale.reject(new Error("Superseded by a new turn.")); } catch {}
+    try {
+      stale.reject(new Error("Superseded by a new turn."));
+    } catch {}
   }
   let resolve!: () => void;
   let reject!: (err: unknown) => void;
-  const promise = new Promise<void>((res, rej) => { resolve = res; reject = rej; });
+  const promise = new Promise<void>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
   managed.pendingTurn = { resolve, reject };
   return promise;
 }
@@ -1088,7 +1392,11 @@ function createTurnDeferred(managed: ManagedAgent): Promise<void> {
 // Bound to a specific session instance: loop exits when `managed.session` is
 // swapped out (abort / resume / fork / etc.) — `session.close()` unblocks the
 // parked `stream()` generator.
-async function runConsumer(agentId: string, managed: ManagedAgent, boundSession: ReturnType<typeof unstable_v2_createSession>) {
+async function runConsumer(
+  agentId: string,
+  managed: ManagedAgent,
+  boundSession: ReturnType<typeof unstable_v2_createSession>,
+) {
   while (agents.has(agentId) && managed.session === boundSession) {
     try {
       for await (const msg of boundSession.stream()) {
@@ -1130,7 +1438,11 @@ async function runConsumer(agentId: string, managed: ManagedAgent, boundSession:
 
 // Install a freshly-created session on managed and spawn its consumer. Caller
 // is responsible for having closed/awaited any previous session first.
-function installSession(agentId: string, managed: ManagedAgent, session: ReturnType<typeof unstable_v2_createSession>) {
+function installSession(
+  agentId: string,
+  managed: ManagedAgent,
+  session: ReturnType<typeof unstable_v2_createSession>,
+) {
   managed.session = session;
   managed.consumerPromise = runConsumer(agentId, managed, session);
 }
@@ -1138,17 +1450,27 @@ function installSession(agentId: string, managed: ManagedAgent, session: ReturnT
 // Swap the agent's session: close the current one, await its consumer to
 // drain, install the new session + consumer. Rejects any in-flight turn so
 // callers awaiting sendMessage's deferred don't hang.
-async function replaceSession(agentId: string, managed: ManagedAgent, newSession: ReturnType<typeof unstable_v2_createSession>) {
+async function replaceSession(
+  agentId: string,
+  managed: ManagedAgent,
+  newSession: ReturnType<typeof unstable_v2_createSession>,
+) {
   const oldConsumer = managed.consumerPromise;
   const turn = managed.pendingTurn;
   managed.pendingTurn = null;
   if (turn) {
-    try { turn.reject(new SessionSwappedError()); } catch {}
+    try {
+      turn.reject(new SessionSwappedError());
+    } catch {}
   }
-  try { managed.session?.close(); } catch {}
+  try {
+    managed.session?.close();
+  } catch {}
   managed.session = null;
   if (oldConsumer) {
-    try { await oldConsumer; } catch {}
+    try {
+      await oldConsumer;
+    } catch {}
   }
   installSession(agentId, managed, newSession);
 }
@@ -1164,7 +1486,12 @@ function resolveCwd(cwd: string): string {
 // Sanitization observed: any non-alphanumeric, non-hyphen char becomes "-".
 // Ex: /home/nil/nilmamano.com -> -home-nil-nilmamano-com
 function claudeProjectDir(cwd: string): string {
-  return join(homedir(), ".claude", "projects", cwd.replace(/[^a-zA-Z0-9-]/g, "-"));
+  return join(
+    homedir(),
+    ".claude",
+    "projects",
+    cwd.replace(/[^a-zA-Z0-9-]/g, "-"),
+  );
 }
 
 function claudeSessionFileExists(cwd: string, sessionId: string): boolean {
@@ -1174,7 +1501,11 @@ function claudeSessionFileExists(cwd: string, sessionId: string): boolean {
 // Move an agent's Claude CLI session files from one cwd's project dir to another.
 // The Claude CLI derives its session storage path from cwd, so changing an agent's cwd
 // without moving these files orphans every session on the next respawn (e.g. server restart).
-function moveClaudeSessionFiles(agentId: string, oldCwd: string, newCwd: string) {
+function moveClaudeSessionFiles(
+  agentId: string,
+  oldCwd: string,
+  newCwd: string,
+) {
   const oldDir = claudeProjectDir(oldCwd);
   const newDir = claudeProjectDir(newCwd);
   if (oldDir === newDir || !existsSync(oldDir)) return;
@@ -1185,16 +1516,26 @@ function moveClaudeSessionFiles(agentId: string, oldCwd: string, newCwd: string)
     const oldJsonl = join(oldDir, `${sessionId}.jsonl`);
     const newJsonl = join(newDir, `${sessionId}.jsonl`);
     if (existsSync(oldJsonl) && !existsSync(newJsonl)) {
-      try { renameSync(oldJsonl, newJsonl); } catch (err) {
-        console.error(`[cwd-change] Failed to move ${oldJsonl} -> ${newJsonl}:`, err);
+      try {
+        renameSync(oldJsonl, newJsonl);
+      } catch (err) {
+        console.error(
+          `[cwd-change] Failed to move ${oldJsonl} -> ${newJsonl}:`,
+          err,
+        );
       }
     }
     // Claude CLI also writes a sibling <sessionId>/ dir (tool-results cache, etc.)
     const oldSib = join(oldDir, sessionId);
     const newSib = join(newDir, sessionId);
     if (existsSync(oldSib) && !existsSync(newSib)) {
-      try { renameSync(oldSib, newSib); } catch (err) {
-        console.error(`[cwd-change] Failed to move ${oldSib} -> ${newSib}:`, err);
+      try {
+        renameSync(oldSib, newSib);
+      } catch (err) {
+        console.error(
+          `[cwd-change] Failed to move ${oldSib} -> ${newSib}:`,
+          err,
+        );
       }
     }
   }
@@ -1227,7 +1568,8 @@ export function validateCwd(cwd: string): string {
   try {
     stat = statSync(resolved);
   } catch (err: any) {
-    if (err.code === "ENOENT") throw new Error(`Directory does not exist: ${resolved}`);
+    if (err.code === "ENOENT")
+      throw new Error(`Directory does not exist: ${resolved}`);
     throw new Error(`Cannot access ${resolved}: ${err.message}`);
   }
   if (!stat.isDirectory()) throw new Error(`Not a directory: ${resolved}`);
@@ -1238,7 +1580,9 @@ export function validateCwd(cwd: string): string {
 // Room overrides office; office overrides process.env. Spawn-time failure mode:
 // if a configured env file is missing or fails to parse, throw — the caller is
 // responsible for surfacing the error to the agent log.
-function buildSessionEnv(managed: ManagedAgent): { [key: string]: string | undefined } | undefined {
+function buildSessionEnv(
+  managed: ManagedAgent,
+): { [key: string]: string | undefined } | undefined {
   const room = rooms[managed.info.room];
   const roomEnvFile = room?.envFile ?? null;
   const officeEnvFile = officeConfig.envFile;
@@ -1258,7 +1602,12 @@ function buildSessionEnv(managed: ManagedAgent): { [key: string]: string | undef
   return merged;
 }
 
-function requestPermission(managed: ManagedAgent, toolName: string, input: Record<string, unknown>, opts: Parameters<CanUseTool>[2]): Promise<PermissionResult> {
+function requestPermission(
+  managed: ManagedAgent,
+  toolName: string,
+  input: Record<string, unknown>,
+  opts: Parameters<CanUseTool>[2],
+): Promise<PermissionResult> {
   const agentId = managed.info.id;
   return new Promise<PermissionResult>((resolve) => {
     const title = opts.title ?? `Claude wants to use ${toolName}`;
@@ -1267,7 +1616,9 @@ function requestPermission(managed: ManagedAgent, toolName: string, input: Recor
     if (opts.decisionReason) lines.push(`\n_${opts.decisionReason}_`);
     lines.push("");
     lines.push("Reply:");
-    lines.push("  1. Allow — and don't ask again for similar calls this session");
+    lines.push(
+      "  1. Allow — and don't ask again for similar calls this session",
+    );
     lines.push("  2. Allow — just this time");
     lines.push("  3. Deny");
     lines.push("");
@@ -1276,7 +1627,12 @@ function requestPermission(managed: ManagedAgent, toolName: string, input: Recor
 
     // If a prior pending permission was never resolved, deny it now so we don't leak.
     if (managed.pendingPermission) {
-      try { managed.pendingPermission.resolve({ behavior: "deny", message: "Superseded by newer request." }); } catch {}
+      try {
+        managed.pendingPermission.resolve({
+          behavior: "deny",
+          message: "Superseded by newer request.",
+        });
+      } catch {}
     }
     managed.pendingPermission = {
       toolUseID: opts.toolUseID,
@@ -1286,12 +1642,16 @@ function requestPermission(managed: ManagedAgent, toolName: string, input: Recor
     };
     updateState(agentId, "waiting_for_response");
 
-    opts.signal.addEventListener("abort", () => {
-      if (managed.pendingPermission?.toolUseID === opts.toolUseID) {
-        managed.pendingPermission = null;
-        resolve({ behavior: "deny", message: "Request aborted." });
-      }
-    }, { once: true });
+    opts.signal.addEventListener(
+      "abort",
+      () => {
+        if (managed.pendingPermission?.toolUseID === opts.toolUseID) {
+          managed.pendingPermission = null;
+          resolve({ behavior: "deny", message: "Request aborted." });
+        }
+      },
+      { once: true },
+    );
   });
 }
 
@@ -1299,7 +1659,12 @@ function createSession(managed: ManagedAgent, resumeSessionId?: string) {
   // Drop any pending permission prompt from a prior (now-closed) session so the
   // next user message isn't swallowed by a dead request.
   if (managed.pendingPermission) {
-    try { managed.pendingPermission.resolve({ behavior: "deny", message: "Session restarted." }); } catch {}
+    try {
+      managed.pendingPermission.resolve({
+        behavior: "deny",
+        message: "Session restarted.",
+      });
+    } catch {}
     managed.pendingPermission = null;
   }
   // Preflight checks so failures surface as readable errors instead of the SDK's
@@ -1307,13 +1672,18 @@ function createSession(managed: ManagedAgent, resumeSessionId?: string) {
   try {
     validateCwd(managed.info.cwd);
   } catch (err: any) {
-    throw new Error(`cwd is invalid: ${err.message}. Click the agent name in the log view header to fix it.`);
+    throw new Error(
+      `cwd is invalid: ${err.message}. Click the agent name in the log view header to fix it.`,
+    );
   }
-  if (resumeSessionId && !claudeSessionFileExists(managed.info.cwd, resumeSessionId)) {
+  if (
+    resumeSessionId &&
+    !claudeSessionFileExists(managed.info.cwd, resumeSessionId)
+  ) {
     throw new Error(
       `Cannot resume session ${resumeSessionId.slice(0, 8)}…: its file is missing from ${claudeProjectDir(managed.info.cwd)}. ` +
-      `Most commonly this happens after the agent's cwd was moved or renamed — the Claude CLI stores sessions under a path derived from cwd. ` +
-      `Use /resume to pick a different session, or move the session .jsonl into the new project dir.`
+        `Most commonly this happens after the agent's cwd was moved or renamed — the Claude CLI stores sessions under a path derived from cwd. ` +
+        `Use /resume to pick a different session, or move the session .jsonl into the new project dir.`,
     );
   }
   const room = rooms[managed.info.room]!;
@@ -1335,7 +1705,8 @@ function createSession(managed: ManagedAgent, resumeSessionId?: string) {
     executableArgs: ["--append-system-prompt", systemPrompt],
     cwd: managed.info.cwd,
     hooks: createSafetyHooks(),
-    canUseTool: ((toolName, input, options) => requestPermission(managed, toolName, input, options)) as CanUseTool,
+    canUseTool: ((toolName, input, options) =>
+      requestPermission(managed, toolName, input, options)) as CanUseTool,
   };
   const env = buildSessionEnv(managed);
   if (env) opts.env = env;
@@ -1351,7 +1722,16 @@ function createSession(managed: ManagedAgent, resumeSessionId?: string) {
     : unstable_v2_createSession(opts);
 }
 
-export async function spawn(name: string, cwd: string, permissionMode: AgentInfo["permissionMode"], desk?: number, customInstructions?: string, roomId?: string, outfit?: AgentOutfit, modelFamily?: ModelFamily): Promise<AgentInfo | null> {
+export async function spawn(
+  name: string,
+  cwd: string,
+  permissionMode: AgentInfo["permissionMode"],
+  desk?: number,
+  customInstructions?: string,
+  roomId?: string,
+  outfit?: AgentOutfit,
+  modelFamily?: ModelFamily,
+): Promise<AgentInfo | null> {
   // Reject duplicate names across all rooms
   const nameLower = name.trim().toLowerCase();
   for (const a of agents.values()) {
@@ -1362,7 +1742,9 @@ export async function spawn(name: string, cwd: string, permissionMode: AgentInfo
     const idx = findRoomIndex(roomId);
     if (idx >= 0) targetRoom = idx;
   }
-  const roomAgents = [...agents.values()].filter((a) => a.info.room === targetRoom);
+  const roomAgents = [...agents.values()].filter(
+    (a) => a.info.room === targetRoom,
+  );
   const taken = new Set(roomAgents.map((a) => a.info.desk));
   if (desk !== undefined && !taken.has(desk)) {
     // Use the requested desk
@@ -1370,7 +1752,10 @@ export async function spawn(name: string, cwd: string, permissionMode: AgentInfo
     // Find first free desk in the target room
     desk = -1;
     for (let i = 0; i < 8; i++) {
-      if (!taken.has(i)) { desk = i; break; }
+      if (!taken.has(i)) {
+        desk = i;
+        break;
+      }
     }
   }
   if (desk === -1) return null;
@@ -1401,7 +1786,12 @@ export async function spawn(name: string, cwd: string, permissionMode: AgentInfo
     pendingTurn: null,
     aborting: false,
     slashCommands: autocompleteCommands(),
-    skills: deduplicateSkills([...discoverUserSkills(), ...discoverProjectSkills(resolvedCwd), ...discoverPluginSkills(), ...discoverBundledSkills()]),
+    skills: deduplicateSkills([
+      ...discoverUserSkills(),
+      ...discoverProjectSkills(resolvedCwd),
+      ...discoverPluginSkills(),
+      ...discoverBundledSkills(),
+    ]),
     sdkReportedCommands: [],
     thinkingStartedAt: 0,
     toolCallTimestamps: new Map(),
@@ -1429,7 +1819,11 @@ export async function spawn(name: string, cwd: string, permissionMode: AgentInfo
   // Create V2 session
   try {
     installSession(id, managed, createSession(managed));
-    addLogEntry(id, "system", `Agent "${name}" ready. Working in ${resolvedCwd}. Permission mode: ${permissionMode}.`);
+    addLogEntry(
+      id,
+      "system",
+      `Agent "${name}" ready. Working in ${resolvedCwd}. Permission mode: ${permissionMode}.`,
+    );
     // First stream() will deliver system/init + response to the first send().
   } catch (err: any) {
     console.error(`Failed to create session for ${name}:`, err.message);
@@ -1442,14 +1836,48 @@ export async function spawn(name: string, cwd: string, permissionMode: AgentInfo
 
 // Extensions that should be sent as text content blocks
 const TEXT_FILE_EXTENSIONS = new Set([
-  "txt", "md", "json", "csv", "log", "xml", "yaml", "yml", "toml", "ini", "cfg",
-  "sh", "bash", "py", "js", "ts", "go", "rs", "c", "h", "cpp", "java", "rb",
-  "html", "css", "sql", "env", "conf",
+  "txt",
+  "md",
+  "json",
+  "csv",
+  "log",
+  "xml",
+  "yaml",
+  "yml",
+  "toml",
+  "ini",
+  "cfg",
+  "sh",
+  "bash",
+  "py",
+  "js",
+  "ts",
+  "go",
+  "rs",
+  "c",
+  "h",
+  "cpp",
+  "java",
+  "rb",
+  "html",
+  "css",
+  "sql",
+  "env",
+  "conf",
 ]);
 
-const IMAGE_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+const IMAGE_MEDIA_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+]);
 
-function buildUserMessage(agentId: string, text: string, attachments: Attachment[]): SDKUserMessage {
+function buildUserMessage(
+  agentId: string,
+  text: string,
+  attachments: Attachment[],
+): SDKUserMessage {
   const content: ContentBlockParam[] = [];
 
   // Text block first (if non-empty)
@@ -1468,7 +1896,11 @@ function buildUserMessage(agentId: string, text: string, attachments: Attachment
         type: "image",
         source: {
           type: "base64",
-          media_type: att.mediaType as "image/jpeg" | "image/png" | "image/gif" | "image/webp",
+          media_type: att.mediaType as
+            | "image/jpeg"
+            | "image/png"
+            | "image/gif"
+            | "image/webp",
           data,
         },
       });
@@ -1493,7 +1925,9 @@ function buildUserMessage(agentId: string, text: string, attachments: Attachment
         });
       }
     } else {
-      const ext = att.originalName.includes(".") ? att.originalName.split(".").pop()!.toLowerCase() : "";
+      const ext = att.originalName.includes(".")
+        ? att.originalName.split(".").pop()!.toLowerCase()
+        : "";
       if (TEXT_FILE_EXTENSIONS.has(ext)) {
         const fileContent = readFileSync(filePath, "utf-8");
         content.push({
@@ -1516,7 +1950,12 @@ function buildUserMessage(agentId: string, text: string, attachments: Attachment
   };
 }
 
-export async function sendMessage(agentId: string, text: string, username?: string, attachments?: Attachment[]) {
+export async function sendMessage(
+  agentId: string,
+  text: string,
+  username?: string,
+  attachments?: Attachment[],
+) {
   const managed = agents.get(agentId);
   if (!managed) return;
   if (!managed.session) {
@@ -1524,11 +1963,21 @@ export async function sendMessage(agentId: string, text: string, username?: stri
     try {
       installSession(agentId, managed, createSession(managed));
       managed.sessionId = null;
-      addLogEntry(agentId, "system", "Started a fresh session (previous one could not be restored).");
+      addLogEntry(
+        agentId,
+        "system",
+        "Started a fresh session (previous one could not be restored).",
+      );
       updateState(agentId, "waiting_for_response");
       // Fall through so the message is actually sent on the new session.
     } catch (err: any) {
-      addLogEntry(agentId, "user_message", text, username ? { username } : undefined, attachments);
+      addLogEntry(
+        agentId,
+        "user_message",
+        text,
+        username ? { username } : undefined,
+        attachments,
+      );
       addLogEntry(agentId, "error", `Cannot start session: ${err.message}`);
       updateState(agentId, "error");
       return;
@@ -1547,9 +1996,20 @@ export async function sendMessage(agentId: string, text: string, username?: stri
     const trimmed = text.trim();
     if (trimmed === "1") {
       // Scope suggested rules to this session only so they don't leak across sessions.
-      const sessionScoped = pending.suggestions?.map((s) => ({ ...s, destination: "session" as const }));
-      emitEphemeralLog(agentId, "system", "Permission granted (rule added for this session).");
-      pending.resolve({ behavior: "allow", updatedInput: pending.input, updatedPermissions: sessionScoped });
+      const sessionScoped = pending.suggestions?.map((s) => ({
+        ...s,
+        destination: "session" as const,
+      }));
+      emitEphemeralLog(
+        agentId,
+        "system",
+        "Permission granted (rule added for this session).",
+      );
+      pending.resolve({
+        behavior: "allow",
+        updatedInput: pending.input,
+        updatedPermissions: sessionScoped,
+      });
     } else if (trimmed === "2") {
       emitEphemeralLog(agentId, "system", "Permission granted (once).");
       pending.resolve({ behavior: "allow", updatedInput: pending.input });
@@ -1557,7 +2017,11 @@ export async function sendMessage(agentId: string, text: string, username?: stri
       emitEphemeralLog(agentId, "system", "Permission denied.");
       pending.resolve({ behavior: "deny", message: "User denied." });
     } else {
-      emitEphemeralLog(agentId, "system", "Permission denied with reason forwarded to agent.");
+      emitEphemeralLog(
+        agentId,
+        "system",
+        "Permission denied with reason forwarded to agent.",
+      );
       pending.resolve({ behavior: "deny", message: text });
     }
     return;
@@ -1568,7 +2032,11 @@ export async function sendMessage(agentId: string, text: string, username?: stri
     managed.pendingResume = false;
     const trimmed = text.trim();
     const num = parseInt(trimmed, 10);
-    if (!isNaN(num) && num >= 1 && num <= managed.pendingResumeSessions.length) {
+    if (
+      !isNaN(num) &&
+      num >= 1 &&
+      num <= managed.pendingResumeSessions.length
+    ) {
       const userMeta = username ? { username } : undefined;
       emitEphemeralLog(agentId, "user_message", text, userMeta);
       const picked = managed.pendingResumeSessions[num - 1];
@@ -1595,8 +2063,16 @@ export async function sendMessage(agentId: string, text: string, username?: stri
         // Restore topic
         managed.info.topic = picked.topic;
         managed.info.topicStale = false;
-        emit({ type: "agent_updated", agentId, changes: { topic: picked.topic, topicStale: false } });
-        emitEphemeralLog(agentId, "system", `Resumed session: ${picked.topic || picked.sessionId.slice(0, 8) + "..."}`);
+        emit({
+          type: "agent_updated",
+          agentId,
+          changes: { topic: picked.topic, topicStale: false },
+        });
+        emitEphemeralLog(
+          agentId,
+          "system",
+          `Resumed session: ${picked.topic || picked.sessionId.slice(0, 8) + "..."}`,
+        );
         updateState(agentId, "waiting_for_response");
         persistAll();
         if (!picked.topic) {
@@ -1629,11 +2105,21 @@ export async function sendMessage(agentId: string, text: string, username?: stri
       } else {
         managed.info.modelFamily = picked.family;
         const sessionId = managed.sessionId;
-        const newSession = sessionId ? createSession(managed, sessionId) : createSession(managed);
+        const newSession = sessionId
+          ? createSession(managed, sessionId)
+          : createSession(managed);
         await replaceSession(agentId, managed, newSession);
-        emit({ type: "agent_updated", agentId, changes: { modelFamily: picked.family } });
+        emit({
+          type: "agent_updated",
+          agentId,
+          changes: { modelFamily: picked.family },
+        });
         persistAll();
-        addLogEntry(agentId, "system", `Model switched to ${label}. The agent's context may still say they are a different model — the correct model is shown in the top bar.`);
+        addLogEntry(
+          agentId,
+          "system",
+          `Model switched to ${label}. The agent's context may still say they are a different model — the correct model is shown in the top bar.`,
+        );
       }
       return;
     } else {
@@ -1644,11 +2130,24 @@ export async function sendMessage(agentId: string, text: string, username?: stri
   // Intercept slash commands that are handled locally, not by the LLM
   if (text.startsWith("/")) {
     const [cmd, ...args] = text.slice(1).trim().split(/\s+/);
-    const handled = await handleSlashCommand(agentId, managed, cmd, args, text, username);
+    const handled = await handleSlashCommand(
+      agentId,
+      managed,
+      cmd,
+      args,
+      text,
+      username,
+    );
     if (handled) return;
   }
 
-  addLogEntry(agentId, "user_message", text, username ? { username } : undefined, attachments);
+  addLogEntry(
+    agentId,
+    "user_message",
+    text,
+    username ? { username } : undefined,
+    attachments,
+  );
   updateState(agentId, "thinking");
 
   // Auto-generate topic on first user message in a conversation
@@ -1685,7 +2184,13 @@ function persistCurrentSessionTopic(agentId: string, managed: ManagedAgent) {
 // The handler key in commands.ts must match a key here.
 // ---------------------------------------------------------------------------
 
-type HandlerFn = (agentId: string, managed: ManagedAgent, args: string[], rawText: string, username?: string) => Promise<boolean>;
+type HandlerFn = (
+  agentId: string,
+  managed: ManagedAgent,
+  args: string[],
+  rawText: string,
+  username?: string,
+) => Promise<boolean>;
 
 function formatRelativeTime(timestamp: number): string {
   const now = Date.now();
@@ -1726,12 +2231,20 @@ function renderUsageReport(): string {
   // parenthesised suffixes on each column.
   lines.push(`## Agent usage`);
   lines.push("");
-  lines.push(`| Agent | Room | In (sess) | Out (sess) | $ (sess) | In (life) | Out (life) | $ (life) |`);
+  lines.push(
+    `| Agent | Room | In (sess) | Out (sess) | $ (sess) | In (life) | Out (life) | $ (life) |`,
+  );
   lines.push(`| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |`);
   const rows = [...agents.values()].map((a) => {
     const usage = readAgentUsage(a.info.id, a.sessionId);
     const roomName = rooms[a.info.room]?.name ?? "?";
-    return { id: a.info.id, name: a.info.name, room: roomName, sess: usage.session, life: usage.lifetime };
+    return {
+      id: a.info.id,
+      name: a.info.name,
+      room: roomName,
+      sess: usage.session,
+      life: usage.lifetime,
+    };
   });
   rows.sort((a, b) => b.life.costUSD - a.life.costUSD);
   for (const r of rows) {
@@ -1748,9 +2261,19 @@ function renderUsageReport(): string {
   // names so renames are reflected immediately.
   const liveAgentIds = new Set([...agents.values()].map((a) => a.info.id));
   const history = loadAgentHistory();
-  type RoomBucket = { id: string; name: string; deleted: boolean; sess: UsageBucket; life: UsageBucket };
+  type RoomBucket = {
+    id: string;
+    name: string;
+    deleted: boolean;
+    sess: UsageBucket;
+    life: UsageBucket;
+  };
   const roomBuckets = new Map<string, RoomBucket>();
-  const getBucket = (id: string, name: string, deleted: boolean): RoomBucket => {
+  const getBucket = (
+    id: string,
+    name: string,
+    deleted: boolean,
+  ): RoomBucket => {
     let b = roomBuckets.get(id);
     if (!b) {
       b = { id, name, deleted, sess: emptyBucket(), life: emptyBucket() };
@@ -1789,14 +2312,20 @@ function renderUsageReport(): string {
     addBucket(total.life, b.life);
   }
 
-  const sortedBuckets = [...roomBuckets.values()].sort((a, b) => b.life.costUSD - a.life.costUSD);
+  const sortedBuckets = [...roomBuckets.values()].sort(
+    (a, b) => b.life.costUSD - a.life.costUSD,
+  );
 
   lines.push("");
   lines.push(`## Per-room usage`);
   lines.push("");
-  lines.push(`_Agents contribute to the room they were last in (killed agents included)._`);
+  lines.push(
+    `_Agents contribute to the room they were last in (killed agents included)._`,
+  );
   lines.push("");
-  lines.push(`| Room | In (sess) | Out (sess) | $ (sess) | In (life) | Out (life) | $ (life) |`);
+  lines.push(
+    `| Room | In (sess) | Out (sess) | $ (sess) | In (life) | Out (life) | $ (life) |`,
+  );
   lines.push(`| --- | ---: | ---: | ---: | ---: | ---: | ---: |`);
   for (const r of sortedBuckets) {
     const label = r.deleted ? `${r.name} _(deleted)_` : r.name;
@@ -1824,10 +2353,22 @@ function addBucket(dst: UsageBucket, src: UsageBucket) {
 // message — so "cached as a % of totalIn" is always ~100% and meaningless.
 // The useful signal is hit-rate over *cacheable* input: cacheRead / (cacheRead
 // + cacheCreation), which drops when the cache expires and gets rewritten.
-interface UsageBucket { totalIn: number; cacheRead: number; cacheCreation: number; totalOut: number; costUSD: number; }
+interface UsageBucket {
+  totalIn: number;
+  cacheRead: number;
+  cacheCreation: number;
+  totalOut: number;
+  costUSD: number;
+}
 
 function emptyBucket(): UsageBucket {
-  return { totalIn: 0, cacheRead: 0, cacheCreation: 0, totalOut: 0, costUSD: 0 };
+  return {
+    totalIn: 0,
+    cacheRead: 0,
+    cacheCreation: 0,
+    totalOut: 0,
+    costUSD: 0,
+  };
 }
 
 // Read an agent's per-session usage off disk and aggregate into:
@@ -1836,7 +2377,10 @@ function emptyBucket(): UsageBucket {
 // `forkBaseUsage` is captured at fork creation by walking the parent's log to
 // find the cumulative usage at the exact fork point, so each fork contributes
 // only its own new work — no double-counting of the shared parent prefix.
-function readAgentUsage(agentId: string, currentSessionId: string | null): { session: UsageBucket; lifetime: UsageBucket } {
+function readAgentUsage(
+  agentId: string,
+  currentSessionId: string | null,
+): { session: UsageBucket; lifetime: UsageBucket } {
   const map = loadSessionsMap(agentId);
   const lifetime = emptyBucket();
   for (const entry of Object.values(map)) {
@@ -1847,13 +2391,22 @@ function readAgentUsage(agentId: string, currentSessionId: string | null): { ses
     // Session total = current-run + all prior completed runs (if any).
     const inputTokens = (u?.inputTokens ?? 0) + (p?.inputTokens ?? 0);
     const outputTokens = (u?.outputTokens ?? 0) + (p?.outputTokens ?? 0);
-    const cacheReadInputTokens = (u?.cacheReadInputTokens ?? 0) + (p?.cacheReadInputTokens ?? 0);
-    const cacheCreationInputTokens = (u?.cacheCreationInputTokens ?? 0) + (p?.cacheCreationInputTokens ?? 0);
+    const cacheReadInputTokens =
+      (u?.cacheReadInputTokens ?? 0) + (p?.cacheReadInputTokens ?? 0);
+    const cacheCreationInputTokens =
+      (u?.cacheCreationInputTokens ?? 0) + (p?.cacheCreationInputTokens ?? 0);
     const costUSD = (u?.costUSD ?? 0) + (p?.costUSD ?? 0);
-    lifetime.totalIn += inputTokens + cacheReadInputTokens + cacheCreationInputTokens
-      - ((base?.inputTokens ?? 0) + (base?.cacheReadInputTokens ?? 0) + (base?.cacheCreationInputTokens ?? 0));
-    lifetime.cacheRead += cacheReadInputTokens - (base?.cacheReadInputTokens ?? 0);
-    lifetime.cacheCreation += cacheCreationInputTokens - (base?.cacheCreationInputTokens ?? 0);
+    lifetime.totalIn +=
+      inputTokens +
+      cacheReadInputTokens +
+      cacheCreationInputTokens -
+      ((base?.inputTokens ?? 0) +
+        (base?.cacheReadInputTokens ?? 0) +
+        (base?.cacheCreationInputTokens ?? 0));
+    lifetime.cacheRead +=
+      cacheReadInputTokens - (base?.cacheReadInputTokens ?? 0);
+    lifetime.cacheCreation +=
+      cacheCreationInputTokens - (base?.cacheCreationInputTokens ?? 0);
     lifetime.totalOut += outputTokens - (base?.outputTokens ?? 0);
     lifetime.costUSD += costUSD - (base?.costUSD ?? 0);
   }
@@ -1862,11 +2415,17 @@ function readAgentUsage(agentId: string, currentSessionId: string | null): { ses
   if (sessEntry && (sessEntry.usage || sessEntry.priorRunsUsage)) {
     const u = sessEntry.usage;
     const p = sessEntry.priorRunsUsage;
-    session.totalIn = (u?.inputTokens ?? 0) + (p?.inputTokens ?? 0)
-      + (u?.cacheReadInputTokens ?? 0) + (p?.cacheReadInputTokens ?? 0)
-      + (u?.cacheCreationInputTokens ?? 0) + (p?.cacheCreationInputTokens ?? 0);
-    session.cacheRead = (u?.cacheReadInputTokens ?? 0) + (p?.cacheReadInputTokens ?? 0);
-    session.cacheCreation = (u?.cacheCreationInputTokens ?? 0) + (p?.cacheCreationInputTokens ?? 0);
+    session.totalIn =
+      (u?.inputTokens ?? 0) +
+      (p?.inputTokens ?? 0) +
+      (u?.cacheReadInputTokens ?? 0) +
+      (p?.cacheReadInputTokens ?? 0) +
+      (u?.cacheCreationInputTokens ?? 0) +
+      (p?.cacheCreationInputTokens ?? 0);
+    session.cacheRead =
+      (u?.cacheReadInputTokens ?? 0) + (p?.cacheReadInputTokens ?? 0);
+    session.cacheCreation =
+      (u?.cacheCreationInputTokens ?? 0) + (p?.cacheCreationInputTokens ?? 0);
     session.totalOut = (u?.outputTokens ?? 0) + (p?.outputTokens ?? 0);
     session.costUSD = (u?.costUSD ?? 0) + (p?.costUSD ?? 0);
   }
@@ -1880,7 +2439,11 @@ function readAgentUsage(agentId: string, currentSessionId: string | null): { ses
 // cumulative `usage` — best-effort, slightly over-subtracts if the parent
 // continued past the fork, but bounded and avoids a full prefix double-count
 // in lifetime totals.
-function findUsageAtFork(agentId: string, parentSessionId: string, forkMessageId: string): PersistedUsage | undefined {
+function findUsageAtFork(
+  agentId: string,
+  parentSessionId: string,
+  forkMessageId: string,
+): PersistedUsage | undefined {
   const entries = loadLog(agentId, parentSessionId);
   const positions = new Map<string, number>();
   entries.forEach((e, i) => positions.set(e.id, i));
@@ -1909,8 +2472,10 @@ function findUsageAtFork(agentId: string, parentSessionId: string, forkMessageId
   return {
     inputTokens: (u?.inputTokens ?? 0) + (p?.inputTokens ?? 0),
     outputTokens: (u?.outputTokens ?? 0) + (p?.outputTokens ?? 0),
-    cacheReadInputTokens: (u?.cacheReadInputTokens ?? 0) + (p?.cacheReadInputTokens ?? 0),
-    cacheCreationInputTokens: (u?.cacheCreationInputTokens ?? 0) + (p?.cacheCreationInputTokens ?? 0),
+    cacheReadInputTokens:
+      (u?.cacheReadInputTokens ?? 0) + (p?.cacheReadInputTokens ?? 0),
+    cacheCreationInputTokens:
+      (u?.cacheCreationInputTokens ?? 0) + (p?.cacheCreationInputTokens ?? 0),
     costUSD: (u?.costUSD ?? 0) + (p?.costUSD ?? 0),
   };
 }
@@ -1951,7 +2516,11 @@ const commandHandlers: Record<string, HandlerFn> = {
     managed.info.topicStale = false;
     logCache.set(agentId, []);
     emit({ type: "clear_logs", agentId } as any);
-    emit({ type: "agent_updated", agentId, changes: { topic: null, topicStale: false } });
+    emit({
+      type: "agent_updated",
+      agentId,
+      changes: { topic: null, topicStale: false },
+    });
     emitEphemeralLog(agentId, "system", "Conversation cleared.");
     updateState(agentId, "idle");
     persistAll();
@@ -1968,7 +2537,11 @@ const commandHandlers: Record<string, HandlerFn> = {
     try {
       const query = (managed.session as any).query;
       if (!query?.getContextUsage) {
-        emitEphemeralLog(agentId, "system", "Context usage not available for this session.");
+        emitEphemeralLog(
+          agentId,
+          "system",
+          "Context usage not available for this session.",
+        );
         return true;
       }
       const ctx = await query.getContextUsage();
@@ -1976,9 +2549,11 @@ const commandHandlers: Record<string, HandlerFn> = {
 
       const pct = Math.round(ctx.percentage);
       const barLen = 30;
-      const filled = Math.round(barLen * ctx.percentage / 100);
+      const filled = Math.round((barLen * ctx.percentage) / 100);
       const bar = "\u2588".repeat(filled) + "\u2591".repeat(barLen - filled);
-      lines.push(`**${ctx.model}** \u2014 ${ctx.totalTokens.toLocaleString()} / ${ctx.maxTokens.toLocaleString()} tokens (${pct}%)`);
+      lines.push(
+        `**${ctx.model}** \u2014 ${ctx.totalTokens.toLocaleString()} / ${ctx.maxTokens.toLocaleString()} tokens (${pct}%)`,
+      );
       lines.push(`\`${bar}\``);
 
       if (ctx.categories?.length > 0) {
@@ -1986,7 +2561,9 @@ const commandHandlers: Record<string, HandlerFn> = {
         for (const cat of ctx.categories) {
           if (cat.tokens > 0) {
             const catPct = ((cat.tokens / ctx.maxTokens) * 100).toFixed(1);
-            lines.push(`  ${cat.name}: ${cat.tokens.toLocaleString()} tokens (${catPct}%)`);
+            lines.push(
+              `  ${cat.name}: ${cat.tokens.toLocaleString()} tokens (${catPct}%)`,
+            );
           }
         }
       }
@@ -2006,13 +2583,21 @@ const commandHandlers: Record<string, HandlerFn> = {
       }
 
       if (ctx.isAutoCompactEnabled && ctx.autoCompactThreshold) {
-        const compactPct = Math.round((ctx.autoCompactThreshold / ctx.maxTokens) * 100);
-        lines.push(`\nAuto-compact at ${compactPct}% (${ctx.autoCompactThreshold.toLocaleString()} tokens)`);
+        const compactPct = Math.round(
+          (ctx.autoCompactThreshold / ctx.maxTokens) * 100,
+        );
+        lines.push(
+          `\nAuto-compact at ${compactPct}% (${ctx.autoCompactThreshold.toLocaleString()} tokens)`,
+        );
       }
 
       emitEphemeralLog(agentId, "system", lines.join("\n"));
     } catch (err: any) {
-      emitEphemeralLog(agentId, "system", `Failed to get context usage: ${err.message}`);
+      emitEphemeralLog(
+        agentId,
+        "system",
+        `Failed to get context usage: ${err.message}`,
+      );
     }
     return true;
   },
@@ -2024,18 +2609,30 @@ const commandHandlers: Record<string, HandlerFn> = {
     const lines: string[] = [];
 
     // Agent metadata
-    const topicLine = managed.info.topic ? `  Topic: ${managed.info.topic}` : "";
-    lines.push(`**${managed.info.name}** — Room ${managed.info.room + 1}, Desk ${managed.info.desk + 1}`);
+    const topicLine = managed.info.topic
+      ? `  Topic: ${managed.info.topic}`
+      : "";
+    lines.push(
+      `**${managed.info.name}** — Room ${managed.info.room + 1}, Desk ${managed.info.desk + 1}`,
+    );
     lines.push(`  cwd: \`${managed.info.cwd}\``);
     if (topicLine) lines.push(topicLine);
     lines.push("");
 
     // Isomux description
-    lines.push("Isomux is a multi-agent office manager for Claude Code. Learn more at https://isomux.com");
+    lines.push(
+      "Isomux is a multi-agent office manager for Claude Code. Learn more at https://isomux.com",
+    );
     lines.push("");
 
     // Commands
-    const cmdList = managed.slashCommands.map((c) => c.description ? `  \`/${c.name}\`  — ${c.description}` : `  \`/${c.name}\``).join("\n");
+    const cmdList = managed.slashCommands
+      .map((c) =>
+        c.description
+          ? `  \`/${c.name}\`  — ${c.description}`
+          : `  \`/${c.name}\``,
+      )
+      .join("\n");
     lines.push(`**Commands:**\n${cmdList}`);
 
     // Skills grouped by origin
@@ -2046,7 +2643,13 @@ const commandHandlers: Record<string, HandlerFn> = {
       isomux: "Isomux skills",
       claude: "Claude skills",
     };
-    const originOrder: SkillOrigin[] = ["isomux", "user", "project", "plugin", "claude"];
+    const originOrder: SkillOrigin[] = [
+      "isomux",
+      "user",
+      "project",
+      "plugin",
+      "claude",
+    ];
     const grouped = new Map<SkillOrigin, SkillInfo[]>();
     for (const s of managed.skills) {
       if (!grouped.has(s.origin)) grouped.set(s.origin, []);
@@ -2055,23 +2658,39 @@ const commandHandlers: Record<string, HandlerFn> = {
     for (const origin of originOrder) {
       const skills = grouped.get(origin);
       if (!skills || skills.length === 0) continue;
-      const skillLines = skills.map((s) => {
-        const desc = s.description ? ` — ${s.description}` : "";
-        return `  \`/${s.name}\`${desc}`;
-      }).join("\n");
+      const skillLines = skills
+        .map((s) => {
+          const desc = s.description ? ` — ${s.description}` : "";
+          return `  \`/${s.name}\`${desc}`;
+        })
+        .join("\n");
       lines.push(`\n**${originLabel[origin]}:**\n${skillLines}`);
     }
 
     // Tips
     lines.push("\n**Tips:**");
-    lines.push("  \u2022 Isomux also works on your phone. The easiest way is to connect it to the same tailscale network as the machine running it (it's free).");
-    lines.push("  \u2022 The built-in side-panel terminal is useful for one-off situations where you need to run something manually, like auth flows.");
-    lines.push("  \u2022 Isomux comes with safety pre-tool-call hooks to prevent destructive commands, like `rm -rf /`.");
-    lines.push("  \u2022 Isomux agents can check what other agents are up to in real time. Just ask naturally.");
-    lines.push("  \u2022 Use voice-to-text for faster prompting. The shortcut is ctrl+space.");
-    lines.push("  \u2022 Use `/isomux-all-hands` to check what every agent is up to.");
+    lines.push(
+      "  \u2022 Isomux also works on your phone. The easiest way is to connect it to the same tailscale network as the machine running it (it's free).",
+    );
+    lines.push(
+      "  \u2022 The built-in side-panel terminal is useful for one-off situations where you need to run something manually, like auth flows.",
+    );
+    lines.push(
+      "  \u2022 Isomux comes with safety pre-tool-call hooks to prevent destructive commands, like `rm -rf /`.",
+    );
+    lines.push(
+      "  \u2022 Isomux agents can check what other agents are up to in real time. Just ask naturally.",
+    );
+    lines.push(
+      "  \u2022 Use voice-to-text for faster prompting. The shortcut is ctrl+space.",
+    );
+    lines.push(
+      "  \u2022 Use `/isomux-all-hands` to check what every agent is up to.",
+    );
     lines.push("  \u2022 Use `/report-isomux-bug` if you find any issues.");
-    lines.push("  \u2022 Use `/isomux-grill-me` to make your feature designs more robust.");
+    lines.push(
+      "  \u2022 Use `/isomux-grill-me` to make your feature designs more robust.",
+    );
 
     addLogEntry(agentId, "system", lines.join("\n"));
     updateState(agentId, "waiting_for_response");
@@ -2092,7 +2711,12 @@ const commandHandlers: Record<string, HandlerFn> = {
     const pickable: typeof sessions = [];
     for (const s of sessions.slice(0, 20)) {
       const date = new Date(s.lastModified);
-      const dateStr = date.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+      const dateStr = date.toLocaleString([], {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
       const rawLabel = s.topic || s.sessionId.slice(0, 8) + "...";
       const label = s.forked ? `↳ ${rawLabel}` : rawLabel;
       const suffix = s.branched ? "  (branched)" : "";
@@ -2151,14 +2775,18 @@ const commandHandlers: Record<string, HandlerFn> = {
     const sortedRooms = [...roomMap.keys()].sort((a, b) => a - b);
 
     for (const room of sortedRooms) {
-      const roomAgents = roomMap.get(room)!.sort((a, b) => a.info.desk - b.info.desk);
+      const roomAgents = roomMap
+        .get(room)!
+        .sort((a, b) => a.info.desk - b.info.desk);
       lines.push(`**=== Room ${room + 1} ===**`);
       lines.push("");
 
       for (const a of roomAgents) {
         const selfTag = a.info.id === agentId ? "  **(me)**" : "";
         const modelLabel = familyDisplayLabel(a.info.modelFamily);
-        lines.push(`**${a.info.name}** (desk ${a.info.desk + 1})${selfTag} — ${modelLabel} — \`${a.info.cwd}\``);
+        lines.push(
+          `**${a.info.name}** (desk ${a.info.desk + 1})${selfTag} — ${modelLabel} — \`${a.info.cwd}\``,
+        );
 
         const sessions = listAgentSessions(a.info.id);
         if (sessions.length === 0) {
@@ -2176,7 +2804,9 @@ const commandHandlers: Record<string, HandlerFn> = {
       }
     }
 
-    lines.push("Ask your agent if you'd like to know more about any agent or conversation.");
+    lines.push(
+      "Ask your agent if you'd like to know more about any agent or conversation.",
+    );
 
     addLogEntry(agentId, "system", lines.join("\n"));
     updateState(agentId, "waiting_for_response");
@@ -2196,10 +2826,18 @@ const commandHandlers: Record<string, HandlerFn> = {
     );
     // Pick a fence longer than any backtick run inside the prompt so the block
     // renders verbatim regardless of what office/room/agent prompts contain.
-    const longestRun = (prompt.match(/`+/g) ?? []).reduce((m, s) => Math.max(m, s.length), 0);
+    const longestRun = (prompt.match(/`+/g) ?? []).reduce(
+      (m, s) => Math.max(m, s.length),
+      0,
+    );
     const fence = "`".repeat(Math.max(3, longestRun + 1));
-    const header = "**Full system prompt** *(reflects current settings; takes effect on next conversation)*";
-    emitEphemeralLog(agentId, "system", `${header}\n\n${fence}plaintext\n${prompt}\n${fence}`);
+    const header =
+      "**Full system prompt** *(reflects current settings; takes effect on next conversation)*";
+    emitEphemeralLog(
+      agentId,
+      "system",
+      `${header}\n\n${fence}plaintext\n${prompt}\n${fence}`,
+    );
     updateState(agentId, "waiting_for_response");
     return true;
   },
@@ -2210,12 +2848,21 @@ const commandHandlers: Record<string, HandlerFn> = {
     const cwd = managed.info.cwd;
 
     const runGit = (args: string, maxBuffer = 10 * 1024 * 1024) =>
-      execSync(`git ${args}`, { cwd, timeout: 10000, maxBuffer, stdio: ["ignore", "pipe", "pipe"] }).toString();
+      execSync(`git ${args}`, {
+        cwd,
+        timeout: 10000,
+        maxBuffer,
+        stdio: ["ignore", "pipe", "pipe"],
+      }).toString();
 
     try {
       runGit("rev-parse --is-inside-work-tree", 1024);
     } catch {
-      emitEphemeralLog(agentId, "system", `\`${cwd}\` is not a git repository.`);
+      emitEphemeralLog(
+        agentId,
+        "system",
+        `\`${cwd}\` is not a git repository.`,
+      );
       updateState(agentId, "waiting_for_response");
       return true;
     }
@@ -2232,11 +2879,17 @@ const commandHandlers: Record<string, HandlerFn> = {
         stat = runGit("diff --stat").trim();
         diff = runGit("diff", 50 * 1024 * 1024);
       }
-      const untrackedOut = runGit("ls-files --others --exclude-standard").trim();
+      const untrackedOut = runGit(
+        "ls-files --others --exclude-standard",
+      ).trim();
       if (untrackedOut) untracked = untrackedOut.split("\n");
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      emitEphemeralLog(agentId, "system", `Failed to run git diff in \`${cwd}\`:\n\n\`\`\`\n${msg}\n\`\`\``);
+      emitEphemeralLog(
+        agentId,
+        "system",
+        `Failed to run git diff in \`${cwd}\`:\n\n\`\`\`\n${msg}\n\`\`\``,
+      );
       updateState(agentId, "waiting_for_response");
       return true;
     }
@@ -2261,13 +2914,19 @@ const commandHandlers: Record<string, HandlerFn> = {
           body = body.slice(0, MAX);
           truncated = true;
         }
-        const longestRun = (body.match(/`+/g) ?? []).reduce((m, s) => Math.max(m, s.length), 0);
+        const longestRun = (body.match(/`+/g) ?? []).reduce(
+          (m, s) => Math.max(m, s.length),
+          0,
+        );
         const fence = "`".repeat(Math.max(3, longestRun + 1));
         parts.push("");
         parts.push(`${fence}diff`);
         parts.push(body);
         parts.push(fence);
-        if (truncated) parts.push(`\n*Diff truncated at ${MAX.toLocaleString()} bytes — run \`git diff HEAD\` for the full patch.*`);
+        if (truncated)
+          parts.push(
+            `\n*Diff truncated at ${MAX.toLocaleString()} bytes — run \`git diff HEAD\` for the full patch.*`,
+          );
       }
       if (untracked.length > 0) {
         parts.push("");
@@ -2293,7 +2952,9 @@ const commandHandlers: Record<string, HandlerFn> = {
 // Startup assertion: every supported command with a handler key must have a matching handler
 for (const [name, cfg] of Object.entries(commands)) {
   if (cfg.supported && cfg.handler && !commandHandlers[cfg.handler]) {
-    throw new Error(`Command /${name} is marked supported with handler "${cfg.handler}" but no handler exists`);
+    throw new Error(
+      `Command /${name} is marked supported with handler "${cfg.handler}" but no handler exists`,
+    );
   }
 }
 
@@ -2301,14 +2962,27 @@ for (const [name, cfg] of Object.entries(commands)) {
 // Slash command resolution — 5-step priority order (see docs/slash-command-design.md)
 // ---------------------------------------------------------------------------
 
-async function handleSlashCommand(agentId: string, managed: ManagedAgent, cmd: string, args: string[], rawText: string, username?: string): Promise<boolean> {
+async function handleSlashCommand(
+  agentId: string,
+  managed: ManagedAgent,
+  cmd: string,
+  args: string[],
+  rawText: string,
+  username?: string,
+): Promise<boolean> {
   const userMeta = username ? { username } : undefined;
   const cfg: CommandConfig | undefined = commands[cmd];
 
   // Step 1: Config lookup (non-overridable)
   if (cfg && !cfg.overridable) {
     if (cfg.supported && cfg.handler && commandHandlers[cfg.handler]) {
-      return commandHandlers[cfg.handler](agentId, managed, args, rawText, username);
+      return commandHandlers[cfg.handler](
+        agentId,
+        managed,
+        args,
+        rawText,
+        username,
+      );
     }
     // Unsupported non-overridable command — show message
     emitEphemeralLog(agentId, "user_message", rawText, userMeta);
@@ -2325,7 +2999,13 @@ async function handleSlashCommand(agentId: string, managed: ManagedAgent, cmd: s
   // Step 3: Config lookup (overridable, no skill found)
   if (cfg && cfg.overridable) {
     if (cfg.supported && cfg.handler && commandHandlers[cfg.handler]) {
-      return commandHandlers[cfg.handler](agentId, managed, args, rawText, username);
+      return commandHandlers[cfg.handler](
+        agentId,
+        managed,
+        args,
+        rawText,
+        username,
+      );
     }
     // Unsupported overridable command with no skill override
     emitEphemeralLog(agentId, "user_message", rawText, userMeta);
@@ -2340,12 +3020,23 @@ async function handleSlashCommand(agentId: string, managed: ManagedAgent, cmd: s
 
   // Step 5: Unknown command
   emitEphemeralLog(agentId, "user_message", rawText, userMeta);
-  emitEphemeralLog(agentId, "system", `Unknown command \`/${cmd}\`. Type \`/help\` to see available commands.`);
+  emitEphemeralLog(
+    agentId,
+    "system",
+    `Unknown command \`/${cmd}\`. Type \`/help\` to see available commands.`,
+  );
   return true;
 }
 
 // Execute a resolved skill prompt by sending it to the agent
-async function executeSkill(agentId: string, managed: ManagedAgent, skillPrompt: string, args: string[], rawText: string, username?: string): Promise<boolean> {
+async function executeSkill(
+  agentId: string,
+  managed: ManagedAgent,
+  skillPrompt: string,
+  args: string[],
+  rawText: string,
+  username?: string,
+): Promise<boolean> {
   const userMeta = username ? { username } : undefined;
   const userArgs = args.join(" ");
   const fullPrompt = userArgs
@@ -2353,7 +3044,9 @@ async function executeSkill(agentId: string, managed: ManagedAgent, skillPrompt:
     : skillPrompt;
   addLogEntry(agentId, "user_message", rawText, userMeta);
   updateState(agentId, "thinking");
-  const prefixedSkillPrompt = username ? `[${username}] ${fullPrompt}` : fullPrompt;
+  const prefixedSkillPrompt = username
+    ? `[${username}] ${fullPrompt}`
+    : fullPrompt;
   try {
     const turn = createTurnDeferred(managed);
     await managed.session!.send(prefixedSkillPrompt);
@@ -2379,23 +3072,37 @@ function readSkillFile(path: string): string | null {
 }
 
 // Resolve a plugin-namespaced skill (e.g., "codex:rescue") to its prompt text
-function resolvePluginSkillPrompt(pluginName: string, skillName: string): string | null {
-  const manifestPath = join(homedir(), ".claude", "plugins", "installed_plugins.json");
+function resolvePluginSkillPrompt(
+  pluginName: string,
+  skillName: string,
+): string | null {
+  const manifestPath = join(
+    homedir(),
+    ".claude",
+    "plugins",
+    "installed_plugins.json",
+  );
   if (!existsSync(manifestPath)) return null;
   let manifest: any;
   try {
     manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 
-  const pluginKey = Object.keys(manifest.plugins ?? {}).find(k => k.split("@")[0] === pluginName);
+  const pluginKey = Object.keys(manifest.plugins ?? {}).find(
+    (k) => k.split("@")[0] === pluginName,
+  );
   if (!pluginKey) return null;
   const entries = manifest.plugins[pluginKey];
   if (!Array.isArray(entries) || entries.length === 0) return null;
   const installPath = entries[0].installPath;
   if (!installPath) return null;
 
-  return readSkillFile(join(installPath, "skills", skillName, "SKILL.md"))
-    ?? readSkillFile(join(installPath, "commands", `${skillName}.md`));
+  return (
+    readSkillFile(join(installPath, "skills", skillName, "SKILL.md")) ??
+    readSkillFile(join(installPath, "commands", `${skillName}.md`))
+  );
 }
 
 // Resolve a skill name to its prompt text, checking skill dirs in priority order:
@@ -2431,9 +3138,16 @@ export async function abort(agentId: string) {
   // exited) while the UI still shows "thinking". Reset state so Stop is
   // never a no-op.
   if (!managed.pendingTurn) {
-    if (managed.info.state === "thinking" || managed.info.state === "tool_executing") {
+    if (
+      managed.info.state === "thinking" ||
+      managed.info.state === "tool_executing"
+    ) {
       updateState(agentId, "waiting_for_response");
-      addLogEntry(agentId, "system", "Agent interrupted (stream was already dead — state reset).");
+      addLogEntry(
+        agentId,
+        "system",
+        "Agent interrupted (stream was already dead — state reset).",
+      );
     }
     return;
   }
@@ -2441,12 +3155,18 @@ export async function abort(agentId: string) {
   const sessionId = managed.sessionId;
 
   try {
-    const newSession = sessionId ? createSession(managed, sessionId) : createSession(managed);
+    const newSession = sessionId
+      ? createSession(managed, sessionId)
+      : createSession(managed);
     await replaceSession(agentId, managed, newSession);
     updateState(agentId, "waiting_for_response");
     addLogEntry(agentId, "system", "Agent interrupted.");
   } catch (err: any) {
-    addLogEntry(agentId, "error", `Failed to resume after interrupt: ${err.message}`);
+    addLogEntry(
+      agentId,
+      "error",
+      `Failed to resume after interrupt: ${err.message}`,
+    );
     updateState(agentId, "error");
   } finally {
     managed.aborting = false;
@@ -2457,20 +3177,38 @@ export async function kill(agentId: string) {
   const managed = agents.get(agentId);
   if (!managed) return;
   if (managed.pendingPermission) {
-    try { managed.pendingPermission.resolve({ behavior: "deny", message: "Agent killed." }); } catch {}
+    try {
+      managed.pendingPermission.resolve({
+        behavior: "deny",
+        message: "Agent killed.",
+      });
+    } catch {}
     managed.pendingPermission = null;
   }
   const turn = managed.pendingTurn;
   managed.pendingTurn = null;
-  if (turn) { try { turn.reject(new Error("Agent killed.")); } catch {} }
+  if (turn) {
+    try {
+      turn.reject(new Error("Agent killed."));
+    } catch {}
+  }
   const oldConsumer = managed.consumerPromise;
-  try { managed.session?.close(); } catch {}
+  try {
+    managed.session?.close();
+  } catch {}
   managed.session = null;
   // Remove from the map so the consumer's outer `agents.has(agentId)` guard exits.
   agents.delete(agentId);
   logCache.delete(agentId);
-  if (oldConsumer) { try { await oldConsumer; } catch {} }
-  try { sidecarSend(managed, { type: "kill" }); managed.ptySidecar?.kill(); } catch {}
+  if (oldConsumer) {
+    try {
+      await oldConsumer;
+    } catch {}
+  }
+  try {
+    sidecarSend(managed, { type: "kill" });
+    managed.ptySidecar?.kill();
+  } catch {}
   emit({ type: "agent_removed", agentId });
   persistAll();
 }
@@ -2491,12 +3229,20 @@ export async function newConversation(agentId: string) {
     managed.topicMessageCount = 0;
     managed.info.topic = null;
     managed.info.topicStale = false;
-    emit({ type: "agent_updated", agentId, changes: { topic: null, topicStale: false } });
+    emit({
+      type: "agent_updated",
+      agentId,
+      changes: { topic: null, topicStale: false },
+    });
     updateState(agentId, "idle");
     addLogEntry(agentId, "system", "New conversation started.");
     persistAll();
   } catch (err: any) {
-    addLogEntry(agentId, "error", `Failed to start new conversation: ${err.message}`);
+    addLogEntry(
+      agentId,
+      "error",
+      `Failed to start new conversation: ${err.message}`,
+    );
     updateState(agentId, "error");
   }
 }
@@ -2529,13 +3275,21 @@ export async function resume(agentId: string, sessionId: string) {
 
     // Restore topic from sessions.json
     const sessions = listAgentSessions(agentId);
-    const sessionEntry = sessions.find(s => s.sessionId === sessionId);
+    const sessionEntry = sessions.find((s) => s.sessionId === sessionId);
     managed.info.topic = sessionEntry?.topic ?? null;
     managed.info.topicStale = false;
-    emit({ type: "agent_updated", agentId, changes: { topic: managed.info.topic, topicStale: false } });
+    emit({
+      type: "agent_updated",
+      agentId,
+      changes: { topic: managed.info.topic, topicStale: false },
+    });
 
     updateState(agentId, "waiting_for_response");
-    addLogEntry(agentId, "system", `Resumed session: ${managed.info.topic || sessionId.slice(0, 8) + "..."}`);
+    addLogEntry(
+      agentId,
+      "system",
+      `Resumed session: ${managed.info.topic || sessionId.slice(0, 8) + "..."}`,
+    );
     persistAll();
 
     // If no topic, regenerate from session logs
@@ -2548,7 +3302,12 @@ export async function resume(agentId: string, sessionId: string) {
   }
 }
 
-export async function editMessage(agentId: string, logEntryId: string, newText: string, username?: string) {
+export async function editMessage(
+  agentId: string,
+  logEntryId: string,
+  newText: string,
+  username?: string,
+) {
   const managed = agents.get(agentId);
   if (!managed) return;
   if (!managed.sessionId) {
@@ -2570,7 +3329,7 @@ export async function editMessage(agentId: string, logEntryId: string, newText: 
     // --- Phase 1: Fallible SDK operations (no UI/cache mutations yet) ---
 
     // 1. Find the target LogEntry in the current log cache
-    const targetEntry = oldLogCache.find(e => e.id === logEntryId);
+    const targetEntry = oldLogCache.find((e) => e.id === logEntryId);
     if (!targetEntry || targetEntry.kind !== "user_message") {
       addLogEntry(agentId, "error", "Cannot edit: message not found.");
       return;
@@ -2579,10 +3338,12 @@ export async function editMessage(agentId: string, logEntryId: string, newText: 
     // 2. Get SDK session messages and match by content + occurrence index
     const sdkMessages = await getSessionMessages(oldSessionId);
     const targetUsername = targetEntry.metadata?.username as string | undefined;
-    const prefixedContent = targetUsername ? `[${targetUsername}] ${targetEntry.content}` : targetEntry.content;
+    const prefixedContent = targetUsername
+      ? `[${targetUsername}] ${targetEntry.content}`
+      : targetEntry.content;
 
     // Count which occurrence of this exact content this is among user_message log entries
-    const userLogEntries = oldLogCache.filter(e => e.kind === "user_message");
+    const userLogEntries = oldLogCache.filter((e) => e.kind === "user_message");
     let occurrenceIndex = 0;
     for (const e of userLogEntries) {
       const u = e.metadata?.username as string | undefined;
@@ -2603,10 +3364,13 @@ export async function editMessage(agentId: string, logEntryId: string, newText: 
       if (m.type !== "user") continue;
       // SDK message format: { role: "user", content: [{ type: "text", text: "..." }, ...] }
       const msg = m.message as any;
-      const contentBlocks = Array.isArray(msg?.content) ? msg.content
-        : Array.isArray(msg) ? msg
-        : typeof msg === "string" ? [{ type: "text", text: msg }]
-        : [];
+      const contentBlocks = Array.isArray(msg?.content)
+        ? msg.content
+        : Array.isArray(msg)
+          ? msg
+          : typeof msg === "string"
+            ? [{ type: "text", text: msg }]
+            : [];
       const msgContent = contentBlocks
         .filter((b: any) => b.type === "text")
         .map((b: any) => b.text)
@@ -2621,7 +3385,11 @@ export async function editMessage(agentId: string, logEntryId: string, newText: 
     }
 
     if (targetIdx === -1) {
-      addLogEntry(agentId, "error", "Cannot edit: could not locate message in SDK session.");
+      addLogEntry(
+        agentId,
+        "error",
+        "Cannot edit: could not locate message in SDK session.",
+      );
       return;
     }
 
@@ -2637,7 +3405,9 @@ export async function editMessage(agentId: string, logEntryId: string, newText: 
       newSessionId = ""; // placeholder, set after createSession
     } else {
       const predecessorUuid = sdkMessages[targetIdx - 1].uuid;
-      const forkResult = await forkSession(oldSessionId, { upToMessageId: predecessorUuid });
+      const forkResult = await forkSession(oldSessionId, {
+        upToMessageId: predecessorUuid,
+      });
       newSessionId = forkResult.sessionId;
     }
 
@@ -2649,14 +3419,14 @@ export async function editMessage(agentId: string, logEntryId: string, newText: 
       // loadLogWithAncestors cuts at the right level.
       let forkFromSessionId = oldSessionId;
       const ownEntries = loadLog(agentId, oldSessionId);
-      if (!ownEntries.some(e => e.id === logEntryId)) {
+      if (!ownEntries.some((e) => e.id === logEntryId)) {
         const sessMap = loadSessionsMap(agentId);
         let walk: string | undefined = sessMap[oldSessionId]?.forkedFrom;
         const visited = new Set<string>([oldSessionId]);
         while (walk && !visited.has(walk)) {
           visited.add(walk);
           const ancestorEntries = loadLog(agentId, walk);
-          if (ancestorEntries.some(e => e.id === logEntryId)) {
+          if (ancestorEntries.some((e) => e.id === logEntryId)) {
             forkFromSessionId = walk;
             break;
           }
@@ -2668,12 +3438,25 @@ export async function editMessage(agentId: string, logEntryId: string, newText: 
       // continued in the original branch). Walk parent's log to find the fork
       // entry's position, then look up the latest snapshot whose anchor entry
       // sits before that position.
-      const parentBase = findUsageAtFork(agentId, forkFromSessionId, logEntryId);
-      persistSessionFork(agentId, newSessionId, forkFromSessionId, logEntryId, oldTopic, parentBase);
+      const parentBase = findUsageAtFork(
+        agentId,
+        forkFromSessionId,
+        logEntryId,
+      );
+      persistSessionFork(
+        agentId,
+        newSessionId,
+        forkFromSessionId,
+        logEntryId,
+        oldTopic,
+        parentBase,
+      );
     }
 
     // 5. Create new session from fork (or fresh session for first-message edit), then close old
-    const newSession = isFirstMessage ? createSession(managed) : createSession(managed, newSessionId);
+    const newSession = isFirstMessage
+      ? createSession(managed)
+      : createSession(managed, newSessionId);
     await replaceSession(agentId, managed, newSession);
     // For first-message edits, sessionId will be set by the system/init event (like newConversation).
     // For forks, set it now.
@@ -2702,16 +3485,29 @@ export async function editMessage(agentId: string, logEntryId: string, newText: 
     }
 
     // 8. Add system log entry at branch point
-    addLogEntry(agentId, "system", `Branched from: ${oldTopic || oldSessionId.slice(0, 8) + "..."}`);
+    addLogEntry(
+      agentId,
+      "system",
+      `Branched from: ${oldTopic || oldSessionId.slice(0, 8) + "..."}`,
+    );
 
     // 9. Inherit topic (marked stale so it regenerates after first exchange)
     managed.info.topic = oldTopic;
     managed.info.topicStale = true;
-    emit({ type: "agent_updated", agentId, changes: { topic: oldTopic, topicStale: true } });
+    emit({
+      type: "agent_updated",
+      agentId,
+      changes: { topic: oldTopic, topicStale: true },
+    });
 
     // 10. Send the edited message
     updateState(agentId, "thinking");
-    addLogEntry(agentId, "user_message", newText, username ? { username } : undefined);
+    addLogEntry(
+      agentId,
+      "user_message",
+      newText,
+      username ? { username } : undefined,
+    );
 
     const prefixedNew = username ? `[${username}] ${newText}` : newText;
     const turn = createTurnDeferred(managed);
@@ -2749,10 +3545,18 @@ export async function editMessage(agentId: string, logEntryId: string, newText: 
       // Restore topic
       managed.info.topic = oldTopic;
       managed.info.topicStale = oldTopicStale;
-      emit({ type: "agent_updated", agentId, changes: { topic: oldTopic, topicStale: oldTopicStale } });
+      emit({
+        type: "agent_updated",
+        agentId,
+        changes: { topic: oldTopic, topicStale: oldTopicStale },
+      });
     }
 
-    addLogEntry(agentId, "error", `Failed to branch conversation: ${err.message}`);
+    addLogEntry(
+      agentId,
+      "error",
+      `Failed to branch conversation: ${err.message}`,
+    );
     updateState(agentId, "error");
   }
 }
@@ -2762,9 +3566,15 @@ export function setTopic(agentId: string, topic: string) {
   if (!managed) return;
   managed.info.topic = topic.slice(0, 80);
   managed.info.topicStale = false;
-  const textCount = (logCache.get(agentId) ?? []).filter(e => e.kind === "user_message" || e.kind === "text").length;
+  const textCount = (logCache.get(agentId) ?? []).filter(
+    (e) => e.kind === "user_message" || e.kind === "text",
+  ).length;
   managed.topicMessageCount = textCount;
-  emit({ type: "agent_updated", agentId, changes: { topic: managed.info.topic, topicStale: false } });
+  emit({
+    type: "agent_updated",
+    agentId,
+    changes: { topic: managed.info.topic, topicStale: false },
+  });
   // Persist to sessions.json so resume list shows the manual topic
   if (managed.sessionId) {
     persistSessionTopic(agentId, managed.sessionId, managed.info.topic);
@@ -2785,7 +3595,8 @@ const MAX_PTY_BUFFER = 100_000;
 
 function sidecarSend(managed: ManagedAgent, msg: Record<string, unknown>) {
   const stdin = managed.ptySidecar?.stdin;
-  if (stdin && typeof stdin !== "number") stdin.write(JSON.stringify(msg) + "\n");
+  if (stdin && typeof stdin !== "number")
+    stdin.write(JSON.stringify(msg) + "\n");
 }
 
 export function openTerminal(agentId: string): boolean {
@@ -2798,7 +3609,7 @@ export function openTerminal(agentId: string): boolean {
   const shell = process.env.SHELL || "/bin/bash";
   const home = homedir();
   const ptyEnv: Record<string, string> = {
-    ...process.env as Record<string, string>,
+    ...(process.env as Record<string, string>),
     TERM: "xterm-256color",
     SHELL: shell,
     HOME: home,
@@ -2831,7 +3642,11 @@ export function openTerminal(agentId: string): boolean {
         for (const line of lines) {
           if (!line) continue;
           let msg: any;
-          try { msg = JSON.parse(line); } catch { continue; }
+          try {
+            msg = JSON.parse(line);
+          } catch {
+            continue;
+          }
           if (msg.type === "output") {
             managed.ptyBuffer += msg.data;
             if (managed.ptyBuffer.length > MAX_PTY_BUFFER) {
@@ -2839,9 +3654,15 @@ export function openTerminal(agentId: string): boolean {
             }
             emit({ type: "terminal_output", agentId, data: msg.data } as any);
           } else if (msg.type === "exit") {
-            console.log(`[terminal] PTY exited for ${agentId}: code=${msg.exitCode}, signal=${msg.signal}`);
+            console.log(
+              `[terminal] PTY exited for ${agentId}: code=${msg.exitCode}, signal=${msg.signal}`,
+            );
             managed.ptySidecar = null;
-            emit({ type: "terminal_exit", agentId, exitCode: msg.exitCode } as any);
+            emit({
+              type: "terminal_exit",
+              agentId,
+              exitCode: msg.exitCode,
+            } as any);
           }
         }
       }
@@ -2864,7 +3685,9 @@ export function openTerminal(agentId: string): boolean {
     env: ptyEnv,
   });
 
-  console.log(`[terminal] Spawned sidecar for ${agentId}: shell=${shell}, cwd=${managed.info.cwd}, pid=${sidecar.pid}`);
+  console.log(
+    `[terminal] Spawned sidecar for ${agentId}: shell=${shell}, cwd=${managed.info.cwd}, pid=${sidecar.pid}`,
+  );
   return true;
 }
 

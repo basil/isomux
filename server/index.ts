@@ -1,11 +1,26 @@
 import type { ServerWebSocket } from "bun";
 import type { ServerMessage, ClientCommand } from "../shared/types.ts";
 import * as AgentManager from "./agent-manager.ts";
-import { loadRecentCwds, saveRecentCwd, loadTasks, saveTasks, getFilePath, saveFile } from "./persistence.ts";
+import {
+  loadRecentCwds,
+  saveRecentCwd,
+  loadTasks,
+  saveTasks,
+  getFilePath,
+  saveFile,
+} from "./persistence.ts";
 import type { Attachment } from "../shared/types.ts";
-import { startUpdateChecker, getUpdateStatus, onUpdateChange } from "./update-checker.ts";
+import {
+  startUpdateChecker,
+  getUpdateStatus,
+  onUpdateChange,
+} from "./update-checker.ts";
 import type { TaskItem } from "../shared/types.ts";
-import { generateTaskId, isValidStatus, isValidPriority } from "../shared/types.ts";
+import {
+  generateTaskId,
+  isValidStatus,
+  isValidPriority,
+} from "../shared/types.ts";
 import { join } from "path";
 
 const browsers = new Set<ServerWebSocket<unknown>>();
@@ -33,14 +48,36 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
         AgentManager.validateCwd(cmd.cwd);
       } catch (err: any) {
         if (cmd.requestId) {
-          ws.send(JSON.stringify({ type: "agent_save_response", requestId: cmd.requestId, ok: false, error: err.message || "Invalid directory" } as ServerMessage));
+          ws.send(
+            JSON.stringify({
+              type: "agent_save_response",
+              requestId: cmd.requestId,
+              ok: false,
+              error: err.message || "Invalid directory",
+            } as ServerMessage),
+          );
         }
         break;
       }
       saveRecentCwd(cmd.cwd);
-      await AgentManager.spawn(cmd.name, cmd.cwd, cmd.permissionMode, cmd.desk, cmd.customInstructions, cmd.roomId, cmd.outfit, cmd.modelFamily);
+      await AgentManager.spawn(
+        cmd.name,
+        cmd.cwd,
+        cmd.permissionMode,
+        cmd.desk,
+        cmd.customInstructions,
+        cmd.roomId,
+        cmd.outfit,
+        cmd.modelFamily,
+      );
       if (cmd.requestId) {
-        ws.send(JSON.stringify({ type: "agent_save_response", requestId: cmd.requestId, ok: true } as ServerMessage));
+        ws.send(
+          JSON.stringify({
+            type: "agent_save_response",
+            requestId: cmd.requestId,
+            ok: true,
+          } as ServerMessage),
+        );
       }
       break;
     }
@@ -52,7 +89,12 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
       break;
     case "send_message":
       // Don't await — let it stream in the background
-      AgentManager.sendMessage(cmd.agentId, cmd.text, cmd.username, cmd.attachments);
+      AgentManager.sendMessage(
+        cmd.agentId,
+        cmd.text,
+        cmd.username,
+        cmd.attachments,
+      );
       break;
     case "new_conversation":
       await AgentManager.newConversation(cmd.agentId);
@@ -66,15 +108,35 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
           AgentManager.validateCwd(cmd.cwd);
         } catch (err: any) {
           if (cmd.requestId) {
-            ws.send(JSON.stringify({ type: "agent_save_response", requestId: cmd.requestId, ok: false, error: err.message || "Invalid directory" } as ServerMessage));
+            ws.send(
+              JSON.stringify({
+                type: "agent_save_response",
+                requestId: cmd.requestId,
+                ok: false,
+                error: err.message || "Invalid directory",
+              } as ServerMessage),
+            );
           }
           break;
         }
         saveRecentCwd(cmd.cwd);
       }
-      AgentManager.editAgent(cmd.agentId, { name: cmd.name, cwd: cmd.cwd, outfit: cmd.outfit, customInstructions: cmd.customInstructions, modelFamily: cmd.modelFamily, permissionMode: cmd.permissionMode });
+      AgentManager.editAgent(cmd.agentId, {
+        name: cmd.name,
+        cwd: cmd.cwd,
+        outfit: cmd.outfit,
+        customInstructions: cmd.customInstructions,
+        modelFamily: cmd.modelFamily,
+        permissionMode: cmd.permissionMode,
+      });
       if (cmd.requestId) {
-        ws.send(JSON.stringify({ type: "agent_save_response", requestId: cmd.requestId, ok: true } as ServerMessage));
+        ws.send(
+          JSON.stringify({
+            type: "agent_save_response",
+            requestId: cmd.requestId,
+            ok: true,
+          } as ServerMessage),
+        );
       }
       break;
     }
@@ -104,7 +166,11 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
         // Replay buffered output so the browser catches up
         const buffer = AgentManager.getTerminalBuffer(cmd.agentId);
         if (buffer) {
-          broadcast({ type: "terminal_output", agentId: cmd.agentId, data: buffer } as ServerMessage);
+          broadcast({
+            type: "terminal_output",
+            agentId: cmd.agentId,
+            data: buffer,
+          } as ServerMessage);
         }
       }
       break;
@@ -119,43 +185,91 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
       AgentManager.closeTerminal(cmd.agentId);
       break;
     case "update_office_settings": {
-      const envFile = cmd.envFile && cmd.envFile.trim() ? cmd.envFile.trim() : null;
+      const envFile =
+        cmd.envFile && cmd.envFile.trim() ? cmd.envFile.trim() : null;
       if (envFile) {
         try {
           AgentManager.validateEnvPath(envFile);
         } catch (err: any) {
-          ws.send(JSON.stringify({ type: "settings_save_response", requestId: cmd.requestId, ok: false, error: err.message || "Invalid env file" } as ServerMessage));
+          ws.send(
+            JSON.stringify({
+              type: "settings_save_response",
+              requestId: cmd.requestId,
+              ok: false,
+              error: err.message || "Invalid env file",
+            } as ServerMessage),
+          );
           break;
         }
       }
       AgentManager.setOfficeSettings(cmd.prompt, envFile);
-      ws.send(JSON.stringify({ type: "settings_save_response", requestId: cmd.requestId, ok: true } as ServerMessage));
+      ws.send(
+        JSON.stringify({
+          type: "settings_save_response",
+          requestId: cmd.requestId,
+          ok: true,
+        } as ServerMessage),
+      );
       break;
     }
     case "update_room_settings": {
-      const envFile = cmd.envFile && cmd.envFile.trim() ? cmd.envFile.trim() : null;
+      const envFile =
+        cmd.envFile && cmd.envFile.trim() ? cmd.envFile.trim() : null;
       if (envFile) {
         try {
           AgentManager.validateEnvPath(envFile);
         } catch (err: any) {
-          ws.send(JSON.stringify({ type: "settings_save_response", requestId: cmd.requestId, ok: false, error: err.message || "Invalid env file" } as ServerMessage));
+          ws.send(
+            JSON.stringify({
+              type: "settings_save_response",
+              requestId: cmd.requestId,
+              ok: false,
+              error: err.message || "Invalid env file",
+            } as ServerMessage),
+          );
           break;
         }
       }
       const ok = AgentManager.setRoomSettings(cmd.roomId, cmd.prompt, envFile);
       if (!ok) {
-        ws.send(JSON.stringify({ type: "settings_save_response", requestId: cmd.requestId, ok: false, error: "Room not found" } as ServerMessage));
+        ws.send(
+          JSON.stringify({
+            type: "settings_save_response",
+            requestId: cmd.requestId,
+            ok: false,
+            error: "Room not found",
+          } as ServerMessage),
+        );
       } else {
-        ws.send(JSON.stringify({ type: "settings_save_response", requestId: cmd.requestId, ok: true } as ServerMessage));
+        ws.send(
+          JSON.stringify({
+            type: "settings_save_response",
+            requestId: cmd.requestId,
+            ok: true,
+          } as ServerMessage),
+        );
       }
       break;
     }
     case "request_cwd_validation": {
       try {
         AgentManager.validateCwd(cmd.cwd);
-        ws.send(JSON.stringify({ type: "cwd_validation", requestId: cmd.requestId, ok: true } as ServerMessage));
+        ws.send(
+          JSON.stringify({
+            type: "cwd_validation",
+            requestId: cmd.requestId,
+            ok: true,
+          } as ServerMessage),
+        );
       } catch (err: any) {
-        ws.send(JSON.stringify({ type: "cwd_validation", requestId: cmd.requestId, ok: false, error: err.message || "Invalid directory" } as ServerMessage));
+        ws.send(
+          JSON.stringify({
+            type: "cwd_validation",
+            requestId: cmd.requestId,
+            ok: false,
+            error: err.message || "Invalid directory",
+          } as ServerMessage),
+        );
       }
       break;
     }
@@ -168,23 +282,55 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
         envFile = room?.envFile ?? null;
       }
       if (!envFile) {
-        ws.send(JSON.stringify({ type: "settings_validation", requestId: cmd.requestId, scope: cmd.scope, roomId: cmd.roomId, envFile: null, ok: true } as ServerMessage));
+        ws.send(
+          JSON.stringify({
+            type: "settings_validation",
+            requestId: cmd.requestId,
+            scope: cmd.scope,
+            roomId: cmd.roomId,
+            envFile: null,
+            ok: true,
+          } as ServerMessage),
+        );
         break;
       }
       try {
         const keyCount = AgentManager.validateEnvPath(envFile);
-        ws.send(JSON.stringify({ type: "settings_validation", requestId: cmd.requestId, scope: cmd.scope, roomId: cmd.roomId, envFile, ok: true, keyCount } as ServerMessage));
+        ws.send(
+          JSON.stringify({
+            type: "settings_validation",
+            requestId: cmd.requestId,
+            scope: cmd.scope,
+            roomId: cmd.roomId,
+            envFile,
+            ok: true,
+            keyCount,
+          } as ServerMessage),
+        );
       } catch (err: any) {
-        ws.send(JSON.stringify({ type: "settings_validation", requestId: cmd.requestId, scope: cmd.scope, roomId: cmd.roomId, envFile, ok: false, error: err.message || "Invalid env file" } as ServerMessage));
+        ws.send(
+          JSON.stringify({
+            type: "settings_validation",
+            requestId: cmd.requestId,
+            scope: cmd.scope,
+            roomId: cmd.roomId,
+            envFile,
+            ok: false,
+            error: err.message || "Invalid env file",
+          } as ServerMessage),
+        );
       }
       break;
     }
     case "add_task": {
       const task: TaskItem = {
-        id: generateTaskId(tasks.map(t => t.id)),
+        id: generateTaskId(tasks.map((t) => t.id)),
         title: cmd.title.trim(),
         description: cmd.description,
-        priority: cmd.priority && isValidPriority(cmd.priority) ? cmd.priority : undefined,
+        priority:
+          cmd.priority && isValidPriority(cmd.priority)
+            ? cmd.priority
+            : undefined,
         status: "open",
         assignee: cmd.assignee,
         createdBy: cmd.username,
@@ -200,10 +346,14 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
       if (task) {
         const c = cmd.changes;
         if (c.title !== undefined) task.title = String(c.title);
-        if (c.description !== undefined) task.description = c.description ? String(c.description) : undefined;
-        if (c.assignee !== undefined) task.assignee = c.assignee ? String(c.assignee) : undefined;
-        if (c.status !== undefined && isValidStatus(c.status)) task.status = c.status;
-        if (c.priority !== undefined && isValidPriority(c.priority)) task.priority = c.priority;
+        if (c.description !== undefined)
+          task.description = c.description ? String(c.description) : undefined;
+        if (c.assignee !== undefined)
+          task.assignee = c.assignee ? String(c.assignee) : undefined;
+        if (c.status !== undefined && isValidStatus(c.status))
+          task.status = c.status;
+        if (c.priority !== undefined && isValidPriority(c.priority))
+          task.priority = c.priority;
         saveTasks(tasks);
         broadcast({ type: "tasks", tasks } as ServerMessage);
       }
@@ -232,7 +382,12 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
       break;
     case "edit_message":
       // Don't await — let it stream in the background (like send_message)
-      AgentManager.editMessage(cmd.agentId, cmd.logEntryId, cmd.newText, cmd.username);
+      AgentManager.editMessage(
+        cmd.agentId,
+        cmd.logEntryId,
+        cmd.newText,
+        cmd.username,
+      );
       break;
   }
 }
@@ -266,14 +421,20 @@ const server = Bun.serve({
 
     // Task HTTP API
     if (url.pathname.startsWith("/tasks")) {
-      const corsHeaders = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" };
+      const corsHeaders = {
+        "Access-Control-Allow-Origin": "*",
+        "Content-Type": "application/json",
+      };
       const parts = url.pathname.split("/").filter(Boolean); // ["tasks"] or ["tasks", id] or ["tasks", id, action]
       const taskId = parts[1];
       const action = parts[2]; // "claim" or "done"
 
       // DELETE blocked at HTTP level
       if (req.method === "DELETE") {
-        return new Response(JSON.stringify({ error: "DELETE not allowed via HTTP" }), { status: 405, headers: corsHeaders });
+        return new Response(
+          JSON.stringify({ error: "DELETE not allowed via HTTP" }),
+          { status: 405, headers: corsHeaders },
+        );
       }
 
       // GET /tasks — list (excludes done by default)
@@ -300,24 +461,39 @@ const server = Bun.serve({
       // GET /tasks/:id — detail
       if (req.method === "GET" && taskId && !action) {
         const task = tasks.find((t) => t.id === taskId);
-        if (!task) return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: corsHeaders });
+        if (!task)
+          return new Response(JSON.stringify({ error: "not found" }), {
+            status: 404,
+            headers: corsHeaders,
+          });
         return new Response(JSON.stringify(task), { headers: corsHeaders });
       }
 
       // POST /tasks — create
       if (req.method === "POST" && !taskId) {
         let body: Record<string, unknown>;
-        try { body = await req.json() as Record<string, unknown>; } catch {
-          return new Response(JSON.stringify({ error: "invalid JSON" }), { status: 400, headers: corsHeaders });
+        try {
+          body = (await req.json()) as Record<string, unknown>;
+        } catch {
+          return new Response(JSON.stringify({ error: "invalid JSON" }), {
+            status: 400,
+            headers: corsHeaders,
+          });
         }
         if (!body.title || !body.createdBy) {
-          return new Response(JSON.stringify({ error: "title and createdBy required" }), { status: 400, headers: corsHeaders });
+          return new Response(
+            JSON.stringify({ error: "title and createdBy required" }),
+            { status: 400, headers: corsHeaders },
+          );
         }
         if (body.priority !== undefined && !isValidPriority(body.priority)) {
-          return new Response(JSON.stringify({ error: "invalid priority, must be P0-P3" }), { status: 400, headers: corsHeaders });
+          return new Response(
+            JSON.stringify({ error: "invalid priority, must be P0-P3" }),
+            { status: 400, headers: corsHeaders },
+          );
         }
         const task: TaskItem = {
-          id: generateTaskId(tasks.map(t => t.id)),
+          id: generateTaskId(tasks.map((t) => t.id)),
           title: String(body.title).trim(),
           description: body.description ? String(body.description) : undefined,
           priority: body.priority as TaskItem["priority"],
@@ -329,28 +505,56 @@ const server = Bun.serve({
         tasks.push(task);
         saveTasks(tasks);
         broadcast({ type: "tasks", tasks } as ServerMessage);
-        return new Response(JSON.stringify(task), { status: 201, headers: corsHeaders });
+        return new Response(JSON.stringify(task), {
+          status: 201,
+          headers: corsHeaders,
+        });
       }
 
       // PATCH /tasks/:id — update
       if (req.method === "PATCH" && taskId && !action) {
         const task = tasks.find((t) => t.id === taskId);
-        if (!task) return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: corsHeaders });
+        if (!task)
+          return new Response(JSON.stringify({ error: "not found" }), {
+            status: 404,
+            headers: corsHeaders,
+          });
         let body: Record<string, unknown>;
-        try { body = await req.json() as Record<string, unknown>; } catch {
-          return new Response(JSON.stringify({ error: "invalid JSON" }), { status: 400, headers: corsHeaders });
+        try {
+          body = (await req.json()) as Record<string, unknown>;
+        } catch {
+          return new Response(JSON.stringify({ error: "invalid JSON" }), {
+            status: 400,
+            headers: corsHeaders,
+          });
         }
         if (body.status !== undefined && !isValidStatus(body.status)) {
-          return new Response(JSON.stringify({ error: "invalid status, must be open|in_progress|done" }), { status: 400, headers: corsHeaders });
+          return new Response(
+            JSON.stringify({
+              error: "invalid status, must be open|in_progress|done",
+            }),
+            { status: 400, headers: corsHeaders },
+          );
         }
         if (body.priority !== undefined && !isValidPriority(body.priority)) {
-          return new Response(JSON.stringify({ error: "invalid priority, must be P0-P3" }), { status: 400, headers: corsHeaders });
+          return new Response(
+            JSON.stringify({ error: "invalid priority, must be P0-P3" }),
+            { status: 400, headers: corsHeaders },
+          );
         }
         if (body.title !== undefined) task.title = String(body.title);
-        if (body.description !== undefined) task.description = body.description ? String(body.description) : undefined;
-        if (body.status !== undefined) task.status = body.status as TaskItem["status"];
-        if (body.priority !== undefined) task.priority = body.priority ? body.priority as TaskItem["priority"] : undefined;
-        if (body.assignee !== undefined) task.assignee = body.assignee ? String(body.assignee) : undefined;
+        if (body.description !== undefined)
+          task.description = body.description
+            ? String(body.description)
+            : undefined;
+        if (body.status !== undefined)
+          task.status = body.status as TaskItem["status"];
+        if (body.priority !== undefined)
+          task.priority = body.priority
+            ? (body.priority as TaskItem["priority"])
+            : undefined;
+        if (body.assignee !== undefined)
+          task.assignee = body.assignee ? String(body.assignee) : undefined;
         saveTasks(tasks);
         broadcast({ type: "tasks", tasks } as ServerMessage);
         return new Response(JSON.stringify(task), { headers: corsHeaders });
@@ -359,10 +563,19 @@ const server = Bun.serve({
       // POST /tasks/:id/claim
       if (req.method === "POST" && taskId && action === "claim") {
         const task = tasks.find((t) => t.id === taskId);
-        if (!task) return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: corsHeaders });
+        if (!task)
+          return new Response(JSON.stringify({ error: "not found" }), {
+            status: 404,
+            headers: corsHeaders,
+          });
         let body: Record<string, unknown>;
-        try { body = await req.json() as Record<string, unknown>; } catch {
-          return new Response(JSON.stringify({ error: "invalid JSON" }), { status: 400, headers: corsHeaders });
+        try {
+          body = (await req.json()) as Record<string, unknown>;
+        } catch {
+          return new Response(JSON.stringify({ error: "invalid JSON" }), {
+            status: 400,
+            headers: corsHeaders,
+          });
         }
         task.assignee = body.assignee ? String(body.assignee) : task.assignee;
         task.status = "in_progress";
@@ -374,16 +587,25 @@ const server = Bun.serve({
       // POST /tasks/:id/done
       if (req.method === "POST" && taskId && action === "done") {
         const task = tasks.find((t) => t.id === taskId);
-        if (!task) return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: corsHeaders });
+        if (!task)
+          return new Response(JSON.stringify({ error: "not found" }), {
+            status: 404,
+            headers: corsHeaders,
+          });
         // Agents send `curl -d '{}'` — consume the body so Bun doesn't warn
-        try { await req.json(); } catch {}
+        try {
+          await req.json();
+        } catch {}
         task.status = "done";
         saveTasks(tasks);
         broadcast({ type: "tasks", tasks } as ServerMessage);
         return new Response(JSON.stringify(task), { headers: corsHeaders });
       }
 
-      return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: corsHeaders });
+      return new Response(JSON.stringify({ error: "not found" }), {
+        status: 404,
+        headers: corsHeaders,
+      });
     }
 
     // File upload endpoint: POST /api/upload/{agentId}
@@ -391,7 +613,8 @@ const server = Bun.serve({
       const agentId = url.pathname.split("/")[3];
       if (!agentId || !AgentManager.getAgent(agentId)) {
         return new Response(JSON.stringify({ error: "agent not found" }), {
-          status: 404, headers: { "Content-Type": "application/json" },
+          status: 404,
+          headers: { "Content-Type": "application/json" },
         });
       }
       try {
@@ -407,37 +630,65 @@ const server = Bun.serve({
           if (!(value instanceof File)) continue;
           fileCount++;
           if (fileCount > MAX_FILES) {
-            return new Response(JSON.stringify({ error: `Maximum ${MAX_FILES} files per upload` }), {
-              status: 400, headers: { "Content-Type": "application/json" },
-            });
+            return new Response(
+              JSON.stringify({
+                error: `Maximum ${MAX_FILES} files per upload`,
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
           }
           if (value.size > MAX_FILE_SIZE) {
-            return new Response(JSON.stringify({ error: `File "${value.name}" exceeds 20MB limit` }), {
-              status: 400, headers: { "Content-Type": "application/json" },
-            });
+            return new Response(
+              JSON.stringify({
+                error: `File "${value.name}" exceeds 20MB limit`,
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
           }
           totalSize += value.size;
           if (totalSize > MAX_TOTAL) {
-            return new Response(JSON.stringify({ error: "Total upload exceeds 40MB limit" }), {
-              status: 400, headers: { "Content-Type": "application/json" },
-            });
+            return new Response(
+              JSON.stringify({ error: "Total upload exceeds 40MB limit" }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
           }
           const buffer = Buffer.from(await value.arrayBuffer());
-          const att = saveFile(agentId, buffer, value.type || "application/octet-stream", value.name);
+          const att = saveFile(
+            agentId,
+            buffer,
+            value.type || "application/octet-stream",
+            value.name,
+          );
           if (att) attachments.push(att);
         }
         return new Response(JSON.stringify({ attachments }), {
           headers: { "Content-Type": "application/json" },
         });
       } catch (err: any) {
-        return new Response(JSON.stringify({ error: err.message || "Upload failed" }), {
-          status: 500, headers: { "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({ error: err.message || "Upload failed" }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
       }
     }
 
     // File serving endpoint (also handles legacy /api/images/ URLs)
-    if (url.pathname.startsWith("/api/files/") || url.pathname.startsWith("/api/images/")) {
+    if (
+      url.pathname.startsWith("/api/files/") ||
+      url.pathname.startsWith("/api/images/")
+    ) {
       const parts = url.pathname.split("/").filter(Boolean); // ["api", "files"|"images", agentId, filename]
       const agentId = parts[2];
       const filename = parts[3];
@@ -450,10 +701,19 @@ const server = Bun.serve({
       }
       const ext = filename.split(".").pop();
       const mimeTypes: Record<string, string> = {
-        jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp",
-        pdf: "application/pdf", txt: "text/plain", md: "text/markdown",
-        json: "application/json", csv: "text/csv", xml: "text/xml",
-        html: "text/html", css: "text/css",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        png: "image/png",
+        gif: "image/gif",
+        webp: "image/webp",
+        pdf: "application/pdf",
+        txt: "text/plain",
+        md: "text/markdown",
+        json: "application/json",
+        csv: "text/csv",
+        xml: "text/xml",
+        html: "text/html",
+        css: "text/css",
       };
       return new Response(Bun.file(filePath), {
         headers: {
@@ -482,28 +742,47 @@ const server = Bun.serve({
       // Send current agent list
       const agents = AgentManager.getAllAgents();
       const recentCwds = loadRecentCwds();
-      ws.send(JSON.stringify({ type: "full_state", agents, recentCwds, office: AgentManager.getOfficeSettings(), rooms: AgentManager.getRooms() } as ServerMessage));
+      ws.send(
+        JSON.stringify({
+          type: "full_state",
+          agents,
+          recentCwds,
+          office: AgentManager.getOfficeSettings(),
+          rooms: AgentManager.getRooms(),
+        } as ServerMessage),
+      );
       // Send tasks
       ws.send(JSON.stringify({ type: "tasks", tasks } as ServerMessage));
       // Send update status
       const update = getUpdateStatus();
       if (update.updateAvailable) {
-        ws.send(JSON.stringify({ type: "update_status", updateAvailable: true, current: update.current, latest: update.latest } as ServerMessage));
+        ws.send(
+          JSON.stringify({
+            type: "update_status",
+            updateAvailable: true,
+            current: update.current,
+            latest: update.latest,
+          } as ServerMessage),
+        );
       }
       // Send cached log history and slash commands for each agent
       for (const agent of agents) {
         const logs = AgentManager.getAgentLogs(agent.id);
         for (const entry of logs) {
-          ws.send(JSON.stringify({ type: "log_entry", entry } as ServerMessage));
+          ws.send(
+            JSON.stringify({ type: "log_entry", entry } as ServerMessage),
+          );
         }
         const cmds = AgentManager.getAgentCommands(agent.id);
         if (cmds.commands.length > 0 || cmds.skills.length > 0) {
-          ws.send(JSON.stringify({
-            type: "slash_commands",
-            agentId: agent.id,
-            commands: cmds.commands,
-            skills: cmds.skills,
-          } as ServerMessage));
+          ws.send(
+            JSON.stringify({
+              type: "slash_commands",
+              agentId: agent.id,
+              commands: cmds.commands,
+              skills: cmds.skills,
+            } as ServerMessage),
+          );
         }
       }
     },
@@ -523,14 +802,21 @@ const server = Bun.serve({
 
 // Start update checker
 onUpdateChange((status) => {
-  broadcast({ type: "update_status", updateAvailable: status.updateAvailable, current: status.current, latest: status.latest } as ServerMessage);
+  broadcast({
+    type: "update_status",
+    updateAvailable: status.updateAvailable,
+    current: status.current,
+    latest: status.latest,
+  } as ServerMessage);
 });
 startUpdateChecker();
 
 // Restore persisted agents on startup
 AgentManager.restoreAgents().then((restored) => {
   if (restored.length > 0) {
-    console.log(`Restored ${restored.length} agent(s): ${restored.map((a) => a.name).join(", ")}`);
+    console.log(
+      `Restored ${restored.length} agent(s): ${restored.map((a) => a.name).join(", ")}`,
+    );
   }
 });
 

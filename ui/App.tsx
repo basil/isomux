@@ -23,25 +23,45 @@ function cycleAgent(
 ): string | null {
   const roomAgents = agents.filter((a) => a.room === currentRoom);
   const sorted = [...roomAgents].sort((a, b) => a.desk - b.desk);
-  const nonIdle = sorted.filter((a) => (a.state !== "idle" && a.state !== "stopped") || (drafts.get(a.id) ?? "").length > 0);
+  const nonIdle = sorted.filter(
+    (a) =>
+      (a.state !== "idle" && a.state !== "stopped") ||
+      (drafts.get(a.id) ?? "").length > 0,
+  );
   const pool = nonIdle.length > 0 ? nonIdle : sorted;
   if (pool.length === 0) return null;
   const idx = pool.findIndex((a) => a.id === focusedAgentId);
   if (idx !== -1 && pool.length <= 1) return null;
-  const next = idx === -1
-    ? (direction === "prev" ? pool[pool.length - 1] : pool[0])
-    : direction === "prev"
-      ? pool[(idx - 1 + pool.length) % pool.length]
-      : pool[(idx + 1) % pool.length];
+  const next =
+    idx === -1
+      ? direction === "prev"
+        ? pool[pool.length - 1]
+        : pool[0]
+      : direction === "prev"
+        ? pool[(idx - 1 + pool.length) % pool.length]
+        : pool[(idx + 1) % pool.length];
   return next.id;
 }
 
 export function App() {
-  const { agents, logs, focusedAgentId, isMobile, mobileViewMode, drafts, currentRoom, rooms } = useAppState();
+  const {
+    agents,
+    logs,
+    focusedAgentId,
+    isMobile,
+    mobileViewMode,
+    drafts,
+    currentRoom,
+    rooms,
+  } = useAppState();
   const roomCount = rooms.length;
   const dispatch = useDispatch();
   const [spawnDesk, setSpawnDesk] = useState<number | null>(null);
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; agent: AgentInfo } | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{
+    x: number;
+    y: number;
+    agent: AgentInfo;
+  } | null>(null);
   const [editAgent, setEditAgent] = useState<AgentInfo | null>(null);
   const [username, setUsername] = useState<string | null>(() => {
     if (typeof localStorage !== "undefined") {
@@ -51,11 +71,15 @@ export function App() {
   });
   const [editingUsername, setEditingUsername] = useState(false);
   const [editingOfficePrompt, setEditingOfficePrompt] = useState(false);
-  const [editingRoomSettings, setEditingRoomSettings] = useState<string | null>(null);
+  const [editingRoomSettings, setEditingRoomSettings] = useState<string | null>(
+    null,
+  );
   const [tasksOpen, setTasksOpen] = useState(false);
   const [updateOpen, setUpdateOpen] = useState(false);
 
-  const focusedAgent = focusedAgentId ? agents.find((a) => a.id === focusedAgentId) : null;
+  const focusedAgent = focusedAgentId
+    ? agents.find((a) => a.id === focusedAgentId)
+    : null;
 
   const swipeRoomNext = useCallback(() => {
     if (roomCount <= 1) return;
@@ -64,16 +88,31 @@ export function App() {
 
   const swipeRoomPrev = useCallback(() => {
     if (roomCount <= 1) return;
-    dispatch({ type: "set_current_room", room: (currentRoom - 1 + roomCount) % roomCount });
+    dispatch({
+      type: "set_current_room",
+      room: (currentRoom - 1 + roomCount) % roomCount,
+    });
   }, [dispatch, currentRoom, roomCount]);
 
   const swipeAgentNext = useCallback(() => {
-    const nextId = cycleAgent(agents, drafts, currentRoom, focusedAgentId, "next");
+    const nextId = cycleAgent(
+      agents,
+      drafts,
+      currentRoom,
+      focusedAgentId,
+      "next",
+    );
     if (nextId) dispatch({ type: "focus", agentId: nextId });
   }, [dispatch, agents, drafts, currentRoom, focusedAgentId]);
 
   const swipeAgentPrev = useCallback(() => {
-    const nextId = cycleAgent(agents, drafts, currentRoom, focusedAgentId, "prev");
+    const nextId = cycleAgent(
+      agents,
+      drafts,
+      currentRoom,
+      focusedAgentId,
+      "prev",
+    );
     if (nextId) dispatch({ type: "focus", agentId: nextId });
   }, [dispatch, agents, drafts, currentRoom, focusedAgentId]);
 
@@ -97,7 +136,10 @@ export function App() {
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName;
-      const isInput = tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable;
+      const isInput =
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        (e.target as HTMLElement)?.isContentEditable;
       if (e.key === "Escape") {
         goHome();
         setSpawnDesk(null);
@@ -105,16 +147,32 @@ export function App() {
         setEditAgent(null);
       }
       // Number keys 1-8: focus agent at that desk in current room (only from office view)
-      if (!isInput && !focusedAgentId && e.key >= "1" && e.key <= "8" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      if (
+        !isInput &&
+        !focusedAgentId &&
+        e.key >= "1" &&
+        e.key <= "8" &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey
+      ) {
         const deskIndex = parseInt(e.key) - 1;
-        const agent = agents.find((a) => a.desk === deskIndex && a.room === currentRoom);
+        const agent = agents.find(
+          (a) => a.desk === deskIndex && a.room === currentRoom,
+        );
         if (agent) {
           e.preventDefault();
           dispatch({ type: "focus", agentId: agent.id });
         }
       }
       // Tab/Shift+Tab in office view: switch rooms
-      if (!isInput && !focusedAgentId && e.key === "Tab" && roomCount > 1 && !e.defaultPrevented) {
+      if (
+        !isInput &&
+        !focusedAgentId &&
+        e.key === "Tab" &&
+        roomCount > 1 &&
+        !e.defaultPrevented
+      ) {
         e.preventDefault();
         const next = e.shiftKey
           ? (currentRoom - 1 + roomCount) % roomCount
@@ -123,15 +181,34 @@ export function App() {
       }
       // Tab: cycle to next agent within current room (Shift+Tab: previous) when viewing an agent
       // Skip if autocomplete already consumed this Tab (it calls preventDefault)
-      if (focusedAgentId && e.key === "Tab" && agents.length > 1 && !e.defaultPrevented) {
+      if (
+        focusedAgentId &&
+        e.key === "Tab" &&
+        agents.length > 1 &&
+        !e.defaultPrevented
+      ) {
         e.preventDefault();
-        const nextId = cycleAgent(agents, drafts, currentRoom, focusedAgentId, e.shiftKey ? "prev" : "next");
+        const nextId = cycleAgent(
+          agents,
+          drafts,
+          currentRoom,
+          focusedAgentId,
+          e.shiftKey ? "prev" : "next",
+        );
         if (nextId) dispatch({ type: "focus", agentId: nextId });
       }
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [dispatch, goHome, focusedAgentId, agents, drafts, currentRoom, roomCount]);
+  }, [
+    dispatch,
+    goHome,
+    focusedAgentId,
+    agents,
+    drafts,
+    currentRoom,
+    roomCount,
+  ]);
 
   // Sync history stack with view state
   const isDeep = tasksOpen || focusedAgentId !== null;
@@ -162,10 +239,12 @@ export function App() {
     <>
       <style>{CSS}</style>
       {username === null && (
-        <UsernameModal onSave={(name) => {
-          localStorage.setItem("isomux-username", name);
-          setUsername(name);
-        }} />
+        <UsernameModal
+          onSave={(name) => {
+            localStorage.setItem("isomux-username", name);
+            setUsername(name);
+          }}
+        />
       )}
       {editingUsername && username !== null && (
         <UsernameModal
@@ -182,7 +261,10 @@ export function App() {
         <TaskView
           username={username ?? ""}
           onClose={goHome}
-          onFocusAgent={(agentId) => { setTasksOpen(false); dispatch({ type: "focus", agentId }); }}
+          onFocusAgent={(agentId) => {
+            setTasksOpen(false);
+            dispatch({ type: "focus", agentId });
+          }}
         />
       ) : focusedAgent ? (
         <LogView
@@ -204,7 +286,10 @@ export function App() {
           username={username ?? ""}
           onEditUsername={() => setEditingUsername(true)}
           onEditOfficePrompt={() => setEditingOfficePrompt(true)}
-          onEditRoomSettings={() => { const rid = rooms[currentRoom]?.id; if (rid) setEditingRoomSettings(rid); }}
+          onEditRoomSettings={() => {
+            const rid = rooms[currentRoom]?.id;
+            if (rid) setEditingRoomSettings(rid);
+          }}
           onOpenTasks={() => setTasksOpen(true)}
           onOpenUpdate={() => setUpdateOpen(true)}
           onToggleView={() => dispatch({ type: "toggle_mobile_view" })}
@@ -218,7 +303,10 @@ export function App() {
           username={username ?? ""}
           onEditUsername={() => setEditingUsername(true)}
           onEditOfficePrompt={() => setEditingOfficePrompt(true)}
-          onEditRoomSettings={() => { const rid = rooms[currentRoom]?.id; if (rid) setEditingRoomSettings(rid); }}
+          onEditRoomSettings={() => {
+            const rid = rooms[currentRoom]?.id;
+            if (rid) setEditingRoomSettings(rid);
+          }}
           onOpenTasks={() => setTasksOpen(true)}
           onOpenUpdate={() => setUpdateOpen(true)}
           onSwipeLeft={swipeRoomNext}
@@ -239,14 +327,14 @@ export function App() {
           y={ctxMenu.y}
           agent={ctxMenu.agent}
           onClose={() => setCtxMenu(null)}
-          onEdit={(agent) => { setEditAgent(agent); setCtxMenu(null); }}
+          onEdit={(agent) => {
+            setEditAgent(agent);
+            setCtxMenu(null);
+          }}
         />
       )}
       {editAgent && (
-        <EditAgentDialog
-          agent={editAgent}
-          onClose={() => setEditAgent(null)}
-        />
+        <EditAgentDialog agent={editAgent} onClose={() => setEditAgent(null)} />
       )}
       {editingOfficePrompt && (
         <OfficePromptModal
@@ -264,9 +352,7 @@ export function App() {
           onClose={() => setEditingRoomSettings(null)}
         />
       )}
-      {updateOpen && (
-        <UpdateModal onClose={() => setUpdateOpen(false)} />
-      )}
+      {updateOpen && <UpdateModal onClose={() => setUpdateOpen(false)} />}
     </>
   );
 }

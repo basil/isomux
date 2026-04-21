@@ -21,7 +21,11 @@ const rl = readline.createInterface({ input: process.stdin });
 
 rl.on("line", (line) => {
   let msg;
-  try { msg = JSON.parse(line); } catch { return; }
+  try {
+    msg = JSON.parse(line);
+  } catch {
+    return;
+  }
 
   switch (msg.type) {
     case "spawn":
@@ -43,10 +47,14 @@ rl.on("line", (line) => {
       proc?.write(msg.data);
       break;
     case "resize":
-      try { proc?.resize(msg.cols, msg.rows); } catch {}
+      try {
+        proc?.resize(msg.cols, msg.rows);
+      } catch {}
       break;
     case "kill":
-      try { proc?.kill(); } catch {}
+      try {
+        proc?.kill();
+      } catch {}
       proc = null;
       process.exit(0);
       break;
@@ -54,6 +62,8 @@ rl.on("line", (line) => {
 });
 
 rl.on("close", () => {
-  try { proc?.kill(); } catch {}
+  try {
+    proc?.kill();
+  } catch {}
   process.exit(0);
 });
