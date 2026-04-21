@@ -19,17 +19,35 @@ import { createSafetyHooks } from "./safety-hooks.ts";
 import { commands, autocompleteCommands, unsupportedMessage, type CommandConfig } from "./commands.ts";
 import { resolve, join } from "path";
 import { homedir } from "os";
-import { writeFileSync, mkdirSync, readdirSync, existsSync, readFileSync, rmSync, renameSync, statSync } from "fs";
+import { mkdirSync, readdirSync, existsSync, readFileSync, rmSync, renameSync, statSync } from "fs";
 import { execSync } from "child_process";
-
-// Directory for per-agent launcher scripts
-const LAUNCHERS_DIR = join(homedir(), ".isomux", "launchers");
 
 // Skills bundled with isomux itself (available to all users regardless of their config)
 const BUNDLED_SKILLS_DIR = join(import.meta.dir, "..", "skills");
-mkdirSync(LAUNCHERS_DIR, { recursive: true });
 
-const CLI_PATH = join(import.meta.dir, "..", "node_modules", "@anthropic-ai", "claude-agent-sdk", "cli.js");
+// Path to the Claude CLI native binary that ships with the Agent SDK.
+// The SDK's auto-resolver tries the musl variant first on Linux, which fails
+// on glibc systems (ENOENT on /lib/ld-musl-*.so.1 when execve runs the binary).
+// We resolve explicitly and pass it as pathToClaudeCodeExecutable so every
+// libc gets the right binary.
+const CLAUDE_NATIVE_BIN = resolveClaudeNativeBinary();
+
+function resolveClaudeNativeBinary(): string {
+  const anthropicDir = join(import.meta.dir, "..", "node_modules", "@anthropic-ai");
+  const binName = process.platform === "win32" ? "claude.exe" : "claude";
+  if (process.platform === "linux") {
+    const muslArch = process.arch === "arm64" ? "aarch64" : "x86_64";
+    const isMusl = existsSync(`/lib/ld-musl-${muslArch}.so.1`);
+    const variants = isMusl
+      ? [`linux-${process.arch}-musl`, `linux-${process.arch}`]
+      : [`linux-${process.arch}`, `linux-${process.arch}-musl`];
+    for (const v of variants) {
+      const p = join(anthropicDir, `claude-agent-sdk-${v}`, binName);
+      if (existsSync(p)) return p;
+    }
+  }
+  return join(anthropicDir, `claude-agent-sdk-${process.platform}-${process.arch}`, binName);
+}
 
 const LOGIN_INSTRUCTIONS = `To authenticate:
 1. Open the built-in terminal
@@ -225,32 +243,6 @@ How to answer questions about Isomux itself: the source lives at https://github.
   return systemPrompt;
 }
 
-// Create a launcher script that sets cwd and injects system prompt before running the CLI.
-function createLauncher(
-  agentId: string,
-  cwd: string,
-  agentName: string,
-  roomName: string,
-  officePrompt?: string | null,
-  roomPrompt?: string | null,
-  customInstructions?: string | null,
-): string {
-  const launcherPath = join(LAUNCHERS_DIR, `${agentId}.mjs`);
-  const systemPrompt = buildSystemPrompt(agentName, roomName, officePrompt, roomPrompt, customInstructions);
-  writeFileSync(
-    launcherPath,
-    `try { process.chdir(${JSON.stringify(cwd)}); }\n` +
-    `catch (err) {\n` +
-    `  console.error("isomux launcher: cannot cd into " + ${JSON.stringify(cwd)} + ": " + err.message);\n` +
-    `  console.error("Fix the agent's cwd by clicking the agent name in the log view header, then send a message again.");\n` +
-    `  process.exit(1);\n` +
-    `}\n` +
-    `process.argv.push("--append-system-prompt", ${JSON.stringify(systemPrompt)});\n` +
-    `await import(${JSON.stringify(CLI_PATH)});\n`
-  );
-  return launcherPath;
-}
-
 // Internal agent state
 interface ManagedAgent {
   info: AgentInfo;
@@ -259,7 +251,6 @@ interface ManagedAgent {
   streaming: boolean;
   aborting: boolean;
   streamGeneration: number; // incremented on abort to invalidate old consumeStream cleanup
-  launcherPath: string;
   slashCommands: { name: string; description?: string }[];
   skills: SkillInfo[];
   sdkReportedCommands: string[]; // commands reported by SDK in system:init
@@ -343,12 +334,8 @@ export function setOfficeSettings(prompt: string | null, envFile: string | null)
   const normalizedPrompt = prompt && prompt.trim() ? prompt.trim() : null;
   officeConfig = { prompt: normalizedPrompt, envFile: envFile || null };
   saveOfficeConfig(officeConfig);
-  // Regenerate all launchers so the new office prompt takes effect on next conversation.
-  // (Env is read fresh at every createSession, but the prompt is baked into the .mjs launcher file.)
-  for (const managed of agents.values()) {
-    const room = rooms[managed.info.room]!;
-    managed.launcherPath = createLauncher(managed.info.id, managed.info.cwd, managed.info.name, room.name, officeConfig.prompt, room.prompt, managed.info.customInstructions);
-  }
+  // System prompt is rebuilt at every createSession from current office/room/agent
+  // config, so the new office prompt automatically lands on the next conversation.
   eventHandler({ type: "office_settings_updated", prompt: officeConfig.prompt, envFile: officeConfig.envFile });
 }
 
@@ -359,12 +346,8 @@ export function setRoomSettings(roomId: string, prompt: string | null, envFile: 
   room.prompt = prompt && prompt.trim() ? prompt.trim() : null;
   room.envFile = envFile || null;
   persistAll();
-  // Regenerate launchers for agents in this room so the new room prompt takes effect next conversation.
-  for (const managed of agents.values()) {
-    if (managed.info.room === idx) {
-      managed.launcherPath = createLauncher(managed.info.id, managed.info.cwd, managed.info.name, room.name, officeConfig.prompt, room.prompt, managed.info.customInstructions);
-    }
-  }
+  // System prompt is rebuilt at every createSession — next conversation picks up
+  // the new room prompt automatically.
   eventHandler({ type: "room_settings_updated", roomId, prompt: room.prompt, envFile: room.envFile });
   return true;
 }
@@ -440,11 +423,8 @@ export function editAgent(agentId: string, changes: { name?: string; cwd?: strin
 
   if (Object.keys(updated).length === 0) return;
 
-  // Regenerate launcher if name, cwd, or customInstructions changed (takes effect on next conversation)
-  if (updated.name !== undefined || updated.cwd !== undefined || updated.customInstructions !== undefined) {
-    const room = rooms[managed.info.room]!;
-    managed.launcherPath = createLauncher(agentId, managed.info.cwd, managed.info.name, room.name, officeConfig.prompt, room.prompt, managed.info.customInstructions);
-  }
+  // System prompt + cwd are passed into every createSession, so name/cwd/
+  // customInstructions changes automatically apply to the next conversation.
 
   // Recreate session if model or permission mode changed so it takes effect immediately
   if (updated.modelFamily || updated.permissionMode) {
@@ -514,13 +494,9 @@ export function renameRoom(roomId: string, name: string): boolean {
   const trimmed = name.trim().slice(0, 40);
   if (!trimmed) return false;
   rooms[roomIdx].name = trimmed;
-  // Room name appears in the system prompt header, so regenerate launchers
-  // for agents in this room (takes effect on their next conversation).
-  for (const managed of agents.values()) {
-    if (managed.info.room === roomIdx) {
-      managed.launcherPath = createLauncher(managed.info.id, managed.info.cwd, managed.info.name, trimmed, officeConfig.prompt, rooms[roomIdx].prompt, managed.info.customInstructions);
-    }
-  }
+  // Room name appears in the system prompt header; it's rebuilt at every
+  // createSession, so agents in this room pick up the new name on their next
+  // conversation automatically.
   persistAll();
   eventHandler({ type: "room_renamed", roomId, name: trimmed });
   return true;
@@ -579,9 +555,8 @@ export function moveAgent(agentId: string, targetRoomId: string): boolean {
 
   managed.info.room = targetIdx;
   managed.info.desk = newDesk;
-  // Moving rooms changes room prompt context — regenerate launcher so the
-  // agent sees the new room's prompt on the next conversation.
-  managed.launcherPath = createLauncher(agentId, managed.info.cwd, managed.info.name, rooms[targetIdx].name, officeConfig.prompt, rooms[targetIdx].prompt, managed.info.customInstructions);
+  // New room's prompt context is picked up on the agent's next conversation
+  // since the system prompt is rebuilt at every createSession.
   eventHandler({ type: "agent_updated", agentId, changes: { room: targetIdx, desk: newDesk } });
   persistAll();
   return true;
@@ -651,18 +626,15 @@ function updateAgentHistory() {
 
 // Restore agents from disk on startup. Creates sessions and loads log history.
 export async function restoreAgents() {
-  // Wipe stale launchers from previous runs — they're fully regenerated below
-  rmSync(LAUNCHERS_DIR, { recursive: true, force: true });
-  mkdirSync(LAUNCHERS_DIR, { recursive: true });
+  // Clean up the pre-0.2.116 per-agent launcher scripts. Isomux now passes the
+  // native Claude binary directly, so these are orphaned.
+  try { rmSync(join(homedir(), ".isomux", "launchers"), { recursive: true, force: true }); } catch {}
 
   const loaded = loadAgents();
   rooms = loaded.map((r) => ({ id: r.id, name: r.name, prompt: r.prompt, envFile: r.envFile }));
 
   for (let roomIdx = 0; roomIdx < loaded.length; roomIdx++) {
-    const roomPrompt = loaded[roomIdx].prompt;
-    const roomName = loaded[roomIdx].name;
     for (const p of loaded[roomIdx].agents) {
-      const launcherPath = createLauncher(p.id, p.cwd, p.name, roomName, officeConfig.prompt, roomPrompt, p.customInstructions);
       const info: AgentInfo = {
         id: p.id,
         name: p.name,
@@ -684,7 +656,6 @@ export async function restoreAgents() {
         streaming: false,
         aborting: false,
         streamGeneration: 0,
-        launcherPath,
         slashCommands: autocompleteCommands(),
         skills: deduplicateSkills([...discoverUserSkills(), ...discoverProjectSkills(p.cwd), ...discoverPluginSkills(), ...discoverBundledSkills()]),
         sdkReportedCommands: [],
@@ -1293,10 +1264,24 @@ function createSession(managed: ManagedAgent, resumeSessionId?: string) {
       `Use /resume to pick a different session, or move the session .jsonl into the new project dir.`
     );
   }
+  const room = rooms[managed.info.room]!;
+  const systemPrompt = buildSystemPrompt(
+    managed.info.name,
+    room.name,
+    officeConfig.prompt,
+    room.prompt,
+    managed.info.customInstructions,
+  );
+  // V2 SDKSessionOptions still doesn't expose systemPrompt / extraArgs, so we
+  // inject --append-system-prompt via executableArgs. When
+  // pathToClaudeCodeExecutable is a native binary, executableArgs are prepended
+  // to the CLI args verbatim (verified against SDK 0.2.116 sdk.mjs).
   const opts: any = {
     model: FAMILY_TO_MODEL[managed.info.modelFamily],
     permissionMode: managed.info.permissionMode,
-    pathToClaudeCodeExecutable: managed.launcherPath,
+    pathToClaudeCodeExecutable: CLAUDE_NATIVE_BIN,
+    executableArgs: ["--append-system-prompt", systemPrompt],
+    cwd: managed.info.cwd,
     hooks: createSafetyHooks(),
     canUseTool: ((toolName, input, options) => requestPermission(managed, toolName, input, options)) as CanUseTool,
   };
@@ -1340,8 +1325,6 @@ export async function spawn(name: string, cwd: string, permissionMode: AgentInfo
 
   const resolvedCwd = resolveCwd(cwd);
   const id = `agent-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-  const room = rooms[targetRoom]!;
-  const launcherPath = createLauncher(id, resolvedCwd, name, room.name, officeConfig.prompt, room.prompt, customInstructions);
 
   const info: AgentInfo = {
     id,
@@ -1365,7 +1348,6 @@ export async function spawn(name: string, cwd: string, permissionMode: AgentInfo
     streaming: false,
     aborting: false,
     streamGeneration: 0,
-    launcherPath,
     slashCommands: autocompleteCommands(),
     skills: deduplicateSkills([...discoverUserSkills(), ...discoverProjectSkills(resolvedCwd), ...discoverPluginSkills(), ...discoverBundledSkills()]),
     sdkReportedCommands: [],
