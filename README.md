@@ -6,7 +6,7 @@ Free · open source · no cloud · no account
 
 See [isomux.com](https://isomux.com) for setup instructions and a live demo. Read the [blog post](https://nilmamano.com/blog/isomux) for a deeper dive.
 
-![Isomux office view](site/screenshot.png)
+![Isomux office view](site/office.gif)
 
 ## Feature Highlights
 
