@@ -1,7 +1,15 @@
 import { useState, useCallback } from "react";
 
 const SPEAK_ICON = (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 16 16"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round">
     <polygon points="2,5.5 5,5.5 8,2.5 8,13.5 5,10.5 2,10.5" fill="currentColor" stroke="none" />
     <path d="M10.5 5.5a3.5 3.5 0 0 1 0 5" />
     <path d="M12.5 3.5a6.5 6.5 0 0 1 0 9" />
@@ -9,7 +17,15 @@ const SPEAK_ICON = (
 );
 
 const STOP_ICON = (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 16 16"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round">
     <rect x="3.5" y="3.5" width="9" height="9" rx="1.5" fill="currentColor" stroke="none" />
   </svg>
 );
@@ -35,10 +51,7 @@ function stripMarkdown(md: string): string {
 function pickVoice(): SpeechSynthesisVoice | undefined {
   const voices = speechSynthesis.getVoices();
   const en = voices.filter(v => v.lang.startsWith("en"));
-  return en.find(v => v.name === "Google US English")
-    ?? en.find(v => /google/i.test(v.name))
-    ?? en.find(v => v.default)
-    ?? en[0];
+  return en.find(v => v.name === "Google US English") ?? en.find(v => /google/i.test(v.name)) ?? en.find(v => v.default) ?? en[0];
 }
 
 export function SpeakButton({ getText, size = 24 }: { getText: () => string; size?: number }) {
@@ -68,7 +81,10 @@ export function SpeakButton({ getText, size = 24 }: { getText: () => string; siz
 
   return (
     <button
-      onClick={(e) => { handleClick(); (e.target as HTMLElement).blur(); }}
+      onClick={e => {
+        handleClick();
+        (e.target as HTMLElement).blur();
+      }}
       className="copy-btn"
       title={speaking ? "Stop" : "Speak"}
       style={{
@@ -85,8 +101,7 @@ export function SpeakButton({ getText, size = 24 }: { getText: () => string; siz
         padding: 0,
         flexShrink: 0,
         transition: "color 0.15s, background 0.15s, border-color 0.15s",
-      }}
-    >
+      }}>
       {speaking ? STOP_ICON : SPEAK_ICON}
     </button>
   );

@@ -6,9 +6,9 @@ import { StatusLight } from "./StatusLight.tsx";
 import { deskPixelPos, DESK_SLOTS } from "./grid.ts";
 
 const MODEL_TINT: Record<ModelFamily, { border: string; bg: string }> = {
-  opus:   { border: "rgba(100,160,255,0.85)", bg: "rgba(100,160,255,0.35)" },
-  sonnet: { border: "rgba(218,165,32,0.80)",  bg: "rgba(218,165,32,0.32)" },
-  haiku:  { border: "rgba(230,130,180,0.80)", bg: "rgba(230,130,180,0.32)" },
+  opus: { border: "rgba(100,160,255,0.85)", bg: "rgba(100,160,255,0.35)" },
+  sonnet: { border: "rgba(218,165,32,0.80)", bg: "rgba(218,165,32,0.32)" },
+  haiku: { border: "rgba(230,130,180,0.80)", bg: "rgba(230,130,180,0.32)" },
 };
 
 export function DeskUnit({
@@ -62,7 +62,10 @@ export function DeskUnit({
       }, 500);
     }
     function handleTouchEnd(e: TouchEvent) {
-      if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
       if (longPressTriggered.current) {
         e.preventDefault();
       } else {
@@ -70,7 +73,10 @@ export function DeskUnit({
       }
     }
     function handleTouchMove() {
-      if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
     }
 
     el.addEventListener("touchstart", handleTouchStart, { passive: false });
@@ -92,22 +98,27 @@ export function DeskUnit({
     <div
       ref={containerRef}
       draggable
-      onDragStart={(e) => {
+      onDragStart={e => {
         e.dataTransfer.setData("text/plain", String(agent.desk));
         e.dataTransfer.effectAllowed = "move";
       }}
-      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
+      onDragOver={e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+      }}
       onDragEnter={() => setDragOver(true)}
       onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => {
+      onDrop={e => {
         e.preventDefault();
         setDragOver(false);
         const src = parseInt(e.dataTransfer.getData("text/plain"), 10);
         if (!isNaN(src) && src !== agent.desk) onSwap?.(src, agent.desk);
       }}
       onDragEnd={() => setDragOver(false)}
-      onClick={() => { if (!longPressTriggered.current) onClick(); }}
-      onContextMenu={(e) => {
+      onClick={() => {
+        if (!longPressTriggered.current) onClick();
+      }}
+      onContextMenu={e => {
         e.preventDefault();
         onContextMenu(e);
       }}
@@ -121,18 +132,26 @@ export function DeskUnit({
         cursor: "pointer",
         zIndex: z,
         transition: "filter 0.25s, transform 0.25s",
-        filter: dragOver ? "brightness(1.3) drop-shadow(0 0 40px rgba(126,184,255,0.3))" : hov ? "brightness(1.2) drop-shadow(0 0 30px rgba(126,184,255,0.15))" : "brightness(1)",
+        filter: dragOver
+          ? "brightness(1.3) drop-shadow(0 0 40px rgba(126,184,255,0.3))"
+          : hov
+            ? "brightness(1.2) drop-shadow(0 0 30px rgba(126,184,255,0.15))"
+            : "brightness(1)",
         transform: hov ? "translateY(-5px)" : "translateY(0)",
         outline: dragOver ? "2px solid rgba(126,184,255,0.4)" : "none",
         outlineOffset: 4,
         borderRadius: 8,
         userSelect: "none",
         WebkitUserSelect: "none",
-      }}
-    >
-
+      }}>
       {/* Character behind desk — idle agents sit back a bit */}
-      <div style={{ position: "absolute", left: agent.state === "idle" || agent.state === "stopped" ? 84 : 78, top: agent.state === "idle" || agent.state === "stopped" ? -16 : -20, zIndex: 1 }}>
+      <div
+        style={{
+          position: "absolute",
+          left: agent.state === "idle" || agent.state === "stopped" ? 84 : 78,
+          top: agent.state === "idle" || agent.state === "stopped" ? -16 : -20,
+          zIndex: 1,
+        }}>
         <Character state={agent.state} outfit={agent.outfit} />
       </div>
 
@@ -152,8 +171,7 @@ export function DeskUnit({
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-        }}
-      >
+        }}>
         <div
           style={{
             display: "flex",
@@ -168,8 +186,7 @@ export function DeskUnit({
             transition: "opacity 0.2s, background 0.3s, border 0.3s",
             animation: needsAttention ? "dotPulse 2s ease-in-out infinite" : undefined,
             whiteSpace: "nowrap",
-          }}
-        >
+          }}>
           <StatusLight state={agent.state} size={8} elapsedMs={elapsedMs} />
           <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>
             <span style={{ opacity: 0.5 }}>{agent.desk + 1} ·</span> {agent.name}
@@ -188,13 +205,11 @@ export function DeskUnit({
               whiteSpace: "nowrap",
               opacity: hov ? 0.9 : 0.7,
               transition: "opacity 0.2s",
-            }}
-          >
+            }}>
             {agent.topic}
           </div>
         )}
       </div>
-
     </div>
   );
 }

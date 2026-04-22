@@ -1,5 +1,16 @@
 import { createContext, useContext, useReducer, useEffect, useRef, useState, useCallback, type ReactNode, type Dispatch } from "react";
-import type { AgentInfo, LogEntry, SessionInfo, ServerMessage, SkillInfo, TaskItem, OfficeSettings, RoomWire, SettingsSaveResponse, SettingsValidationResponse } from "../shared/types.ts";
+import type {
+  AgentInfo,
+  LogEntry,
+  SessionInfo,
+  ServerMessage,
+  SkillInfo,
+  TaskItem,
+  OfficeSettings,
+  RoomWire,
+  SettingsSaveResponse,
+  SettingsValidationResponse,
+} from "../shared/types.ts";
 import { connect } from "./ws.ts";
 import { type Features, PRODUCTION_FEATURES } from "../shared/features.ts";
 
@@ -50,7 +61,12 @@ type Action =
   | { type: "rooms_reordered"; order: string[] }
   | SettingsSaveResponse
   | SettingsValidationResponse
-  | { type: "update_status"; updateAvailable: boolean; current: { sha: string; message: string; date: string }; latest: { sha: string; message: string; date: string } };
+  | {
+      type: "update_status";
+      updateAvailable: boolean;
+      current: { sha: string; message: string; date: string };
+      latest: { sha: string; message: string; date: string };
+    };
 
 // States that warrant attention
 const ATTENTION_STATES = new Set(["idle", "error", "waiting_for_response"]);
@@ -68,7 +84,7 @@ function reducer(state: AppState, action: Action): AppState {
         logs: new Map(),
         needsAttention: new Set(),
         slashCommands: new Map(),
-        stateChangedAt: new Map(action.agents.filter((a) => a.state !== "idle" && a.state !== "stopped").map((a) => [a.id, Date.now()])),
+        stateChangedAt: new Map(action.agents.filter(a => a.state !== "idle" && a.state !== "stopped").map(a => [a.id, Date.now()])),
       };
     case "agent_added":
       return { ...state, agents: [...state.agents, action.agent] };
@@ -79,25 +95,21 @@ function reducer(state: AppState, action: Action): AppState {
       needsAttention.delete(action.agentId);
       return {
         ...state,
-        agents: state.agents.filter((a) => a.id !== action.agentId),
+        agents: state.agents.filter(a => a.id !== action.agentId),
         logs,
         needsAttention,
         focusedAgentId: state.focusedAgentId === action.agentId ? null : state.focusedAgentId,
       };
     }
     case "agent_updated": {
-      const newAgents = state.agents.map((a) =>
-        a.id === action.agentId ? { ...a, ...action.changes } : a
-      );
+      const newAgents = state.agents.map(a => (a.id === action.agentId ? { ...a, ...action.changes } : a));
       const needsAttention = new Set(state.needsAttention);
       // Track when state changes for elapsed time display
-      const stateChangedAt = action.changes.state
-        ? new Map(state.stateChangedAt).set(action.agentId, Date.now())
-        : state.stateChangedAt;
+      const stateChangedAt = action.changes.state ? new Map(state.stateChangedAt).set(action.agentId, Date.now()) : state.stateChangedAt;
       // Mark as needing attention if state changed to an attention state
       // and the user is not currently viewing this agent
       if (action.changes.state && ATTENTION_STATES.has(action.changes.state)) {
-        const prevAgent = state.agents.find((a) => a.id === action.agentId);
+        const prevAgent = state.agents.find(a => a.id === action.agentId);
         const wasWorking = prevAgent && !ATTENTION_STATES.has(prevAgent.state);
         let soundTrigger = state.soundTrigger;
         if (wasWorking) {
@@ -169,7 +181,7 @@ function reducer(state: AppState, action: Action): AppState {
     case "update_status":
       return { ...state, updateAvailable: action.updateAvailable, updateCurrent: action.current, updateLatest: action.latest };
     case "room_closed": {
-      const idx = state.rooms.findIndex((r) => r.id === action.roomId);
+      const idx = state.rooms.findIndex(r => r.id === action.roomId);
       if (idx < 0) return state;
       const newRooms = [...state.rooms];
       newRooms.splice(idx, 1);
@@ -179,23 +191,23 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, rooms: newRooms, currentRoom };
     }
     case "room_renamed": {
-      const newRooms = state.rooms.map((r) => r.id === action.roomId ? { ...r, name: action.name } : r);
+      const newRooms = state.rooms.map(r => (r.id === action.roomId ? { ...r, name: action.name } : r));
       return { ...state, rooms: newRooms };
     }
     case "room_settings_updated": {
-      const newRooms = state.rooms.map((r) => r.id === action.roomId ? { ...r, prompt: action.prompt, envFile: action.envFile } : r);
+      const newRooms = state.rooms.map(r => (r.id === action.roomId ? { ...r, prompt: action.prompt, envFile: action.envFile } : r));
       return { ...state, rooms: newRooms };
     }
     case "rooms_reordered": {
       // action.order is the new ordering of roomIds
       const idToOldIdx = new Map(state.rooms.map((r, i) => [r.id, i]));
-      const newRooms = action.order.map((id) => state.rooms[idToOldIdx.get(id)!]).filter(Boolean);
+      const newRooms = action.order.map(id => state.rooms[idToOldIdx.get(id)!]).filter(Boolean);
       // Recompute currentRoom: find where the previously-current room landed
       const prevId = state.rooms[state.currentRoom]?.id;
       const newCurrentRoom = prevId ? Math.max(0, action.order.indexOf(prevId)) : 0;
       // Remap agents' numeric room index to the new positions
       const idToNewIdx = new Map(newRooms.map((r, i) => [r.id, i]));
-      const newAgents = state.agents.map((a) => {
+      const newAgents = state.agents.map(a => {
         const oldId = state.rooms[a.room]?.id;
         if (!oldId) return a;
         const newIdx = idToNewIdx.get(oldId) ?? a.room;
@@ -214,7 +226,7 @@ const initialState: AppState = {
   focusedAgentId: null,
   connected: false,
   isMobile: typeof window !== "undefined" ? window.innerWidth < 768 : false,
-  mobileViewMode: (typeof localStorage !== "undefined" && localStorage.getItem("isomux-mobile-view") === "list") ? "list" : "office",
+  mobileViewMode: typeof localStorage !== "undefined" && localStorage.getItem("isomux-mobile-view") === "list" ? "list" : "office",
   needsAttention: new Set(),
   sessionsList: new Map(),
   soundTrigger: 0,
@@ -345,7 +357,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [theme]);
 
   const toggleTheme = useCallback(() => {
-    setTheme((t) => (t === "dark" ? "light" : "dark"));
+    setTheme(t => (t === "dark" ? "light" : "dark"));
   }, []);
 
   return <ThemeCtx.Provider value={{ theme, toggleTheme }}>{children}</ThemeCtx.Provider>;

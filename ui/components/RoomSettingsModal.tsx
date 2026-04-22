@@ -2,15 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import { useAppState } from "../store.tsx";
 import { send, addRawListener, removeRawListener } from "../ws.ts";
 
-type ValidationStatus =
-  | { kind: "idle" }
-  | { kind: "pending" }
-  | { kind: "ok"; keyCount?: number }
-  | { kind: "error"; message: string };
+type ValidationStatus = { kind: "idle" } | { kind: "pending" } | { kind: "ok"; keyCount?: number } | { kind: "error"; message: string };
 
 export function RoomSettingsModal({ roomId, onClose }: { roomId: string; onClose: () => void }) {
   const { rooms, isMobile } = useAppState();
-  const room = rooms.find((r) => r.id === roomId);
+  const room = rooms.find(r => r.id === roomId);
   const [prompt, setPrompt] = useState(room?.prompt ?? "");
   const [envFile, setEnvFile] = useState(room?.envFile ?? "");
   const [status, setStatus] = useState<ValidationStatus>({ kind: "idle" });
@@ -78,7 +74,10 @@ export function RoomSettingsModal({ roomId, onClose }: { roomId: string; onClose
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") { e.stopPropagation(); onClose(); }
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
     }
     window.addEventListener("keydown", handleKey, true);
     return () => window.removeEventListener("keydown", handleKey, true);
@@ -88,7 +87,9 @@ export function RoomSettingsModal({ roomId, onClose }: { roomId: string; onClose
 
   return (
     <div
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onMouseDown={e => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       style={{
         position: "fixed",
         inset: 0,
@@ -99,8 +100,7 @@ export function RoomSettingsModal({ roomId, onClose }: { roomId: string; onClose
         alignItems: isMobile ? "flex-start" : "center",
         justifyContent: "center",
         overflowY: "auto",
-      }}
-    >
+      }}>
       <div
         style={{
           background: "var(--bg-overlay)",
@@ -114,18 +114,18 @@ export function RoomSettingsModal({ roomId, onClose }: { roomId: string; onClose
           maxWidth: isMobile ? "100%" : undefined,
           boxShadow: "0 20px 60px var(--shadow-heavy)",
           animation: "hudIn 0.2s ease-out",
-        }}
-      >
-        <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>
-          {room.name} · Settings
-        </h3>
+        }}>
+        <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>{room.name} · Settings</h3>
 
         <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", marginTop: 18, marginBottom: 5 }}>
           Env File Path <span style={{ fontWeight: 400, color: "var(--text-ghost)" }}>(optional, absolute path)</span>
         </label>
         <input
           value={envFile}
-          onChange={(e) => { setEnvFile(e.target.value); setStatus({ kind: "idle" }); }}
+          onChange={e => {
+            setEnvFile(e.target.value);
+            setStatus({ kind: "idle" });
+          }}
           placeholder="/home/you/.secrets/room.env"
           style={inputStyle}
         />
@@ -137,18 +137,20 @@ export function RoomSettingsModal({ roomId, onClose }: { roomId: string; onClose
         <textarea
           ref={textareaRef}
           value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
+          onChange={e => setPrompt(e.target.value)}
           placeholder="e.g. You're in the Marketing room. Match our brand voice."
           rows={8}
           style={{ ...inputStyle, resize: "vertical" }}
         />
-        <p style={{ fontSize: 10, color: "var(--text-ghost)", margin: "3px 0 0" }}>
-          Changes take effect on next conversation.
-        </p>
+        <p style={{ fontSize: 10, color: "var(--text-ghost)", margin: "3px 0 0" }}>Changes take effect on next conversation.</p>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
-          <button onClick={onClose} style={cancelBtnStyle} disabled={saving}>Cancel</button>
-          <button onClick={handleSave} style={saveBtnStyle} disabled={saving}>{saving ? "Saving…" : "Save"}</button>
+          <button onClick={onClose} style={cancelBtnStyle} disabled={saving}>
+            Cancel
+          </button>
+          <button onClick={handleSave} style={saveBtnStyle} disabled={saving}>
+            {saving ? "Saving…" : "Save"}
+          </button>
         </div>
       </div>
     </div>
@@ -161,7 +163,11 @@ function ValidationLine({ status }: { status: ValidationStatus }) {
     return <p style={{ fontSize: 10, color: "var(--text-ghost)", margin: "4px 0 0" }}>Checking…</p>;
   }
   if (status.kind === "ok") {
-    return <p style={{ fontSize: 10, color: "var(--accent)", margin: "4px 0 0" }}>Loaded {status.keyCount ?? 0} variable{status.keyCount === 1 ? "" : "s"}.</p>;
+    return (
+      <p style={{ fontSize: 10, color: "var(--accent)", margin: "4px 0 0" }}>
+        Loaded {status.keyCount ?? 0} variable{status.keyCount === 1 ? "" : "s"}.
+      </p>
+    );
   }
   return <p style={{ fontSize: 10, color: "#ff6b6b", margin: "4px 0 0" }}>{status.message}</p>;
 }

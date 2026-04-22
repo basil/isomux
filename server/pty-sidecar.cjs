@@ -19,9 +19,13 @@ function sendMsg(msg) {
 
 const rl = readline.createInterface({ input: process.stdin });
 
-rl.on("line", (line) => {
+rl.on("line", line => {
   let msg;
-  try { msg = JSON.parse(line); } catch { return; }
+  try {
+    msg = JSON.parse(line);
+  } catch {
+    return;
+  }
 
   switch (msg.type) {
     case "spawn":
@@ -33,7 +37,7 @@ rl.on("line", (line) => {
         cwd: msg.cwd || process.env.HOME,
         env: msg.env || process.env,
       });
-      proc.onData((data) => sendMsg({ type: "output", data }));
+      proc.onData(data => sendMsg({ type: "output", data }));
       proc.onExit(({ exitCode, signal }) => {
         sendMsg({ type: "exit", exitCode, signal });
         proc = null;
@@ -43,10 +47,14 @@ rl.on("line", (line) => {
       proc?.write(msg.data);
       break;
     case "resize":
-      try { proc?.resize(msg.cols, msg.rows); } catch {}
+      try {
+        proc?.resize(msg.cols, msg.rows);
+      } catch {}
       break;
     case "kill":
-      try { proc?.kill(); } catch {}
+      try {
+        proc?.kill();
+      } catch {}
       proc = null;
       process.exit(0);
       break;
@@ -54,6 +62,8 @@ rl.on("line", (line) => {
 });
 
 rl.on("close", () => {
-  try { proc?.kill(); } catch {}
+  try {
+    proc?.kill();
+  } catch {}
   process.exit(0);
 });

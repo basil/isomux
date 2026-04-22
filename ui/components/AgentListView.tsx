@@ -34,7 +34,7 @@ export function AgentListView({
 }) {
   const { agents, currentRoom, rooms, updateAvailable } = useAppState();
   const roomCount = rooms.length;
-  const roomAgents = agents.filter((a) => a.room === currentRoom);
+  const roomAgents = agents.filter(a => a.room === currentRoom);
   const swipeRef = useSwipeLeftRight(onSwipeLeft ?? (() => {}), onSwipeRight ?? (() => {}), true);
 
   return (
@@ -45,8 +45,7 @@ export function AgentListView({
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
-      }}
-    >
+      }}>
       <MobileHeader
         viewMode="list"
         onToggleView={onToggleView}
@@ -68,8 +67,7 @@ export function AgentListView({
           overflowY: "auto",
           WebkitOverflowScrolling: "touch",
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
-        }}
-      >
+        }}>
         {roomAgents.length === 0 ? (
           <div
             style={{
@@ -80,17 +78,14 @@ export function AgentListView({
               height: "100%",
               gap: 8,
               padding: 32,
-            }}
-          >
+            }}>
             <span style={{ fontSize: 15, color: "var(--text-muted)" }}>
               {roomCount > 1 ? `${rooms[currentRoom]?.name ?? `Room ${currentRoom + 1}`} is empty` : "No agents yet"}
             </span>
-            <span style={{ fontSize: 13, color: "var(--text-faint)" }}>
-              Tap + to spawn one
-            </span>
+            <span style={{ fontSize: 13, color: "var(--text-faint)" }}>Tap + to spawn one</span>
           </div>
         ) : (
-          roomAgents.map((agent) => (
+          roomAgents.map(agent => (
             <div
               key={agent.id}
               style={{
@@ -100,16 +95,14 @@ export function AgentListView({
                 borderBottom: "1px solid var(--border)",
                 cursor: "pointer",
               }}
-              onClick={() => onFocus(agent.id)}
-            >
+              onClick={() => onFocus(agent.id)}>
               <div
                 style={{
                   flexShrink: 0,
                   display: "flex",
                   alignItems: "center",
                   marginRight: 12,
-                }}
-              >
+                }}>
                 <StatusLight state={agent.state} size={10} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -121,8 +114,7 @@ export function AgentListView({
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
-                  }}
-                >
+                  }}>
                   {agent.name}
                 </div>
                 {agent.topic && (
@@ -134,14 +126,13 @@ export function AgentListView({
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       marginTop: 2,
-                    }}
-                  >
+                    }}>
                     {agent.topic}
                   </div>
                 )}
               </div>
               <button
-                onClick={(e) => {
+                onClick={e => {
                   e.stopPropagation();
                   const rect = (e.target as HTMLElement).getBoundingClientRect();
                   onContextMenu(Math.max(8, rect.right - 208), rect.bottom + 4, agent);
@@ -156,8 +147,7 @@ export function AgentListView({
                   padding: "4px 8px",
                   lineHeight: 1,
                   marginLeft: 8,
-                }}
-              >
+                }}>
                 ...
               </button>
             </div>
@@ -190,8 +180,7 @@ export function AgentListView({
           zIndex: 100,
           opacity: roomAgents.length >= 8 ? 0.5 : 1,
           paddingBottom: 2,
-        }}
-      >
+        }}>
         +
       </button>
     </div>

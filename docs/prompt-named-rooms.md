@@ -63,6 +63,7 @@ export function createRoom(name?: string): number {
 ### `closeRoom(room: number)`
 
 After the existing `roomCount--` (line 386), splice the name out:
+
 ```typescript
 roomNames.splice(room, 1);
 ```
@@ -124,6 +125,7 @@ In the agent manifest (`agents-summary.json`), include `roomName` alongside the 
 Change from `PersistedAgent[][]` to `PersistedRoom[]`.
 
 Migration logic (3 formats):
+
 1. **Flat array** (`PersistedAgent[]`, oldest): wrap as `[{ name: "Room 1", agents: [...] }]`
 2. **Nested array** (`PersistedAgent[][]`, current): wrap each as `{ name: "Room N", agents: [...] }`
 3. **Room objects** (`PersistedRoom[]`, new): use as-is
@@ -200,6 +202,7 @@ In the `handleCommand` switch:
 ## Build & Test
 
 After changes, run `bun run build:ui` to rebuild the frontend. The server picks up the new static files without restart. Test:
+
 1. Fresh start — existing agents.json (old format) migrates correctly, rooms show "Room 1" etc.
 2. Create a new room — gets default name "Room N"
 3. Double-click tab to rename — inline edit works

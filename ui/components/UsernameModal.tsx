@@ -31,7 +31,13 @@ export function UsernameModal({
 
   return (
     <div
-      onMouseDown={canClose ? (e) => { if (e.target === e.currentTarget) onClose!(); } : undefined}
+      onMouseDown={
+        canClose
+          ? e => {
+              if (e.target === e.currentTarget) onClose!();
+            }
+          : undefined
+      }
       style={{
         position: "fixed",
         inset: 0,
@@ -41,8 +47,7 @@ export function UsernameModal({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-      }}
-    >
+      }}>
       <div
         style={{
           background: "var(--bg-surface)",
@@ -52,23 +57,21 @@ export function UsernameModal({
           width: 340,
           maxWidth: "90vw",
           animation: "hudIn 0.2s ease-out",
-        }}
-      >
+        }}>
         <div
           style={{
             fontSize: 16,
             fontWeight: 700,
             color: "var(--text-primary)",
             marginBottom: 16,
-          }}
-        >
+          }}>
           What's your name? (Who's the boss?)
         </div>
         <input
           autoFocus
           value={name}
-          onChange={(e) => setName(e.target.value.slice(0, 16))}
-          onKeyDown={(e) => {
+          onChange={e => setName(e.target.value.slice(0, 16))}
+          onKeyDown={e => {
             if (e.key === "Enter") handleSubmit();
             if (e.key === "Escape" && onClose) onClose();
           }}
@@ -93,8 +96,7 @@ export function UsernameModal({
             justifyContent: "flex-end",
             gap: 8,
             marginTop: 16,
-          }}
-        >
+          }}>
           {isEditing && onClose && (
             <button
               onClick={onClose}
@@ -106,8 +108,7 @@ export function UsernameModal({
                 color: "var(--text-dim)",
                 fontSize: 13,
                 cursor: "pointer",
-              }}
-            >
+              }}>
               Cancel
             </button>
           )}
@@ -124,8 +125,7 @@ export function UsernameModal({
               fontWeight: 600,
               cursor: canSubmit ? "pointer" : "default",
               transition: "background 0.15s, color 0.15s",
-            }}
-          >
+            }}>
             {isEditing ? "Save" : "Continue"}
           </button>
         </div>

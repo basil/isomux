@@ -123,7 +123,21 @@ function Beard({ type, color, headCx, headCy }: { type: AgentOutfit["beard"]; co
     case "stubble":
       return (
         <g fill={color} opacity={0.7}>
-          {[[-4, 6], [-1, 6], [2, 6], [5, 6], [-5, 8], [-2, 8], [1, 8], [4, 8], [-3, 10], [0, 10], [3, 10], [-1, 11], [1, 11]].map(([dx, dy], i) => (
+          {[
+            [-4, 6],
+            [-1, 6],
+            [2, 6],
+            [5, 6],
+            [-5, 8],
+            [-2, 8],
+            [1, 8],
+            [4, 8],
+            [-3, 10],
+            [0, 10],
+            [3, 10],
+            [-1, 11],
+            [1, 11],
+          ].map(([dx, dy], i) => (
             <circle key={i} cx={headCx + dx} cy={headCy + dy} r={0.9} />
           ))}
         </g>
@@ -173,7 +187,12 @@ function Accessory({ type, headCx, headCy }: { type: AgentOutfit["accessory"]; h
     case "headphones":
       return (
         <>
-          <path d={`M${headCx - 12} ${headCy - 4} Q${headCx - 12} ${headCy - 15} ${headCx} ${headCy - 15} Q${headCx + 12} ${headCy - 15} ${headCx + 12} ${headCy - 4}`} stroke="#555" fill="none" strokeWidth={3} />
+          <path
+            d={`M${headCx - 12} ${headCy - 4} Q${headCx - 12} ${headCy - 15} ${headCx} ${headCy - 15} Q${headCx + 12} ${headCy - 15} ${headCx + 12} ${headCy - 4}`}
+            stroke="#555"
+            fill="none"
+            strokeWidth={3}
+          />
           <rect x={headCx - 16} y={headCy - 6} width={8} height={10} rx={3} fill="#555" />
           <rect x={headCx + 8} y={headCy - 6} width={8} height={10} rx={3} fill="#555" />
         </>
@@ -193,7 +212,10 @@ function Accessory({ type, headCx, headCy }: { type: AgentOutfit["accessory"]; h
           {/* Knot */}
           <path d={`M${headCx - 2} ${headCy + 9} L${headCx} ${headCy + 11} L${headCx + 2} ${headCy + 9} Z`} fill="#2c3e50" />
           {/* Tie body */}
-          <path d={`M${headCx - 2} ${headCy + 11} L${headCx - 3} ${headCy + 22} L${headCx} ${headCy + 24} L${headCx + 3} ${headCy + 22} L${headCx + 2} ${headCy + 11} Z`} fill="#2c3e50" />
+          <path
+            d={`M${headCx - 2} ${headCy + 11} L${headCx - 3} ${headCy + 22} L${headCx} ${headCy + 24} L${headCx + 3} ${headCy + 22} L${headCx + 2} ${headCy + 11} Z`}
+            fill="#2c3e50"
+          />
         </>
       );
     case "earrings":
@@ -222,14 +244,14 @@ export function Character({ state, outfit }: { state: AgentState; outfit: AgentO
       height="68"
       viewBox="0 0 52 68"
       overflow="visible"
-      style={{ filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.35))", ...anim }}
-    >
+      style={{ filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.35))", ...anim }}>
       {children}
     </svg>
   );
 
   if (vs === "idle") {
-    const hCx = 26, hCy = 37;
+    const hCx = 26,
+      hCy = 37;
     return wrap(
       <>
         <ellipse cx={hCx} cy={50} rx={11} ry={10} fill={bc} />
@@ -244,26 +266,24 @@ export function Character({ state, outfit }: { state: AgentState; outfit: AgentO
         <g>
           <text x="36" y="28" fontSize="14" fill="rgba(200,220,255,0.7)" fontFamily="monospace" fontWeight="bold">
             <animate attributeName="y" values="28;22;28" dur="2s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="0.5;0.9;0.5" dur="2s" repeatCount="indefinite" />
-            z
+            <animate attributeName="opacity" values="0.5;0.9;0.5" dur="2s" repeatCount="indefinite" />z
           </text>
           <text x="44" y="18" fontSize="12" fill="rgba(200,220,255,0.6)" fontFamily="monospace" fontWeight="bold">
             <animate attributeName="y" values="18;12;18" dur="2.5s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="0.4;0.8;0.4" dur="2.5s" repeatCount="indefinite" />
-            z
+            <animate attributeName="opacity" values="0.4;0.8;0.4" dur="2.5s" repeatCount="indefinite" />z
           </text>
           <text x="50" y="10" fontSize="10" fill="rgba(200,220,255,0.5)" fontFamily="monospace" fontWeight="bold">
             <animate attributeName="y" values="10;4;10" dur="3s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="0.3;0.7;0.3" dur="3s" repeatCount="indefinite" />
-            z
+            <animate attributeName="opacity" values="0.3;0.7;0.3" dur="3s" repeatCount="indefinite" />z
           </text>
         </g>
-      </>
+      </>,
     );
   }
 
   if (vs === "error") {
-    const hCx = 26, hCy = 25;
+    const hCx = 26,
+      hCy = 25;
     return wrap(
       <>
         <rect x={16} y={36} width={20} height={16} fill={bc} rx={3} />
@@ -278,7 +298,12 @@ export function Character({ state, outfit }: { state: AgentState; outfit: AgentO
           <line x1={hCx + 3} y1={hCy - 3} x2={hCx + 6} y2={hCy + 1} />
           <line x1={hCx + 6} y1={hCy - 3} x2={hCx + 3} y2={hCy + 1} />
         </g>
-        <path d={`M${hCx - 4} ${hCy + 6} Q${hCx - 2} ${hCy + 4} ${hCx} ${hCy + 6} Q${hCx + 2} ${hCy + 8} ${hCx + 4} ${hCy + 6}`} stroke="#c33" fill="none" strokeWidth={0.8} />
+        <path
+          d={`M${hCx - 4} ${hCy + 6} Q${hCx - 2} ${hCy + 4} ${hCx} ${hCy + 6} Q${hCx + 2} ${hCy + 8} ${hCx + 4} ${hCy + 6}`}
+          stroke="#c33"
+          fill="none"
+          strokeWidth={0.8}
+        />
         <Beard type={beard} color={hair} headCx={hCx} headCy={hCy} />
         <g>
           <circle cx={42} cy={10} r={8} fill="#E85D75">
@@ -291,12 +316,13 @@ export function Character({ state, outfit }: { state: AgentState; outfit: AgentO
         <rect x={18} y={52} width={6} height={10} fill="#444" rx={2} />
         <rect x={28} y={52} width={6} height={10} fill="#444" rx={2} />
       </>,
-      { animation: "errShake 0.4s ease-in-out infinite" }
+      { animation: "errShake 0.4s ease-in-out infinite" },
     );
   }
 
   if (vs === "waiting_for_response") {
-    const hCx = 26, hCy = 25;
+    const hCx = 26,
+      hCy = 25;
     return wrap(
       <>
         <rect x={16} y={36} width={20} height={16} fill={bc} rx={3} />
@@ -327,12 +353,13 @@ export function Character({ state, outfit }: { state: AgentState; outfit: AgentO
         <rect x={18} y={52} width={6} height={10} fill="#444" rx={2} />
         <rect x={28} y={52} width={6} height={10} fill="#444" rx={2} />
       </>,
-      { animation: "waitBounce 2s ease-in-out infinite" }
+      { animation: "waitBounce 2s ease-in-out infinite" },
     );
   }
 
   // working / starting
-  const hCx = 26, hCy = 25;
+  const hCx = 26,
+    hCy = 25;
   return wrap(
     <>
       <rect x={16} y={36} width={20} height={16} fill={bc} rx={3} />
@@ -353,6 +380,6 @@ export function Character({ state, outfit }: { state: AgentState; outfit: AgentO
       <Beard type={beard} color={hair} headCx={hCx} headCy={hCy} />
       <rect x={18} y={52} width={6} height={10} fill="#444" rx={2} />
       <rect x={28} y={52} width={6} height={10} fill="#444" rx={2} />
-    </>
+    </>,
   );
 }

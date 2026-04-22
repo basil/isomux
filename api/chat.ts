@@ -8,9 +8,9 @@ const hits = new Map<string, number[]>();
 function rateLimit(ip: string): { allowed: boolean; retryAfterSeconds?: number } {
   const now = Date.now();
   const windowMs = 60 * 60 * 1000;
-  const timestamps = (hits.get(ip) || []).filter((t) => now - t < windowMs);
+  const timestamps = (hits.get(ip) || []).filter(t => now - t < windowMs);
 
-  const lastMinute = timestamps.filter((t) => now - t < 60_000);
+  const lastMinute = timestamps.filter(t => now - t < 60_000);
   if (lastMinute.length >= 5) return { allowed: false, retryAfterSeconds: 60 };
   if (timestamps.length >= 20) {
     return { allowed: false, retryAfterSeconds: Math.ceil((timestamps[0] + windowMs - now) / 1000) };
@@ -168,10 +168,10 @@ export default async function handler(req: Request) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   const { allowed, retryAfterSeconds } = rateLimit(ip);
   if (!allowed) {
-    return new Response(
-      JSON.stringify({ error: `Rate limit exceeded. Try again in ${retryAfterSeconds} seconds.` }),
-      { status: 429, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: `Rate limit exceeded. Try again in ${retryAfterSeconds} seconds.` }), {
+      status: 429,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   const { messages } = await req.json();

@@ -81,16 +81,20 @@ export function connect(onMessage: MessageHandler) {
   clearReconnectTimer();
   const myGen = ++socketGen;
   if (socket) {
-    try { socket.close(); } catch {}
+    try {
+      socket.close();
+    } catch {}
   }
 
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   const ws = new WebSocket(`${protocol}//${location.host}/ws`);
   socket = ws;
-  ws.onmessage = (e) => {
+  ws.onmessage = e => {
     const data = e.data as string;
     let msg: ServerMessage | null = null;
-    try { msg = JSON.parse(data) as ServerMessage; } catch {}
+    try {
+      msg = JSON.parse(data) as ServerMessage;
+    } catch {}
     if (msg?.type === "pong") {
       clearPongTimer();
       return;

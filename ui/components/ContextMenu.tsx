@@ -70,8 +70,7 @@ export function ContextMenu({ x, y, agent, onClose, onEdit }: ContextMenuProps) 
         overflowY: "auto",
         boxShadow: "0 12px 40px var(--shadow-heavy)",
         animation: "hudIn 0.12s ease-out",
-      }}
-    >
+      }}>
       <div
         style={{
           padding: "5px 10px",
@@ -80,20 +79,33 @@ export function ContextMenu({ x, y, agent, onClose, onEdit }: ContextMenuProps) 
           color: "var(--text-faint)",
           textTransform: "uppercase",
           letterSpacing: "0.06em",
-        }}
-      >
+        }}>
         {agent.name}
       </div>
-      <MenuItem label="Edit Agent..." onClick={() => { onEdit(agent); onClose(); }} />
+      <MenuItem
+        label="Edit Agent..."
+        onClick={() => {
+          onEdit(agent);
+          onClose();
+        }}
+      />
       {features.sessions && <MenuItem label="New Conversation" onClick={() => handleAction("new_conversation")} />}
 
       {features.sessions && sessions.length > 1 && (
         <>
           <div style={{ height: 1, background: "var(--border-strong)", margin: "3px 8px" }} />
-          <div style={{ padding: "4px 10px", fontSize: 9, color: "var(--text-ghost)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          <div
+            style={{
+              padding: "4px 10px",
+              fontSize: 9,
+              color: "var(--text-ghost)",
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+            }}>
             Resume
           </div>
-          {sessions.slice(0, 5).map((s) => {
+          {sessions.slice(0, 5).map(s => {
             const isCurrent = s.sessionId === currentSessionId;
             const rawLabel = s.topic || s.sessionId.slice(0, 8) + "...";
             const label = s.forked ? `↳ ${rawLabel}` : rawLabel;
@@ -139,10 +151,10 @@ function MenuItem({
   return (
     <button
       onClick={disabled ? undefined : onClick}
-      onMouseEnter={(e) => {
+      onMouseEnter={e => {
         if (!disabled) e.currentTarget.style.background = danger ? "rgba(232,93,117,0.08)" : "rgba(255,255,255,0.04)";
       }}
-      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
       style={{
         display: "flex",
         alignItems: "center",
@@ -159,8 +171,7 @@ function MenuItem({
         textAlign: "left",
         opacity: disabled ? 0.5 : dimmed ? 0.45 : 1,
         fontStyle: dimmed ? "italic" : undefined,
-      }}
-    >
+      }}>
       {label}
     </button>
   );

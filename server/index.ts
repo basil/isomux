@@ -19,7 +19,7 @@ function broadcast(msg: ServerMessage) {
 }
 
 // Wire AgentManager events to WebSocket broadcasts
-AgentManager.onEvent((event) => {
+AgentManager.onEvent(event => {
   broadcast(event as ServerMessage);
 });
 
@@ -33,12 +33,28 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
         AgentManager.validateCwd(cmd.cwd);
       } catch (err: any) {
         if (cmd.requestId) {
-          ws.send(JSON.stringify({ type: "agent_save_response", requestId: cmd.requestId, ok: false, error: err.message || "Invalid directory" } as ServerMessage));
+          ws.send(
+            JSON.stringify({
+              type: "agent_save_response",
+              requestId: cmd.requestId,
+              ok: false,
+              error: err.message || "Invalid directory",
+            } as ServerMessage),
+          );
         }
         break;
       }
       saveRecentCwd(cmd.cwd);
-      await AgentManager.spawn(cmd.name, cmd.cwd, cmd.permissionMode, cmd.desk, cmd.customInstructions, cmd.roomId, cmd.outfit, cmd.modelFamily);
+      await AgentManager.spawn(
+        cmd.name,
+        cmd.cwd,
+        cmd.permissionMode,
+        cmd.desk,
+        cmd.customInstructions,
+        cmd.roomId,
+        cmd.outfit,
+        cmd.modelFamily,
+      );
       if (cmd.requestId) {
         ws.send(JSON.stringify({ type: "agent_save_response", requestId: cmd.requestId, ok: true } as ServerMessage));
       }
@@ -66,13 +82,27 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
           AgentManager.validateCwd(cmd.cwd);
         } catch (err: any) {
           if (cmd.requestId) {
-            ws.send(JSON.stringify({ type: "agent_save_response", requestId: cmd.requestId, ok: false, error: err.message || "Invalid directory" } as ServerMessage));
+            ws.send(
+              JSON.stringify({
+                type: "agent_save_response",
+                requestId: cmd.requestId,
+                ok: false,
+                error: err.message || "Invalid directory",
+              } as ServerMessage),
+            );
           }
           break;
         }
         saveRecentCwd(cmd.cwd);
       }
-      AgentManager.editAgent(cmd.agentId, { name: cmd.name, cwd: cmd.cwd, outfit: cmd.outfit, customInstructions: cmd.customInstructions, modelFamily: cmd.modelFamily, permissionMode: cmd.permissionMode });
+      AgentManager.editAgent(cmd.agentId, {
+        name: cmd.name,
+        cwd: cmd.cwd,
+        outfit: cmd.outfit,
+        customInstructions: cmd.customInstructions,
+        modelFamily: cmd.modelFamily,
+        permissionMode: cmd.permissionMode,
+      });
       if (cmd.requestId) {
         ws.send(JSON.stringify({ type: "agent_save_response", requestId: cmd.requestId, ok: true } as ServerMessage));
       }
@@ -124,7 +154,14 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
         try {
           AgentManager.validateEnvPath(envFile);
         } catch (err: any) {
-          ws.send(JSON.stringify({ type: "settings_save_response", requestId: cmd.requestId, ok: false, error: err.message || "Invalid env file" } as ServerMessage));
+          ws.send(
+            JSON.stringify({
+              type: "settings_save_response",
+              requestId: cmd.requestId,
+              ok: false,
+              error: err.message || "Invalid env file",
+            } as ServerMessage),
+          );
           break;
         }
       }
@@ -138,13 +175,22 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
         try {
           AgentManager.validateEnvPath(envFile);
         } catch (err: any) {
-          ws.send(JSON.stringify({ type: "settings_save_response", requestId: cmd.requestId, ok: false, error: err.message || "Invalid env file" } as ServerMessage));
+          ws.send(
+            JSON.stringify({
+              type: "settings_save_response",
+              requestId: cmd.requestId,
+              ok: false,
+              error: err.message || "Invalid env file",
+            } as ServerMessage),
+          );
           break;
         }
       }
       const ok = AgentManager.setRoomSettings(cmd.roomId, cmd.prompt, envFile);
       if (!ok) {
-        ws.send(JSON.stringify({ type: "settings_save_response", requestId: cmd.requestId, ok: false, error: "Room not found" } as ServerMessage));
+        ws.send(
+          JSON.stringify({ type: "settings_save_response", requestId: cmd.requestId, ok: false, error: "Room not found" } as ServerMessage),
+        );
       } else {
         ws.send(JSON.stringify({ type: "settings_save_response", requestId: cmd.requestId, ok: true } as ServerMessage));
       }
@@ -155,7 +201,14 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
         AgentManager.validateCwd(cmd.cwd);
         ws.send(JSON.stringify({ type: "cwd_validation", requestId: cmd.requestId, ok: true } as ServerMessage));
       } catch (err: any) {
-        ws.send(JSON.stringify({ type: "cwd_validation", requestId: cmd.requestId, ok: false, error: err.message || "Invalid directory" } as ServerMessage));
+        ws.send(
+          JSON.stringify({
+            type: "cwd_validation",
+            requestId: cmd.requestId,
+            ok: false,
+            error: err.message || "Invalid directory",
+          } as ServerMessage),
+        );
       }
       break;
     }
@@ -164,18 +217,47 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
       if (cmd.scope === "office") {
         envFile = AgentManager.getOfficeSettings().envFile;
       } else if (cmd.scope === "room" && cmd.roomId) {
-        const room = AgentManager.getRooms().find((r) => r.id === cmd.roomId);
+        const room = AgentManager.getRooms().find(r => r.id === cmd.roomId);
         envFile = room?.envFile ?? null;
       }
       if (!envFile) {
-        ws.send(JSON.stringify({ type: "settings_validation", requestId: cmd.requestId, scope: cmd.scope, roomId: cmd.roomId, envFile: null, ok: true } as ServerMessage));
+        ws.send(
+          JSON.stringify({
+            type: "settings_validation",
+            requestId: cmd.requestId,
+            scope: cmd.scope,
+            roomId: cmd.roomId,
+            envFile: null,
+            ok: true,
+          } as ServerMessage),
+        );
         break;
       }
       try {
         const keyCount = AgentManager.validateEnvPath(envFile);
-        ws.send(JSON.stringify({ type: "settings_validation", requestId: cmd.requestId, scope: cmd.scope, roomId: cmd.roomId, envFile, ok: true, keyCount } as ServerMessage));
+        ws.send(
+          JSON.stringify({
+            type: "settings_validation",
+            requestId: cmd.requestId,
+            scope: cmd.scope,
+            roomId: cmd.roomId,
+            envFile,
+            ok: true,
+            keyCount,
+          } as ServerMessage),
+        );
       } catch (err: any) {
-        ws.send(JSON.stringify({ type: "settings_validation", requestId: cmd.requestId, scope: cmd.scope, roomId: cmd.roomId, envFile, ok: false, error: err.message || "Invalid env file" } as ServerMessage));
+        ws.send(
+          JSON.stringify({
+            type: "settings_validation",
+            requestId: cmd.requestId,
+            scope: cmd.scope,
+            roomId: cmd.roomId,
+            envFile,
+            ok: false,
+            error: err.message || "Invalid env file",
+          } as ServerMessage),
+        );
       }
       break;
     }
@@ -196,7 +278,7 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
       break;
     }
     case "update_task": {
-      const task = tasks.find((t) => t.id === cmd.id);
+      const task = tasks.find(t => t.id === cmd.id);
       if (task) {
         const c = cmd.changes;
         if (c.title !== undefined) task.title = String(c.title);
@@ -210,7 +292,7 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
       break;
     }
     case "delete_task": {
-      tasks = tasks.filter((t) => t.id !== cmd.id);
+      tasks = tasks.filter(t => t.id !== cmd.id);
       saveTasks(tasks);
       broadcast({ type: "tasks", tasks } as ServerMessage);
       break;
@@ -283,23 +365,23 @@ const server = Bun.serve({
         const titleFilter = url.searchParams.get("title");
         let filtered = tasks;
         if (!status) {
-          filtered = filtered.filter((t) => t.status !== "done");
+          filtered = filtered.filter(t => t.status !== "done");
         } else if (status !== "all") {
-          filtered = filtered.filter((t) => t.status === status);
+          filtered = filtered.filter(t => t.status === status);
         }
         if (assignee) {
-          filtered = filtered.filter((t) => t.assignee === assignee);
+          filtered = filtered.filter(t => t.assignee === assignee);
         }
         if (titleFilter) {
           const q = titleFilter.toLowerCase();
-          filtered = filtered.filter((t) => t.title.toLowerCase().includes(q));
+          filtered = filtered.filter(t => t.title.toLowerCase().includes(q));
         }
         return new Response(JSON.stringify(filtered), { headers: corsHeaders });
       }
 
       // GET /tasks/:id — detail
       if (req.method === "GET" && taskId && !action) {
-        const task = tasks.find((t) => t.id === taskId);
+        const task = tasks.find(t => t.id === taskId);
         if (!task) return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: corsHeaders });
         return new Response(JSON.stringify(task), { headers: corsHeaders });
       }
@@ -307,7 +389,9 @@ const server = Bun.serve({
       // POST /tasks — create
       if (req.method === "POST" && !taskId) {
         let body: Record<string, unknown>;
-        try { body = await req.json() as Record<string, unknown>; } catch {
+        try {
+          body = (await req.json()) as Record<string, unknown>;
+        } catch {
           return new Response(JSON.stringify({ error: "invalid JSON" }), { status: 400, headers: corsHeaders });
         }
         if (!body.title || !body.createdBy) {
@@ -334,14 +418,19 @@ const server = Bun.serve({
 
       // PATCH /tasks/:id — update
       if (req.method === "PATCH" && taskId && !action) {
-        const task = tasks.find((t) => t.id === taskId);
+        const task = tasks.find(t => t.id === taskId);
         if (!task) return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: corsHeaders });
         let body: Record<string, unknown>;
-        try { body = await req.json() as Record<string, unknown>; } catch {
+        try {
+          body = (await req.json()) as Record<string, unknown>;
+        } catch {
           return new Response(JSON.stringify({ error: "invalid JSON" }), { status: 400, headers: corsHeaders });
         }
         if (body.status !== undefined && !isValidStatus(body.status)) {
-          return new Response(JSON.stringify({ error: "invalid status, must be open|in_progress|done" }), { status: 400, headers: corsHeaders });
+          return new Response(JSON.stringify({ error: "invalid status, must be open|in_progress|done" }), {
+            status: 400,
+            headers: corsHeaders,
+          });
         }
         if (body.priority !== undefined && !isValidPriority(body.priority)) {
           return new Response(JSON.stringify({ error: "invalid priority, must be P0-P3" }), { status: 400, headers: corsHeaders });
@@ -349,7 +438,7 @@ const server = Bun.serve({
         if (body.title !== undefined) task.title = String(body.title);
         if (body.description !== undefined) task.description = body.description ? String(body.description) : undefined;
         if (body.status !== undefined) task.status = body.status as TaskItem["status"];
-        if (body.priority !== undefined) task.priority = body.priority ? body.priority as TaskItem["priority"] : undefined;
+        if (body.priority !== undefined) task.priority = body.priority ? (body.priority as TaskItem["priority"]) : undefined;
         if (body.assignee !== undefined) task.assignee = body.assignee ? String(body.assignee) : undefined;
         saveTasks(tasks);
         broadcast({ type: "tasks", tasks } as ServerMessage);
@@ -358,10 +447,12 @@ const server = Bun.serve({
 
       // POST /tasks/:id/claim
       if (req.method === "POST" && taskId && action === "claim") {
-        const task = tasks.find((t) => t.id === taskId);
+        const task = tasks.find(t => t.id === taskId);
         if (!task) return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: corsHeaders });
         let body: Record<string, unknown>;
-        try { body = await req.json() as Record<string, unknown>; } catch {
+        try {
+          body = (await req.json()) as Record<string, unknown>;
+        } catch {
           return new Response(JSON.stringify({ error: "invalid JSON" }), { status: 400, headers: corsHeaders });
         }
         task.assignee = body.assignee ? String(body.assignee) : task.assignee;
@@ -373,10 +464,12 @@ const server = Bun.serve({
 
       // POST /tasks/:id/done
       if (req.method === "POST" && taskId && action === "done") {
-        const task = tasks.find((t) => t.id === taskId);
+        const task = tasks.find(t => t.id === taskId);
         if (!task) return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: corsHeaders });
         // Agents send `curl -d '{}'` — consume the body so Bun doesn't warn
-        try { await req.json(); } catch {}
+        try {
+          await req.json();
+        } catch {}
         task.status = "done";
         saveTasks(tasks);
         broadcast({ type: "tasks", tasks } as ServerMessage);
@@ -391,7 +484,8 @@ const server = Bun.serve({
       const agentId = url.pathname.split("/")[3];
       if (!agentId || !AgentManager.getAgent(agentId)) {
         return new Response(JSON.stringify({ error: "agent not found" }), {
-          status: 404, headers: { "Content-Type": "application/json" },
+          status: 404,
+          headers: { "Content-Type": "application/json" },
         });
       }
       try {
@@ -408,18 +502,21 @@ const server = Bun.serve({
           fileCount++;
           if (fileCount > MAX_FILES) {
             return new Response(JSON.stringify({ error: `Maximum ${MAX_FILES} files per upload` }), {
-              status: 400, headers: { "Content-Type": "application/json" },
+              status: 400,
+              headers: { "Content-Type": "application/json" },
             });
           }
           if (value.size > MAX_FILE_SIZE) {
             return new Response(JSON.stringify({ error: `File "${value.name}" exceeds 20MB limit` }), {
-              status: 400, headers: { "Content-Type": "application/json" },
+              status: 400,
+              headers: { "Content-Type": "application/json" },
             });
           }
           totalSize += value.size;
           if (totalSize > MAX_TOTAL) {
             return new Response(JSON.stringify({ error: "Total upload exceeds 40MB limit" }), {
-              status: 400, headers: { "Content-Type": "application/json" },
+              status: 400,
+              headers: { "Content-Type": "application/json" },
             });
           }
           const buffer = Buffer.from(await value.arrayBuffer());
@@ -431,7 +528,8 @@ const server = Bun.serve({
         });
       } catch (err: any) {
         return new Response(JSON.stringify({ error: err.message || "Upload failed" }), {
-          status: 500, headers: { "Content-Type": "application/json" },
+          status: 500,
+          headers: { "Content-Type": "application/json" },
         });
       }
     }
@@ -450,10 +548,19 @@ const server = Bun.serve({
       }
       const ext = filename.split(".").pop();
       const mimeTypes: Record<string, string> = {
-        jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp",
-        pdf: "application/pdf", txt: "text/plain", md: "text/markdown",
-        json: "application/json", csv: "text/csv", xml: "text/xml",
-        html: "text/html", css: "text/css",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        png: "image/png",
+        gif: "image/gif",
+        webp: "image/webp",
+        pdf: "application/pdf",
+        txt: "text/plain",
+        md: "text/markdown",
+        json: "application/json",
+        csv: "text/csv",
+        xml: "text/xml",
+        html: "text/html",
+        css: "text/css",
       };
       return new Response(Bun.file(filePath), {
         headers: {
@@ -482,13 +589,23 @@ const server = Bun.serve({
       // Send current agent list
       const agents = AgentManager.getAllAgents();
       const recentCwds = loadRecentCwds();
-      ws.send(JSON.stringify({ type: "full_state", agents, recentCwds, office: AgentManager.getOfficeSettings(), rooms: AgentManager.getRooms() } as ServerMessage));
+      ws.send(
+        JSON.stringify({
+          type: "full_state",
+          agents,
+          recentCwds,
+          office: AgentManager.getOfficeSettings(),
+          rooms: AgentManager.getRooms(),
+        } as ServerMessage),
+      );
       // Send tasks
       ws.send(JSON.stringify({ type: "tasks", tasks } as ServerMessage));
       // Send update status
       const update = getUpdateStatus();
       if (update.updateAvailable) {
-        ws.send(JSON.stringify({ type: "update_status", updateAvailable: true, current: update.current, latest: update.latest } as ServerMessage));
+        ws.send(
+          JSON.stringify({ type: "update_status", updateAvailable: true, current: update.current, latest: update.latest } as ServerMessage),
+        );
       }
       // Send cached log history and slash commands for each agent
       for (const agent of agents) {
@@ -498,12 +615,14 @@ const server = Bun.serve({
         }
         const cmds = AgentManager.getAgentCommands(agent.id);
         if (cmds.commands.length > 0 || cmds.skills.length > 0) {
-          ws.send(JSON.stringify({
-            type: "slash_commands",
-            agentId: agent.id,
-            commands: cmds.commands,
-            skills: cmds.skills,
-          } as ServerMessage));
+          ws.send(
+            JSON.stringify({
+              type: "slash_commands",
+              agentId: agent.id,
+              commands: cmds.commands,
+              skills: cmds.skills,
+            } as ServerMessage),
+          );
         }
       }
     },
@@ -522,15 +641,20 @@ const server = Bun.serve({
 });
 
 // Start update checker
-onUpdateChange((status) => {
-  broadcast({ type: "update_status", updateAvailable: status.updateAvailable, current: status.current, latest: status.latest } as ServerMessage);
+onUpdateChange(status => {
+  broadcast({
+    type: "update_status",
+    updateAvailable: status.updateAvailable,
+    current: status.current,
+    latest: status.latest,
+  } as ServerMessage);
 });
 startUpdateChecker();
 
 // Restore persisted agents on startup
-AgentManager.restoreAgents().then((restored) => {
+AgentManager.restoreAgents().then(restored => {
   if (restored.length > 0) {
-    console.log(`Restored ${restored.length} agent(s): ${restored.map((a) => a.name).join(", ")}`);
+    console.log(`Restored ${restored.length} agent(s): ${restored.map(a => a.name).join(", ")}`);
   }
 });
 

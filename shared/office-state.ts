@@ -45,10 +45,18 @@ export class OfficeState {
   private _tasks: TaskItem[] = [];
   private _recentCwds: string[] = [];
 
-  get rooms() { return this._rooms; }
-  get office() { return this._office; }
-  get tasks() { return this._tasks; }
-  get recentCwds() { return this._recentCwds; }
+  get rooms() {
+    return this._rooms;
+  }
+  get office() {
+    return this._office;
+  }
+  get tasks() {
+    return this._tasks;
+  }
+  get recentCwds() {
+    return this._recentCwds;
+  }
 
   getState(): OfficeStateData {
     return {
@@ -108,11 +116,11 @@ export class OfficeState {
 
     let targetRoom = 0;
     if (opts.roomId) {
-      const idx = this._rooms.findIndex((r) => r.id === opts.roomId);
+      const idx = this._rooms.findIndex(r => r.id === opts.roomId);
       if (idx >= 0) targetRoom = idx;
     }
-    const roomAgents = [...this.agents.values()].filter((a) => a.room === targetRoom);
-    const taken = new Set(roomAgents.map((a) => a.desk));
+    const roomAgents = [...this.agents.values()].filter(a => a.room === targetRoom);
+    const taken = new Set(roomAgents.map(a => a.desk));
 
     let desk: number;
     if (opts.desk !== undefined && !taken.has(opts.desk)) {
@@ -120,7 +128,10 @@ export class OfficeState {
     } else {
       desk = -1;
       for (let i = 0; i < 8; i++) {
-        if (!taken.has(i)) { desk = i; break; }
+        if (!taken.has(i)) {
+          desk = i;
+          break;
+        }
       }
     }
     if (desk === -1) return null; // room full
@@ -158,7 +169,16 @@ export class OfficeState {
     return [{ type: "agent_removed", agentId }];
   }
 
-  editAgent(agentId: string, changes: { name?: string; cwd?: string; outfit?: AgentOutfit; customInstructions?: string; permissionMode?: AgentInfo["permissionMode"] }): OfficeEvent[] {
+  editAgent(
+    agentId: string,
+    changes: {
+      name?: string;
+      cwd?: string;
+      outfit?: AgentOutfit;
+      customInstructions?: string;
+      permissionMode?: AgentInfo["permissionMode"];
+    },
+  ): OfficeEvent[] {
     const agent = this.agents.get(agentId);
     if (!agent) return [];
 
@@ -166,7 +186,7 @@ export class OfficeState {
 
     if (changes.name && changes.name !== agent.name) {
       const nameLower = changes.name.trim().toLowerCase();
-      const duplicate = [...this.agents.values()].some((a) => a.id !== agentId && a.name.toLowerCase() === nameLower);
+      const duplicate = [...this.agents.values()].some(a => a.id !== agentId && a.name.toLowerCase() === nameLower);
       if (!duplicate) {
         agent.name = changes.name;
         updated.name = changes.name;
@@ -203,12 +223,12 @@ export class OfficeState {
 
   swapDesks(deskA: number, deskB: number, roomId: string): OfficeEvent[] {
     if (deskA === deskB || deskA < 0 || deskA > 7 || deskB < 0 || deskB > 7) return [];
-    const room = this._rooms.findIndex((r) => r.id === roomId);
+    const room = this._rooms.findIndex(r => r.id === roomId);
     if (room < 0) return [];
 
     const allAgents = [...this.agents.values()];
-    const agentA = allAgents.find((a) => a.desk === deskA && a.room === room);
-    const agentB = allAgents.find((a) => a.desk === deskB && a.room === room);
+    const agentA = allAgents.find(a => a.desk === deskA && a.room === room);
+    const agentB = allAgents.find(a => a.desk === deskB && a.room === room);
     if (!agentA && !agentB) return [];
 
     const events: OfficeEvent[] = [];
@@ -224,7 +244,7 @@ export class OfficeState {
   }
 
   createRoom(name?: string): OfficeEvent[] {
-    const existingIds = this._rooms.map((r) => r.id);
+    const existingIds = this._rooms.map(r => r.id);
     const room: RoomWire = {
       id: generateRoomId(existingIds),
       name: name || `Room ${this._rooms.length + 1}`,
@@ -236,9 +256,9 @@ export class OfficeState {
   }
 
   closeRoom(roomId: string): OfficeEvent[] {
-    const room = this._rooms.findIndex((r) => r.id === roomId);
+    const room = this._rooms.findIndex(r => r.id === roomId);
     if (room <= 0) return [];
-    const roomAgents = [...this.agents.values()].filter((a) => a.room === room);
+    const roomAgents = [...this.agents.values()].filter(a => a.room === room);
     if (roomAgents.length > 0) return [];
 
     this._rooms.splice(room, 1);
@@ -254,7 +274,7 @@ export class OfficeState {
   }
 
   renameRoom(roomId: string, name: string): OfficeEvent[] {
-    const room = this._rooms.findIndex((r) => r.id === roomId);
+    const room = this._rooms.findIndex(r => r.id === roomId);
     if (room < 0) return [];
     const trimmed = name.trim().slice(0, 40);
     if (!trimmed) return [];
@@ -265,16 +285,19 @@ export class OfficeState {
   moveAgent(agentId: string, targetRoomId: string): OfficeEvent[] {
     const agent = this.agents.get(agentId);
     if (!agent) return [];
-    const targetRoom = this._rooms.findIndex((r) => r.id === targetRoomId);
+    const targetRoom = this._rooms.findIndex(r => r.id === targetRoomId);
     if (targetRoom < 0) return [];
     if (agent.room === targetRoom) return [];
 
-    const targetAgents = [...this.agents.values()].filter((a) => a.room === targetRoom);
+    const targetAgents = [...this.agents.values()].filter(a => a.room === targetRoom);
     if (targetAgents.length >= 8) return [];
-    const taken = new Set(targetAgents.map((a) => a.desk));
+    const taken = new Set(targetAgents.map(a => a.desk));
     let newDesk = -1;
     for (let i = 0; i < 8; i++) {
-      if (!taken.has(i)) { newDesk = i; break; }
+      if (!taken.has(i)) {
+        newDesk = i;
+        break;
+      }
     }
     if (newDesk === -1) return [];
 
@@ -290,7 +313,7 @@ export class OfficeState {
   }
 
   setRoomSettings(roomId: string, prompt: string | null, envFile: string | null): OfficeEvent[] {
-    const idx = this._rooms.findIndex((r) => r.id === roomId);
+    const idx = this._rooms.findIndex(r => r.id === roomId);
     if (idx < 0) return [];
     const normalizedPrompt = prompt && prompt.trim() ? prompt.trim() : null;
     this._rooms[idx] = { ...this._rooms[idx], prompt: normalizedPrompt, envFile: envFile || null };
@@ -329,19 +352,19 @@ export class OfficeState {
   }
 
   updateTask(id: string, changes: Partial<Pick<TaskItem, "title" | "description" | "priority" | "status" | "assignee">>): OfficeEvent[] {
-    const task = this._tasks.find((t) => t.id === id);
+    const task = this._tasks.find(t => t.id === id);
     if (!task) return [];
     Object.assign(task, changes);
     return [{ type: "tasks_changed", tasks: [...this._tasks] }];
   }
 
   deleteTask(id: string): OfficeEvent[] {
-    this._tasks = this._tasks.filter((t) => t.id !== id);
+    this._tasks = this._tasks.filter(t => t.id !== id);
     return [{ type: "tasks_changed", tasks: [...this._tasks] }];
   }
 
   addRecentCwd(cwd: string) {
     if (!cwd) return;
-    this._recentCwds = [cwd, ...this._recentCwds.filter((c) => c !== cwd)].slice(0, 20);
+    this._recentCwds = [cwd, ...this._recentCwds.filter(c => c !== cwd)].slice(0, 20);
   }
 }

@@ -21,18 +21,21 @@ function cycleAgent(
   focusedAgentId: string | null,
   direction: "next" | "prev",
 ): string | null {
-  const roomAgents = agents.filter((a) => a.room === currentRoom);
+  const roomAgents = agents.filter(a => a.room === currentRoom);
   const sorted = [...roomAgents].sort((a, b) => a.desk - b.desk);
-  const nonIdle = sorted.filter((a) => (a.state !== "idle" && a.state !== "stopped") || (drafts.get(a.id) ?? "").length > 0);
+  const nonIdle = sorted.filter(a => (a.state !== "idle" && a.state !== "stopped") || (drafts.get(a.id) ?? "").length > 0);
   const pool = nonIdle.length > 0 ? nonIdle : sorted;
   if (pool.length === 0) return null;
-  const idx = pool.findIndex((a) => a.id === focusedAgentId);
+  const idx = pool.findIndex(a => a.id === focusedAgentId);
   if (idx !== -1 && pool.length <= 1) return null;
-  const next = idx === -1
-    ? (direction === "prev" ? pool[pool.length - 1] : pool[0])
-    : direction === "prev"
-      ? pool[(idx - 1 + pool.length) % pool.length]
-      : pool[(idx + 1) % pool.length];
+  const next =
+    idx === -1
+      ? direction === "prev"
+        ? pool[pool.length - 1]
+        : pool[0]
+      : direction === "prev"
+        ? pool[(idx - 1 + pool.length) % pool.length]
+        : pool[(idx + 1) % pool.length];
   return next.id;
 }
 
@@ -55,7 +58,7 @@ export function App() {
   const [tasksOpen, setTasksOpen] = useState(false);
   const [updateOpen, setUpdateOpen] = useState(false);
 
-  const focusedAgent = focusedAgentId ? agents.find((a) => a.id === focusedAgentId) : null;
+  const focusedAgent = focusedAgentId ? agents.find(a => a.id === focusedAgentId) : null;
 
   const swipeRoomNext = useCallback(() => {
     if (roomCount <= 1) return;
@@ -107,7 +110,7 @@ export function App() {
       // Number keys 1-8: focus agent at that desk in current room (only from office view)
       if (!isInput && !focusedAgentId && e.key >= "1" && e.key <= "8" && !e.metaKey && !e.ctrlKey && !e.altKey) {
         const deskIndex = parseInt(e.key) - 1;
-        const agent = agents.find((a) => a.desk === deskIndex && a.room === currentRoom);
+        const agent = agents.find(a => a.desk === deskIndex && a.room === currentRoom);
         if (agent) {
           e.preventDefault();
           dispatch({ type: "focus", agentId: agent.id });
@@ -116,9 +119,7 @@ export function App() {
       // Tab/Shift+Tab in office view: switch rooms
       if (!isInput && !focusedAgentId && e.key === "Tab" && roomCount > 1 && !e.defaultPrevented) {
         e.preventDefault();
-        const next = e.shiftKey
-          ? (currentRoom - 1 + roomCount) % roomCount
-          : (currentRoom + 1) % roomCount;
+        const next = e.shiftKey ? (currentRoom - 1 + roomCount) % roomCount : (currentRoom + 1) % roomCount;
         dispatch({ type: "set_current_room", room: next });
       }
       // Tab: cycle to next agent within current room (Shift+Tab: previous) when viewing an agent
@@ -162,15 +163,17 @@ export function App() {
     <>
       <style>{CSS}</style>
       {username === null && (
-        <UsernameModal onSave={(name) => {
-          localStorage.setItem("isomux-username", name);
-          setUsername(name);
-        }} />
+        <UsernameModal
+          onSave={name => {
+            localStorage.setItem("isomux-username", name);
+            setUsername(name);
+          }}
+        />
       )}
       {editingUsername && username !== null && (
         <UsernameModal
           defaultValue={username}
-          onSave={(name) => {
+          onSave={name => {
             localStorage.setItem("isomux-username", name);
             setUsername(name);
             setEditingUsername(false);
@@ -182,7 +185,10 @@ export function App() {
         <TaskView
           username={username ?? ""}
           onClose={goHome}
-          onFocusAgent={(agentId) => { setTasksOpen(false); dispatch({ type: "focus", agentId }); }}
+          onFocusAgent={agentId => {
+            setTasksOpen(false);
+            dispatch({ type: "focus", agentId });
+          }}
         />
       ) : focusedAgent ? (
         <LogView
@@ -198,13 +204,16 @@ export function App() {
         />
       ) : isMobile && mobileViewMode === "list" ? (
         <AgentListView
-          onFocus={(agentId) => dispatch({ type: "focus", agentId })}
+          onFocus={agentId => dispatch({ type: "focus", agentId })}
           onSpawn={() => setSpawnDesk(0)}
           onContextMenu={(x, y, agent) => setCtxMenu({ x, y, agent })}
           username={username ?? ""}
           onEditUsername={() => setEditingUsername(true)}
           onEditOfficePrompt={() => setEditingOfficePrompt(true)}
-          onEditRoomSettings={() => { const rid = rooms[currentRoom]?.id; if (rid) setEditingRoomSettings(rid); }}
+          onEditRoomSettings={() => {
+            const rid = rooms[currentRoom]?.id;
+            if (rid) setEditingRoomSettings(rid);
+          }}
           onOpenTasks={() => setTasksOpen(true)}
           onOpenUpdate={() => setUpdateOpen(true)}
           onToggleView={() => dispatch({ type: "toggle_mobile_view" })}
@@ -213,60 +222,47 @@ export function App() {
         />
       ) : (
         <OfficeView
-          onSpawn={(desk) => setSpawnDesk(desk)}
+          onSpawn={desk => setSpawnDesk(desk)}
           onContextMenu={(x, y, agent) => setCtxMenu({ x, y, agent })}
           username={username ?? ""}
           onEditUsername={() => setEditingUsername(true)}
           onEditOfficePrompt={() => setEditingOfficePrompt(true)}
-          onEditRoomSettings={() => { const rid = rooms[currentRoom]?.id; if (rid) setEditingRoomSettings(rid); }}
+          onEditRoomSettings={() => {
+            const rid = rooms[currentRoom]?.id;
+            if (rid) setEditingRoomSettings(rid);
+          }}
           onOpenTasks={() => setTasksOpen(true)}
           onOpenUpdate={() => setUpdateOpen(true)}
           onSwipeLeft={swipeRoomNext}
           onSwipeRight={swipeRoomPrev}
         />
       )}
-      {spawnDesk !== null && (
-        <EditAgentDialog
-          deskIndex={spawnDesk}
-          defaultCwd="~"
-          onClose={() => setSpawnDesk(null)}
-          room={currentRoom}
-        />
-      )}
+      {spawnDesk !== null && <EditAgentDialog deskIndex={spawnDesk} defaultCwd="~" onClose={() => setSpawnDesk(null)} room={currentRoom} />}
       {ctxMenu && (
         <ContextMenu
           x={ctxMenu.x}
           y={ctxMenu.y}
           agent={ctxMenu.agent}
           onClose={() => setCtxMenu(null)}
-          onEdit={(agent) => { setEditAgent(agent); setCtxMenu(null); }}
+          onEdit={agent => {
+            setEditAgent(agent);
+            setCtxMenu(null);
+          }}
         />
       )}
-      {editAgent && (
-        <EditAgentDialog
-          agent={editAgent}
-          onClose={() => setEditAgent(null)}
-        />
-      )}
+      {editAgent && <EditAgentDialog agent={editAgent} onClose={() => setEditAgent(null)} />}
       {editingOfficePrompt && (
         <OfficePromptModal
           onClose={() => setEditingOfficePrompt(false)}
           username={username ?? ""}
-          onSaveUsername={(name) => {
+          onSaveUsername={name => {
             localStorage.setItem("isomux-username", name);
             setUsername(name);
           }}
         />
       )}
-      {editingRoomSettings && (
-        <RoomSettingsModal
-          roomId={editingRoomSettings}
-          onClose={() => setEditingRoomSettings(null)}
-        />
-      )}
-      {updateOpen && (
-        <UpdateModal onClose={() => setUpdateOpen(false)} />
-      )}
+      {editingRoomSettings && <RoomSettingsModal roomId={editingRoomSettings} onClose={() => setEditingRoomSettings(null)} />}
+      {updateOpen && <UpdateModal onClose={() => setUpdateOpen(false)} />}
     </>
   );
 }

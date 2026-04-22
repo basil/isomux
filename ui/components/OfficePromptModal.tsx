@@ -2,13 +2,17 @@ import { useState, useEffect, useRef } from "react";
 import { useAppState } from "../store.tsx";
 import { send, addRawListener, removeRawListener } from "../ws.ts";
 
-type ValidationStatus =
-  | { kind: "idle" }
-  | { kind: "pending" }
-  | { kind: "ok"; keyCount?: number }
-  | { kind: "error"; message: string };
+type ValidationStatus = { kind: "idle" } | { kind: "pending" } | { kind: "ok"; keyCount?: number } | { kind: "error"; message: string };
 
-export function OfficePromptModal({ onClose, username, onSaveUsername }: { onClose: () => void; username: string; onSaveUsername: (name: string) => void }) {
+export function OfficePromptModal({
+  onClose,
+  username,
+  onSaveUsername,
+}: {
+  onClose: () => void;
+  username: string;
+  onSaveUsername: (name: string) => void;
+}) {
   const { office, isMobile } = useAppState();
   const [text, setText] = useState(office.prompt ?? "");
   const [envFile, setEnvFile] = useState(office.envFile ?? "");
@@ -83,7 +87,10 @@ export function OfficePromptModal({ onClose, username, onSaveUsername }: { onClo
   // ESC to close
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") { e.stopPropagation(); onClose(); }
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
     }
     window.addEventListener("keydown", handleKey, true);
     return () => window.removeEventListener("keydown", handleKey, true);
@@ -91,7 +98,9 @@ export function OfficePromptModal({ onClose, username, onSaveUsername }: { onClo
 
   return (
     <div
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onMouseDown={e => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       style={{
         position: "fixed",
         inset: 0,
@@ -102,8 +111,7 @@ export function OfficePromptModal({ onClose, username, onSaveUsername }: { onClo
         alignItems: isMobile ? "flex-start" : "center",
         justifyContent: "center",
         overflowY: "auto",
-      }}
-    >
+      }}>
       <div
         style={{
           background: "var(--bg-overlay)",
@@ -117,46 +125,48 @@ export function OfficePromptModal({ onClose, username, onSaveUsername }: { onClo
           maxWidth: isMobile ? "100%" : undefined,
           boxShadow: "0 20px 60px var(--shadow-heavy)",
           animation: "hudIn 0.2s ease-out",
-        }}
-      >
-        <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>
-          Office Settings
-        </h3>
+        }}>
+        <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>Office Settings</h3>
 
-        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", marginTop: 18, marginBottom: 5 }}>Boss Title</label>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          style={inputStyle}
-        />
+        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", marginTop: 18, marginBottom: 5 }}>
+          Boss Title
+        </label>
+        <input value={name} onChange={e => setName(e.target.value)} style={inputStyle} />
 
         <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", marginTop: 14, marginBottom: 5 }}>
           Env File Path <span style={{ fontWeight: 400, color: "var(--text-ghost)" }}>(optional, absolute path)</span>
         </label>
         <input
           value={envFile}
-          onChange={(e) => { setEnvFile(e.target.value); setStatus({ kind: "idle" }); }}
+          onChange={e => {
+            setEnvFile(e.target.value);
+            setStatus({ kind: "idle" });
+          }}
           placeholder="/home/you/.secrets/office.env"
           style={inputStyle}
         />
         <ValidationLine status={status} />
 
-        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", marginTop: 14, marginBottom: 5 }}>Rules <span style={{ fontWeight: 400, color: "var(--text-ghost)" }}>(system prompt for all agents)</span></label>
+        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", marginTop: 14, marginBottom: 5 }}>
+          Rules <span style={{ fontWeight: 400, color: "var(--text-ghost)" }}>(system prompt for all agents)</span>
+        </label>
         <textarea
           ref={textareaRef}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={e => setText(e.target.value)}
           placeholder="e.g. Always write tests. Use TypeScript. Be concise."
           rows={8}
           style={{ ...inputStyle, resize: "vertical" }}
         />
-        <p style={{ fontSize: 10, color: "var(--text-ghost)", margin: "3px 0 0" }}>
-          Changes take effect on next conversation.
-        </p>
+        <p style={{ fontSize: 10, color: "var(--text-ghost)", margin: "3px 0 0" }}>Changes take effect on next conversation.</p>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
-          <button onClick={onClose} style={cancelBtnStyle} disabled={saving}>Cancel</button>
-          <button onClick={handleSave} style={saveBtnStyle} disabled={saving}>{saving ? "Saving…" : "Save"}</button>
+          <button onClick={onClose} style={cancelBtnStyle} disabled={saving}>
+            Cancel
+          </button>
+          <button onClick={handleSave} style={saveBtnStyle} disabled={saving}>
+            {saving ? "Saving…" : "Save"}
+          </button>
         </div>
       </div>
     </div>
@@ -169,7 +179,11 @@ function ValidationLine({ status }: { status: ValidationStatus }) {
     return <p style={{ fontSize: 10, color: "var(--text-ghost)", margin: "4px 0 0" }}>Checking…</p>;
   }
   if (status.kind === "ok") {
-    return <p style={{ fontSize: 10, color: "var(--accent)", margin: "4px 0 0" }}>Loaded {status.keyCount ?? 0} variable{status.keyCount === 1 ? "" : "s"}.</p>;
+    return (
+      <p style={{ fontSize: 10, color: "var(--accent)", margin: "4px 0 0" }}>
+        Loaded {status.keyCount ?? 0} variable{status.keyCount === 1 ? "" : "s"}.
+      </p>
+    );
   }
   return <p style={{ fontSize: 10, color: "#ff6b6b", margin: "4px 0 0" }}>{status.message}</p>;
 }

@@ -17,10 +17,13 @@ export function EmptySlot({
 
   return (
     <div
-      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
+      onDragOver={e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+      }}
       onDragEnter={() => setDragOver(true)}
       onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => {
+      onDrop={e => {
         e.preventDefault();
         setDragOver(false);
         const src = parseInt(e.dataTransfer.getData("text/plain"), 10);
@@ -33,8 +36,7 @@ export function EmptySlot({
         width: 180,
         height: 160,
         zIndex: (pos.row * 2 + pos.col + 1) * 10,
-      }}
-    >
+      }}>
       <svg width="180" height="160" viewBox="0 0 180 160" overflow="visible" style={{ pointerEvents: "none" }}>
         {/* Invisible hit area — only the diamond shape triggers hover/click */}
         <path
@@ -65,8 +67,7 @@ export function EmptySlot({
           transform: "translateX(-50%)",
           textAlign: "center",
           pointerEvents: "none",
-        }}
-      >
+        }}>
         <span
           style={{
             fontSize: 11,
@@ -75,8 +76,7 @@ export function EmptySlot({
             opacity: hov ? 0.75 : 0.6,
             transition: "opacity 0.3s",
             fontFamily: "'JetBrains Mono',monospace",
-          }}
-        >
+          }}>
           {deskIndex + 1}
         </span>
       </div>
@@ -92,8 +92,7 @@ export function EmptySlot({
             alignItems: "center",
             pointerEvents: "none",
             animation: "hudIn 0.12s ease-out",
-          }}
-        >
+          }}>
           <div
             style={{
               width: 30,
@@ -107,8 +106,7 @@ export function EmptySlot({
               color: "var(--accent)",
               margin: "0 auto 5px",
               background: "rgba(126,184,255,0.06)",
-            }}
-          >
+            }}>
             +
           </div>
           <div style={{ fontSize: 10, color: "var(--accent)", fontWeight: 500 }}>New Agent</div>

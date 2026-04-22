@@ -53,13 +53,7 @@ const LIGHT_THEME = {
   brightWhite: "#1a2030",
 };
 
-export function TerminalPanel({
-  agentId,
-  onClose,
-}: {
-  agentId: string;
-  onClose: () => void;
-}) {
+export function TerminalPanel({ agentId, onClose }: { agentId: string; onClose: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -78,7 +72,7 @@ export function TerminalPanel({
         }
       } catch {}
     },
-    [agentId]
+    [agentId],
   );
 
   // Initialize terminal
@@ -111,7 +105,7 @@ export function TerminalPanel({
       });
     });
 
-    term.onData((data) => {
+    term.onData(data => {
       send({ type: "terminal_input", agentId, data });
     });
 
@@ -170,8 +164,7 @@ export function TerminalPanel({
         borderLeft: "1px solid var(--border-strong)",
         background: theme === "dark" ? "#0a0e16" : "#f0f2f6",
         position: "relative",
-      }}
-    >
+      }}>
       {/* Terminal header */}
       <div
         style={{
@@ -183,8 +176,7 @@ export function TerminalPanel({
           borderBottom: "1px solid var(--border-strong)",
           background: "var(--bg-surface)",
           flexShrink: 0,
-        }}
-      >
+        }}>
         <span
           style={{
             fontSize: 11,
@@ -192,8 +184,7 @@ export function TerminalPanel({
             display: "flex",
             alignItems: "center",
             gap: 6,
-          }}
-        >
+          }}>
           <span style={{ color: "var(--green)", fontSize: 13 }}>&#9654;</span>
           Terminal
         </span>
@@ -208,8 +199,7 @@ export function TerminalPanel({
             padding: "0 4px",
             lineHeight: 1,
           }}
-          title="Close terminal"
-        >
+          title="Close terminal">
           &times;
         </button>
       </div>
@@ -242,8 +232,7 @@ export function TerminalPanel({
             fontSize: 12,
             color: "var(--text-dim)",
             boxShadow: "0 4px 12px var(--shadow)",
-          }}
-        >
+          }}>
           <span>Shell exited ({exited})</span>
           <button
             onClick={handleRespawn}
@@ -255,8 +244,7 @@ export function TerminalPanel({
               color: "var(--green)",
               fontSize: 12,
               cursor: "pointer",
-            }}
-          >
+            }}>
             Restart
           </button>
         </div>

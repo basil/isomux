@@ -14,7 +14,10 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
-function buildPlainText(current: { sha: string; message: string; date: string }, latest: { sha: string; message: string; date: string }): string {
+function buildPlainText(
+  current: { sha: string; message: string; date: string },
+  latest: { sha: string; message: string; date: string },
+): string {
   return [
     "Update Available",
     "",
@@ -46,20 +49,22 @@ export function UpdateModal({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") { e.stopPropagation(); onClose(); }
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
     }
     window.addEventListener("keydown", handleKey, true);
     return () => window.removeEventListener("keydown", handleKey, true);
   }, [onClose]);
 
-  const getText = useCallback(
-    () => buildPlainText(updateCurrent, updateLatest),
-    [updateCurrent, updateLatest],
-  );
+  const getText = useCallback(() => buildPlainText(updateCurrent, updateLatest), [updateCurrent, updateLatest]);
 
   return (
     <div
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onMouseDown={e => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       style={{
         position: "fixed",
         inset: 0,
@@ -70,8 +75,7 @@ export function UpdateModal({ onClose }: { onClose: () => void }) {
         alignItems: isMobile ? "flex-start" : "center",
         justifyContent: "center",
         overflowY: "auto",
-      }}
-    >
+      }}>
       <div
         style={{
           background: "var(--bg-overlay)",
@@ -85,37 +89,38 @@ export function UpdateModal({ onClose }: { onClose: () => void }) {
           maxWidth: isMobile ? "100%" : undefined,
           boxShadow: "0 20px 60px var(--shadow-heavy)",
           animation: "hudIn 0.2s ease-out",
-        }}
-      >
+        }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>
-            Update Available
-          </h3>
+          <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>Update Available</h3>
           <CopyButton getText={getText} size={28} />
         </div>
 
         <ul style={{ ...textStyle, margin: "16px 0 0", paddingLeft: 20 }}>
           <li>
-            You are on commit <code style={code}>{shortSha(updateCurrent.sha)}</code>: {updateCurrent.message} ({formatDate(updateCurrent.date)})
+            You are on commit <code style={code}>{shortSha(updateCurrent.sha)}</code>: {updateCurrent.message} (
+            {formatDate(updateCurrent.date)})
           </li>
           <li style={{ marginTop: 4 }}>
             <a
               href={`https://github.com/${REPO}`}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: "var(--blue, #58a6ff)", textDecoration: "none" }}
-            >GitHub</a> is on commit <code style={code}>{shortSha(updateLatest.sha)}</code>: {updateLatest.message} ({formatDate(updateLatest.date)})
+              style={{ color: "var(--blue, #58a6ff)", textDecoration: "none" }}>
+              GitHub
+            </a>{" "}
+            is on commit <code style={code}>{shortSha(updateLatest.sha)}</code>: {updateLatest.message} ({formatDate(updateLatest.date)})
           </li>
         </ul>
 
-        <p style={{ ...textStyle, margin: "16px 0 6px", fontWeight: 600, color: "var(--text-primary)" }}>
-          To update:
-        </p>
+        <p style={{ ...textStyle, margin: "16px 0 6px", fontWeight: 600, color: "var(--text-primary)" }}>To update:</p>
         <ol style={{ ...textStyle, margin: 0, paddingLeft: 20 }}>
           <li>Pull the latest changes</li>
-          <li style={{ marginTop: 4 }}>Run <code style={code}>bun install</code></li>
           <li style={{ marginTop: 4 }}>
-            Restart the server: run <code style={code}>bun run dev</code>, or something like <code style={code}>systemctl --user restart isomux</code> if using a persistent systemd service.
+            Run <code style={code}>bun install</code>
+          </li>
+          <li style={{ marginTop: 4 }}>
+            Restart the server: run <code style={code}>bun run dev</code>, or something like{" "}
+            <code style={code}>systemctl --user restart isomux</code> if using a persistent systemd service.
           </li>
         </ol>
 
@@ -135,8 +140,7 @@ export function UpdateModal({ onClose }: { onClose: () => void }) {
               fontSize: 12,
               fontWeight: 600,
               cursor: "pointer",
-            }}
-          >
+            }}>
             Got it
           </button>
         </div>

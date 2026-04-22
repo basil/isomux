@@ -37,8 +37,7 @@ function DemoBanner() {
         borderBottom: "1px solid var(--border-light)",
         fontSize: 13,
         color: "var(--text-dim)",
-      }}
-    >
+      }}>
       <span>{isMobile ? "This is a demo. To connect real agents:" : "This is a demo office. To connect real Claude agents:"}</span>
       <a
         href="https://isomux.com"
@@ -46,8 +45,7 @@ function DemoBanner() {
           color: "var(--green)",
           textDecoration: "none",
           fontWeight: 600,
-        }}
-      >
+        }}>
         isomux.com
       </a>
     </div>
@@ -85,6 +83,5 @@ root.render(
         <DemoApp />
       </StoreProvider>
     </FeaturesProvider>
-  </ThemeProvider>
+  </ThemeProvider>,
 );
-
