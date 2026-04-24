@@ -96,6 +96,21 @@ function AttachmentDisplay({
   const images = attachments.filter((a) => a.mediaType.startsWith("image/"));
   const files = attachments.filter((a) => !a.mediaType.startsWith("image/"));
 
+  // Intercept Escape at the capture phase so the global window-level handler in
+  // App.tsx (which navigates back to the room view) doesn't fire while the
+  // lightbox is open.
+  useEffect(() => {
+    if (!lightboxSrc) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setLightboxSrc(null);
+      }
+    }
+    window.addEventListener("keydown", handleKey, true);
+    return () => window.removeEventListener("keydown", handleKey, true);
+  }, [lightboxSrc, setLightboxSrc]);
+
   return (
     <>
       {images.length > 0 && (
@@ -126,10 +141,7 @@ function AttachmentDisplay({
       )}
       {lightboxSrc && (
         <div
-          tabIndex={0}
-          ref={(el) => el?.focus()}
           onClick={() => setLightboxSrc(null)}
-          onKeyDown={(e) => e.key === "Escape" && setLightboxSrc(null)}
           style={{
             position: "fixed", inset: 0, zIndex: 9999,
             background: "rgba(0,0,0,0.85)",
