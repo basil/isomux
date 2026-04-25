@@ -11,6 +11,7 @@ type ValidationStatus =
 export function RoomSettingsModal({ roomId, onClose }: { roomId: string; onClose: () => void }) {
   const { rooms, isMobile } = useAppState();
   const room = rooms.find((r) => r.id === roomId);
+  const [name, setName] = useState(room?.name ?? "");
   const [prompt, setPrompt] = useState(room?.prompt ?? "");
   const [envFile, setEnvFile] = useState(room?.envFile ?? "");
   const [status, setStatus] = useState<ValidationStatus>({ kind: "idle" });
@@ -42,6 +43,11 @@ export function RoomSettingsModal({ roomId, onClose }: { roomId: string; onClose
   }, [room?.envFile, roomId]);
 
   function handleSave() {
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+    if (room && trimmedName !== room.name) {
+      send({ type: "rename_room", roomId, name: trimmedName });
+    }
     const reqId = `room-save-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     setSaving(true);
     const listener = (data: string) => {
@@ -121,6 +127,16 @@ export function RoomSettingsModal({ roomId, onClose }: { roomId: string; onClose
         </h3>
 
         <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", marginTop: 18, marginBottom: 5 }}>
+          Name
+        </label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Room name"
+          style={inputStyle}
+        />
+
+        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", marginTop: 14, marginBottom: 5 }}>
           Env File Path <span style={{ fontWeight: 400, color: "var(--text-ghost)" }}>(optional, absolute path)</span>
         </label>
         <input
@@ -148,7 +164,18 @@ export function RoomSettingsModal({ roomId, onClose }: { roomId: string; onClose
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
           <button onClick={onClose} style={cancelBtnStyle} disabled={saving}>Cancel</button>
-          <button onClick={handleSave} style={saveBtnStyle} disabled={saving}>{saving ? "Saving…" : "Save"}</button>
+          {(() => {
+            const disabled = saving || !name.trim();
+            return (
+              <button
+                onClick={handleSave}
+                disabled={disabled}
+                style={{ ...saveBtnStyle, opacity: disabled ? 0.45 : 1, cursor: disabled ? "not-allowed" : "pointer" }}
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+            );
+          })()}
         </div>
       </div>
     </div>
