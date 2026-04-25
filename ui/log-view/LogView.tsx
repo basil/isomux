@@ -354,6 +354,15 @@ export function LogView({
 
   const getConversationText = useCallback(() => serializeEntries(logs), [logs]);
 
+  const handleCancelEdit = useCallback(() => setEditingLogEntryId(null), []);
+  const handleSubmitEdit = useCallback(
+    (id: string, newText: string) => {
+      setEditingLogEntryId(null);
+      send({ type: "edit_message", agentId: agent.id, logEntryId: id, newText, username });
+    },
+    [agent.id, username],
+  );
+
   const handleCopy = useCallback(async () => {
     const text = getConversationText();
     try {
@@ -863,12 +872,9 @@ export function LogView({
               isMobile={isMobile}
               canEdit={canEditMsg}
               isEditing={editingLogEntryId === entry.id}
-              onStartEdit={(id) => setEditingLogEntryId(id)}
-              onCancelEdit={() => setEditingLogEntryId(null)}
-              onSubmitEdit={(id, newText) => {
-                setEditingLogEntryId(null);
-                send({ type: "edit_message", agentId: agent.id, logEntryId: id, newText, username });
-              }}
+              onStartEdit={setEditingLogEntryId}
+              onCancelEdit={handleCancelEdit}
+              onSubmitEdit={handleSubmitEdit}
             />
           );
         })}

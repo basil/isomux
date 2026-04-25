@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, memo } from "react";
 import type { LogEntry, Attachment } from "../../shared/types.ts";
 import { Markdown } from "./Markdown.tsx";
 import { CopyButton } from "../components/CopyButton.tsx";
@@ -171,7 +171,7 @@ function DurationLabel({ ms, isMobile }: { ms: number; isMobile?: boolean }) {
   );
 }
 
-export function LogEntryCard({
+export const LogEntryCard = memo(function LogEntryCard({
   entry,
   isLastInTurn,
   turnEntries,
@@ -266,7 +266,7 @@ export function LogEntryCard({
     default:
       return <div style={{ padding: "4px 0", color: "var(--text-muted)", fontSize: isMobile ? 14 : 12 }}>{entry.content}</div>;
   }
-}
+});
 
 function TurnCopyButton({ turnEntries }: { turnEntries?: LogEntry[] }) {
   const getText = useCallback(
