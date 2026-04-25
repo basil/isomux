@@ -263,16 +263,20 @@ export function LogView({
   }, [logs.length]);
 
   useEffect(() => {
-    if (autoScroll && scrollRef.current) {
-      const el = scrollRef.current;
-      // Defer scroll until after browser layout so scrollHeight is final.
-      // Double-rAF ensures content (images, code blocks, etc.) has been measured.
+    if (!autoScroll || !scrollRef.current) return;
+    const el = scrollRef.current;
+    // Defer scroll until after browser layout so scrollHeight is final.
+    // Double-rAF ensures content (images, code blocks, etc.) has been measured.
+    requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          el.scrollTop = el.scrollHeight;
-        });
+        // Skip if the user has an active selection inside the log — a
+        // scrollTop assignment here combined with sibling DOM churn (e.g.
+        // the sticky avatar remounting on agent.state change) clears it.
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed && sel.anchorNode && el.contains(sel.anchorNode)) return;
+        el.scrollTop = el.scrollHeight;
       });
-    }
+    });
   }, [logs, autoScroll, agent.state]);
 
   // Auto-resize textarea and place cursor at end when draft is restored
@@ -805,34 +809,37 @@ export function LogView({
           position: "relative",
         }}
       >
-        {/* Floating agent portrait */}
-        <div
-          onClick={onEditAgent}
-          style={{
-            position: "sticky",
-            top: isMobile ? 12 : 16,
-            float: "right",
-            marginRight: 0,
-            zIndex: 10,
-            width: 62,
-            height: 78,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: 8,
-            border: `2px solid ${MODEL_TINT[agent.modelFamily]?.border ?? "var(--border-medium)"}`,
-            background: MODEL_TINT[agent.modelFamily]?.bg ?? "rgba(128,128,128,0.2)",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
-            cursor: "pointer",
-            opacity: showAvatar ? 1 : 0,
-            pointerEvents: showAvatar ? "auto" : "none",
-            transition: "opacity 0.2s",
-          }}
-          title="Edit agent"
-        >
-          <Character key={agent.state} state={agent.state} outfit={agent.outfit} />
-        </div>
+        {/* Floating agent portrait — only mount when visible, so the
+            sticky+backdrop-filter element doesn't sit in the scroll
+            container's layer tree when hidden (suspected to deactivate
+            selections on layout commit). */}
+        {showAvatar && (
+          <div
+            onClick={onEditAgent}
+            style={{
+              position: "sticky",
+              top: isMobile ? 12 : 16,
+              float: "right",
+              marginRight: 0,
+              zIndex: 10,
+              width: 62,
+              height: 78,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 8,
+              border: `2px solid ${MODEL_TINT[agent.modelFamily]?.border ?? "var(--border-medium)"}`,
+              background: MODEL_TINT[agent.modelFamily]?.bg ?? "rgba(128,128,128,0.2)",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+              cursor: "pointer",
+              transition: "opacity 0.2s",
+            }}
+            title="Edit agent"
+          >
+            <Character key={agent.state} state={agent.state} outfit={agent.outfit} />
+          </div>
+        )}
         {logs.length === 0 && (
           <div
             style={{
