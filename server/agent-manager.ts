@@ -2577,11 +2577,15 @@ async function handleSlashCommand(agentId: string, managed: ManagedAgent, cmd: s
 
 // Execute a resolved skill prompt by sending it to the agent
 async function executeSkill(agentId: string, managed: ManagedAgent, skillPrompt: string, args: string[], rawText: string, username?: string): Promise<boolean> {
-  const userMeta = username ? { username } : undefined;
   const userArgs = args.join(" ");
   const fullPrompt = userArgs
     ? `${skillPrompt}\n\nUser context: ${userArgs}`
     : skillPrompt;
+  // sdkText captures the expanded prompt the SDK actually receives so editMessage
+  // can match this log entry against the SDK session (content alone is the slash
+  // command and won't match).
+  const userMeta: Record<string, unknown> = { sdkText: fullPrompt };
+  if (username) userMeta.username = username;
   addLogEntry(agentId, "user_message", rawText, userMeta);
   updateState(agentId, "thinking");
   const prefixedSkillPrompt = username ? `[${username}] ${fullPrompt}` : fullPrompt;
@@ -2809,17 +2813,22 @@ export async function editMessage(agentId: string, logEntryId: string, newText: 
       return;
     }
 
-    // 2. Get SDK session messages and match by content + occurrence index
+    // 2. Get SDK session messages and match by content + occurrence index.
+    //    For skill-expanded slash commands the log entry's `content` is the
+    //    raw command (e.g. "/grill") but the SDK received the expanded prompt;
+    //    `metadata.sdkText` captures that expanded form for matching.
     const sdkMessages = await getSessionMessages(oldSessionId);
     const targetUsername = targetEntry.metadata?.username as string | undefined;
-    const prefixedContent = targetUsername ? `[${targetUsername}] ${targetEntry.content}` : targetEntry.content;
+    const targetSdkText = (targetEntry.metadata?.sdkText as string | undefined) ?? targetEntry.content;
+    const prefixedContent = targetUsername ? `[${targetUsername}] ${targetSdkText}` : targetSdkText;
 
     // Count which occurrence of this exact content this is among user_message log entries
     const userLogEntries = oldLogCache.filter(e => e.kind === "user_message");
     let occurrenceIndex = 0;
     for (const e of userLogEntries) {
       const u = e.metadata?.username as string | undefined;
-      const prefixed = u ? `[${u}] ${e.content}` : e.content;
+      const sdkText = (e.metadata?.sdkText as string | undefined) ?? e.content;
+      const prefixed = u ? `[${u}] ${sdkText}` : sdkText;
       if (prefixed === prefixedContent) {
         if (e.id === logEntryId) break;
         occurrenceIndex++;
