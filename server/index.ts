@@ -188,6 +188,7 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
         status: "open",
         assignee: cmd.assignee,
         createdBy: cmd.username,
+        device: cmd.device ?? cmd.username,
         createdAt: Date.now(),
       };
       tasks.push(task);
@@ -324,6 +325,7 @@ const server = Bun.serve({
           status: "open",
           assignee: body.assignee ? String(body.assignee) : undefined,
           createdBy: String(body.createdBy),
+          device: body.device ? String(body.device) : undefined,
           createdAt: Date.now(),
         };
         tasks.push(task);

@@ -3,7 +3,7 @@ import { useAppState } from "../store.tsx";
 import { send } from "../ws.ts";
 import type { TaskItem, TaskStatus, TaskPriority } from "../../shared/types.ts";
 
-type SortField = "status" | "priority" | "title" | "assignee" | "createdBy" | "createdAt";
+type SortField = "status" | "priority" | "title" | "assignee" | "createdBy" | "device" | "createdAt";
 type SortDir = "asc" | "desc";
 
 const STATUS_ORDER: Record<TaskStatus, number> = { in_progress: 0, open: 1, done: 2 };
@@ -106,6 +106,7 @@ function TaskDetailPanel({ task, onClose, username, mode = "edit", agents = [], 
         priority: priority || undefined,
         assignee: assignee.trim() || undefined,
         username,
+        device: username,
       });
     } else if (task) {
       send({
@@ -241,7 +242,7 @@ function TaskDetailPanel({ task, onClose, username, mode = "edit", agents = [], 
 
       {mode === "edit" && task && (
         <div style={{ fontSize: 11, color: "var(--text-hint)", fontFamily: "'JetBrains Mono',monospace" }}>
-          Created by {task.createdBy} &middot; {timeAgo(task.createdAt)}
+          Created by {task.createdBy}{task.device && task.device !== task.createdBy ? ` (${task.device})` : ""} &middot; {timeAgo(task.createdAt)}
         </div>
       )}
 
@@ -412,6 +413,9 @@ export function TaskView({ username, onClose, onFocusAgent }: { username: string
           break;
         case "createdBy":
           cmp = a.createdBy.localeCompare(b.createdBy);
+          break;
+        case "device":
+          cmp = (a.device || "").localeCompare(b.device || "");
           break;
         case "createdAt":
           cmp = a.createdAt - b.createdAt;
@@ -608,6 +612,11 @@ export function TaskView({ username, onClose, onFocusAgent }: { username: string
                       BY{sortField === "createdBy" ? (sortDir === "asc" ? " \u25B2" : " \u25BC") : ""}
                     </th>
                   )}
+                  {!isMobile && (
+                    <th style={{ ...thStyle, width: 90 }} onClick={() => handleSort("device")}>
+                      DEVICE{sortField === "device" ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
+                    </th>
+                  )}
                   <th style={{ ...thStyle, width: 70 }} onClick={() => handleSort("createdAt")}>
                     AGE{sortField === "createdAt" ? (sortDir === "asc" ? " \u25B2" : " \u25BC") : ""}
                   </th>
@@ -616,7 +625,7 @@ export function TaskView({ username, onClose, onFocusAgent }: { username: string
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={isMobile ? 5 : 6} style={{ textAlign: "center", padding: "24px 0", color: "var(--text-muted)", fontSize: 13 }}>
+                    <td colSpan={isMobile ? 5 : 7} style={{ textAlign: "center", padding: "24px 0", color: "var(--text-muted)", fontSize: 13 }}>
                       No tasks
                     </td>
                   </tr>
@@ -693,6 +702,11 @@ export function TaskView({ username, onClose, onFocusAgent }: { username: string
                       {!isMobile && (
                         <td style={{ padding: cellPad, fontSize: 11, color: "var(--text-hint)", fontFamily: "'JetBrains Mono',monospace" }}>
                           {renderName(task.createdBy)}
+                        </td>
+                      )}
+                      {!isMobile && (
+                        <td style={{ padding: cellPad, fontSize: 11, color: "var(--text-hint)", fontFamily: "'JetBrains Mono',monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {task.device || ""}
                         </td>
                       )}
                       <td style={{ padding: cellPad, fontSize: 10, color: "var(--text-hint)", fontFamily: "'JetBrains Mono',monospace", whiteSpace: "nowrap" }}>

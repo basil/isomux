@@ -148,6 +148,7 @@ export interface TaskItem {
   status: TaskStatus;
   assignee?: string;
   createdBy: string;
+  device?: string;      // Device (boss name) that originated the request, if known
   createdAt: number;
 }
 
@@ -291,7 +292,7 @@ export type ClientCommand =
   | { type: "update_room_settings"; requestId: string; roomId: string; prompt: string | null; envFile: string | null }
   | { type: "request_settings_validation"; requestId: string; scope: "office" | "room"; roomId?: string }
   | { type: "request_cwd_validation"; requestId: string; cwd: string }
-  | { type: "add_task"; title: string; description?: string; priority?: TaskPriority; assignee?: string; username: string }
+  | { type: "add_task"; title: string; description?: string; priority?: TaskPriority; assignee?: string; username: string; device?: string }
   | { type: "update_task"; id: string; changes: Partial<Pick<TaskItem, "title" | "description" | "priority" | "status" | "assignee">> }
   | { type: "delete_task"; id: string }
   | { type: "create_room"; name?: string }

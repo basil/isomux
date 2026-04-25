@@ -228,11 +228,12 @@ How to use the task board (localhost:4000/tasks): only touch it when the boss as
   curl -s localhost:4000/tasks                                          # list open tasks
   curl -s localhost:4000/tasks?status=all                               # include done
   curl -s -X POST localhost:4000/tasks -H 'Content-Type: application/json' \\
-    -d '{"title":"...","createdBy":"${agentName}"}'                     # create
+    -d '{"title":"...","createdBy":"${agentName}","device":"<boss-name>"}'          # create
   curl -s -X POST localhost:4000/tasks/ID/claim -H 'Content-Type: application/json' \\
     -d '{"assignee":"${agentName}"}'                                    # claim
   curl -s -X POST localhost:4000/tasks/ID/done -d '{}'                  # mark done
 Optional fields on create/update: description, priority (P0-P3), assignee.
+Set "device" to the boss name in brackets of the message that asked you to add the task (e.g. "[Nil] add task X" → device:"Nil"). Omit if you can't tell.
 
 How to show an image to the boss: read the image file with the Read tool — it renders inline in the conversation.
 
