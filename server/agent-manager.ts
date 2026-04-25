@@ -833,6 +833,7 @@ async function generateTopic(agentId: string) {
   try {
     const result = await unstable_v2_prompt(prompt, {
       model: FAMILY_TO_MODEL.sonnet,
+      pathToClaudeCodeExecutable: CLAUDE_NATIVE_BIN,
       permissionMode: "plan",
     });
     if (result.subtype === "success" && agents.has(agentId)) {
