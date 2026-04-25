@@ -6,8 +6,9 @@ import { Character } from "../office/Character.tsx";
 import { send } from "../ws.ts";
 import { useAppState, useDispatch, useFeatures, useTheme } from "../store.tsx";
 import { LogEntryCard, serializeEntries } from "./LogEntryCard.tsx";
-import { CopyButton } from "../components/CopyButton.tsx";
 import { SunIcon, MoonIcon } from "../components/ThemeIcons.tsx";
+import { NavActions, type NavAction } from "../components/NavActions.tsx";
+import { TasksIcon, PersonIcon, TerminalIcon, CopyIcon, CheckIcon } from "../components/NavIcons.tsx";
 import { TerminalPanel } from "./TerminalPanel.tsx";
 import { useSwipeLeftRight } from "../hooks/useSwipeLeftRight.ts";
 
@@ -24,15 +25,6 @@ const MODEL_TINT: Record<ModelFamily, { border: string; bg: string }> = {
   sonnet: { border: "rgba(218,165,32,0.80)",  bg: "rgba(218,165,32,0.32)" },
   haiku:  { border: "rgba(230,130,180,0.80)", bg: "rgba(230,130,180,0.32)" },
 };
-
-function PersonIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="8" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.5" fill="none" />
-      <path d="M3 14c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-    </svg>
-  );
-}
 
 function formatElapsed(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
@@ -166,6 +158,8 @@ export function LogView({
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [showAvatar, setShowAvatar] = useState(() => localStorage.getItem("isomux-show-avatar") !== "false");
   const toggleAvatar = () => setShowAvatar((prev) => { const next = !prev; localStorage.setItem("isomux-show-avatar", String(next)); return next; });
+  const [copied, setCopied] = useState(false);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isListening, setIsListening] = useState(false);
   const isListeningRef = useRef(false);
   const [showMicHint, setShowMicHint] = useState(false);
@@ -355,6 +349,36 @@ export function LogView({
   }, [logs]);
 
   const getConversationText = useCallback(() => serializeEntries(logs), [logs]);
+
+  const handleCopy = useCallback(async () => {
+    const text = getConversationText();
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => setCopied(false), 1500);
+  }, [getConversationText]);
+
+  const baseAgentActions: NavAction[] = [
+    ...(onOpenTasks ? [{ id: "tasks", icon: TasksIcon, label: "Tasks", onClick: onOpenTasks }] : []),
+    ...(logs.length > 0 ? [{ id: "copy", icon: copied ? CheckIcon : CopyIcon, label: copied ? "Copied" : "Copy", onClick: handleCopy, active: copied }] : []),
+    { id: "agent", icon: PersonIcon, label: "Agent avatar", onClick: toggleAvatar, active: showAvatar },
+    { id: "theme", icon: theme === "dark" ? <SunIcon size={15} /> : <MoonIcon size={15} />, label: theme === "dark" ? "Light mode" : "Dark mode", onClick: toggleTheme },
+  ];
+
+  const desktopAgentActions: NavAction[] = features.terminal
+    ? [...baseAgentActions, { id: "terminal", icon: TerminalIcon, label: "Terminal", onClick: () => setTerminalOpen((v) => !v), active: terminalOpen, title: "Open terminal (Ctrl+`)" }]
+    : baseAgentActions;
 
   function autoResize(el: HTMLTextAreaElement) {
     el.style.height = "auto";
@@ -596,27 +620,7 @@ export function LogView({
               {STATE_LABELS[agent.state] && (
                 <HeaderTimer state={agent.state} stateChangedAt={stateChangedAt.get(agent.id)} />
               )}
-              {logs.length > 0 && <CopyButton getText={getConversationText} />}
-              <button
-                onClick={toggleAvatar}
-                title={showAvatar ? "Hide agent avatar" : "Show agent avatar"}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "2px 6px",
-                  borderRadius: 6,
-                  border: "1px solid var(--border-medium)",
-                  background: "var(--btn-surface)",
-                  color: "var(--text-dim)",
-                  cursor: "pointer",
-                  opacity: showAvatar ? 1 : 0.35,
-                  transition: "opacity 0.2s",
-                  flexShrink: 0,
-                }}
-              >
-                <PersonIcon />
-              </button>
+              <NavActions actions={baseAgentActions} viewport="mobile" />
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 16 }}>
               <span style={{
@@ -632,9 +636,9 @@ export function LogView({
         <div
           style={{
             display: "flex",
-            alignItems: "center",
+            alignItems: "stretch",
             justifyContent: "space-between",
-            padding: "0 16px",
+            padding: "0 16px 0 0",
             height: 48,
             background: "var(--bg-surface)",
             borderBottom: "1px solid var(--border-strong)",
@@ -647,13 +651,14 @@ export function LogView({
               display: "flex",
               alignItems: "center",
               gap: 8,
-              padding: "6px 14px",
-              borderRadius: 8,
-              border: "1px solid var(--border-medium)",
+              padding: "0 16px",
+              border: "none",
+              borderRight: "1px solid var(--border-medium)",
               background: "var(--btn-surface)",
               color: "var(--text-dim)",
               fontSize: 13,
               cursor: "pointer",
+              flexShrink: 0,
             }}
           >
             ← Back to Office
@@ -781,83 +786,8 @@ export function LogView({
               {familyDisplayLabel(agent.modelFamily)}
             </span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
-            {onOpenTasks && (
-              <button
-                onClick={onOpenTasks}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: 6,
-                  border: "1px solid var(--border-medium)",
-                  background: "var(--btn-surface)",
-                  color: "var(--text-dim)",
-                  fontSize: 11,
-                  cursor: "pointer",
-                }}
-              >
-                Tasks
-              </button>
-            )}
-            {logs.length > 0 && <CopyButton getText={getConversationText} />}
-            <button
-              onClick={toggleAvatar}
-              title={showAvatar ? "Hide agent avatar" : "Show agent avatar"}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "4px 8px",
-                borderRadius: 6,
-                border: "1px solid var(--border-medium)",
-                background: "var(--btn-surface)",
-                color: "var(--text-dim)",
-                cursor: "pointer",
-                opacity: showAvatar ? 1 : 0.35,
-                transition: "opacity 0.2s",
-              }}
-            >
-              <PersonIcon />
-            </button>
-            {!isMobile && (
-              <button
-                onClick={toggleTheme}
-                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "4px 8px",
-                  borderRadius: 6,
-                  border: "1px solid var(--border-medium)",
-                  background: "var(--btn-surface)",
-                  color: "var(--text-dim)",
-                  cursor: "pointer",
-                }}
-              >
-                {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-              </button>
-            )}
-            {features.terminal && (
-            <button
-              onClick={() => setTerminalOpen((prev) => !prev)}
-              title={terminalOpen ? "Close terminal (Ctrl+`)" : "Open terminal (Ctrl+`)"}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                padding: "4px 10px",
-                borderRadius: 6,
-                border: `1px solid ${terminalOpen ? "var(--green-border)" : "var(--border-medium)"}`,
-                background: terminalOpen ? "var(--green-bg)" : "var(--btn-surface)",
-                color: terminalOpen ? "var(--green)" : "var(--text-dim)",
-                fontSize: 12,
-                cursor: "pointer",
-                transition: "all 0.15s",
-              }}
-            >
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11 }}>&gt;_</span>
-            </button>
-            )}
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <NavActions actions={desktopAgentActions} viewport="desktop" />
           </div>
         </div>
       )}

@@ -10,6 +10,8 @@ import { SCENE_W, SCENE_H } from "./grid.ts";
 import { send } from "../ws.ts";
 import { SunIcon, MoonIcon } from "../components/ThemeIcons.tsx";
 import { MobileHeader, getRoomCounts } from "../components/MobileHeader.tsx";
+import { NavActions, type NavAction } from "../components/NavActions.tsx";
+import { TasksIcon, BuildingIcon, DoorIcon, ListIcon } from "../components/NavIcons.tsx";
 import { useSwipeLeftRight } from "../hooks/useSwipeLeftRight.ts";
 import type { AgentInfo } from "../../shared/types.ts";
 
@@ -60,6 +62,18 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
 
   const counts = getRoomCounts(roomAgents);
 
+  const officeActions: NavAction[] = [
+    { id: "tasks", icon: TasksIcon, label: "Tasks", onClick: onOpenTasks },
+    { id: "office", icon: BuildingIcon, label: "Office settings", onClick: onEditOfficePrompt },
+    ...(onEditRoomSettings ? [{ id: "room", icon: DoorIcon, label: "Room settings", onClick: onEditRoomSettings }] : []),
+    { id: "theme", icon: theme === "dark" ? <SunIcon size={15} /> : <MoonIcon size={15} />, label: theme === "dark" ? "Light mode" : "Dark mode", onClick: toggleTheme },
+  ];
+
+  const mobileOfficeActions: NavAction[] = [
+    ...officeActions,
+    { id: "list", icon: ListIcon, label: "Show agent list", onClick: () => dispatch({ type: "toggle_mobile_view" }) },
+  ];
+
   return (
     <div
       style={{
@@ -74,12 +88,8 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
       {/* Top HUD bar */}
       {embed ? null : isMobile ? (
         <MobileHeader
-          viewMode="office"
-          onToggleView={() => dispatch({ type: "toggle_mobile_view" })}
           counts={counts}
-          onOpenTasks={onOpenTasks}
-          onEditOfficePrompt={onEditOfficePrompt}
-          onEditRoomSettings={onEditRoomSettings}
+          actions={mobileOfficeActions}
           updateAvailable={updateAvailable}
           onOpenUpdate={onOpenUpdate}
         />
@@ -157,53 +167,7 @@ export function OfficeView({ onSpawn, onContextMenu, username, onEditUsername, o
                 </div>
               ))}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button
-              onClick={onOpenTasks}
-              style={{
-                padding: "4px 10px",
-                borderRadius: 8,
-                border: "1px solid var(--border-medium)",
-                background: "var(--btn-surface)",
-                color: "var(--text-dim)",
-                fontSize: 11,
-                cursor: "pointer",
-              }}
-            >
-              Tasks
-            </button>
-            <button
-              onClick={onEditOfficePrompt}
-              style={{
-                padding: "4px 10px",
-                borderRadius: 8,
-                border: "1px solid var(--border-medium)",
-                background: "var(--btn-surface)",
-                color: "var(--text-dim)",
-                fontSize: 11,
-                cursor: "pointer",
-              }}
-            >
-              Office settings
-            </button>
-            <button
-              onClick={toggleTheme}
-              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "4px 8px",
-                borderRadius: 8,
-                border: "1px solid var(--border-medium)",
-                background: "var(--btn-surface)",
-                color: "var(--text-dim)",
-                cursor: "pointer",
-              }}
-            >
-              {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-            </button>
-          </div>
+          <NavActions actions={officeActions} viewport="desktop" />
         </div>
       )}
 

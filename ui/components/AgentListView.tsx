@@ -1,8 +1,11 @@
-import { useAppState } from "../store.tsx";
+import { useAppState, useTheme } from "../store.tsx";
 import { StatusLight } from "../office/StatusLight.tsx";
 import { RoomTabBar } from "../office/RoomTabBar.tsx";
 import { MobileHeader, getRoomCounts } from "./MobileHeader.tsx";
 import { useSwipeLeftRight } from "../hooks/useSwipeLeftRight.ts";
+import { type NavAction } from "./NavActions.tsx";
+import { TasksIcon, BuildingIcon, DoorIcon, IsoIcon } from "./NavIcons.tsx";
+import { SunIcon, MoonIcon } from "./ThemeIcons.tsx";
 import type { AgentInfo } from "../../shared/types.ts";
 
 export function AgentListView({
@@ -33,9 +36,18 @@ export function AgentListView({
   onSwipeRight?: () => void;
 }) {
   const { agents, currentRoom, rooms, updateAvailable } = useAppState();
+  const { theme, toggleTheme } = useTheme();
   const roomCount = rooms.length;
   const roomAgents = agents.filter((a) => a.room === currentRoom);
   const swipeRef = useSwipeLeftRight(onSwipeLeft ?? (() => {}), onSwipeRight ?? (() => {}), true);
+
+  const actions: NavAction[] = [
+    { id: "tasks", icon: TasksIcon, label: "Tasks", onClick: onOpenTasks },
+    { id: "office", icon: BuildingIcon, label: "Office settings", onClick: onEditOfficePrompt },
+    ...(onEditRoomSettings ? [{ id: "room", icon: DoorIcon, label: "Room settings", onClick: onEditRoomSettings }] : []),
+    { id: "theme", icon: theme === "dark" ? <SunIcon size={15} /> : <MoonIcon size={15} />, label: theme === "dark" ? "Light mode" : "Dark mode", onClick: toggleTheme },
+    { id: "list", icon: IsoIcon, label: "Show floor view", onClick: onToggleView },
+  ];
 
   return (
     <div
@@ -48,12 +60,8 @@ export function AgentListView({
       }}
     >
       <MobileHeader
-        viewMode="list"
-        onToggleView={onToggleView}
         counts={getRoomCounts(roomAgents)}
-        onOpenTasks={onOpenTasks}
-        onEditOfficePrompt={onEditOfficePrompt}
-        onEditRoomSettings={onEditRoomSettings}
+        actions={actions}
         updateAvailable={updateAvailable}
         onOpenUpdate={onOpenUpdate}
       />

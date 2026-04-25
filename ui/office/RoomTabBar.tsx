@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useAppState, useDispatch } from "../store.tsx";
 import { send } from "../ws.ts";
 import { RoomSettingsModal } from "../components/RoomSettingsModal.tsx";
+import { Portal } from "../components/Portal.tsx";
 
 export function RoomTabBar() {
   const { agents, currentRoom, rooms, needsAttention } = useAppState();
@@ -218,6 +219,9 @@ export function RoomTabBar() {
                   letterSpacing: "0.02em",
                   outline: "none",
                   position: "relative",
+                  userSelect: "none",
+                  WebkitUserSelect: "none",
+                  WebkitTouchCallout: "none",
                 }}
               >
                 {displayName}
@@ -301,33 +305,35 @@ export function RoomTabBar() {
         const roomAgents = agents.filter((a) => a.room === ctxMenu.roomIdx);
         const canClose = ctxMenu.roomIdx > 0 && roomAgents.length === 0;
         return (
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: "fixed",
-              left: Math.min(ctxMenu.x, window.innerWidth - 180),
-              top: Math.min(ctxMenu.y, window.innerHeight - 140),
-              background: "var(--bg-overlay)",
-              border: "1px solid var(--border-light)",
-              borderRadius: 8,
-              boxShadow: "0 10px 30px var(--shadow-heavy)",
-              padding: 4,
-              minWidth: 160,
-              zIndex: 950,
-              fontFamily: "'DM Sans',sans-serif",
-              fontSize: 12,
-            }}
-          >
-            <button style={ctxItemStyle} onClick={() => { setCtxMenu(null); startEditing(ctxMenu.roomIdx); }}>Rename</button>
-            <button style={ctxItemStyle} onClick={() => { setCtxMenu(null); setSettingsRoomId(room.id); }}>Room settings…</button>
-            <button
-              style={{ ...ctxItemStyle, color: canClose ? "var(--text-dim)" : "var(--text-ghost)", cursor: canClose ? "pointer" : "not-allowed" }}
-              disabled={!canClose}
-              onClick={() => { setCtxMenu(null); if (canClose) send({ type: "close_room", roomId: room.id }); }}
+          <Portal>
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: "fixed",
+                left: Math.min(ctxMenu.x, window.innerWidth - 180),
+                top: Math.min(ctxMenu.y, window.innerHeight - 140),
+                background: "var(--bg-overlay)",
+                border: "1px solid var(--border-light)",
+                borderRadius: 8,
+                boxShadow: "0 10px 30px var(--shadow-heavy)",
+                padding: 4,
+                minWidth: 160,
+                zIndex: 2000,
+                fontFamily: "'DM Sans',sans-serif",
+                fontSize: 12,
+              }}
             >
-              Close room
-            </button>
-          </div>
+              <button style={ctxItemStyle} onClick={() => { setCtxMenu(null); startEditing(ctxMenu.roomIdx); }}>Rename</button>
+              <button style={ctxItemStyle} onClick={() => { setCtxMenu(null); setSettingsRoomId(room.id); }}>Room settings…</button>
+              <button
+                style={{ ...ctxItemStyle, color: canClose ? "var(--text-dim)" : "var(--text-ghost)", cursor: canClose ? "pointer" : "not-allowed" }}
+                disabled={!canClose}
+                onClick={() => { setCtxMenu(null); if (canClose) send({ type: "close_room", roomId: room.id }); }}
+              >
+                Close room
+              </button>
+            </div>
+          </Portal>
         );
       })()}
 
