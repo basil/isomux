@@ -3,6 +3,7 @@ import type { LogEntry, Attachment } from "../../shared/types.ts";
 import { Markdown } from "./Markdown.tsx";
 import { CopyButton } from "../components/CopyButton.tsx";
 import { SpeakButton } from "../components/SpeakButton.tsx";
+import { DiffCard } from "./DiffCard.tsx";
 
 function EditIcon() {
   return (
@@ -258,6 +259,10 @@ export function LogEntryCard({
       );
     case "system":
       return <SystemMessage content={entry.content} isMobile={isMobile} />;
+    case "diff": {
+      if (!entry.diff) return <SystemMessage content={entry.content} isMobile={isMobile} />;
+      return <DiffCard payload={entry.diff} />;
+    }
     default:
       return <div style={{ padding: "4px 0", color: "var(--text-muted)", fontSize: isMobile ? 14 : 12 }}>{entry.content}</div>;
   }
