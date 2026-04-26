@@ -20,6 +20,7 @@ import {
   generateCronjobRunId,
   cronjobRunStreamId,
   humanizeSchedule,
+  type Attachment,
   type Cronjob,
   type CronjobRun,
   type CronjobPermissionMode,
@@ -28,12 +29,15 @@ import {
 } from "../shared/types.ts";
 import { CLAUDE_NATIVE_BIN, validateCwd, resolveCwd } from "./cwd-utils.ts";
 import { createSafetyHooks } from "./safety-hooks.ts";
-import { loadOfficeConfig, saveOfficeConfig, type PersistedUsage } from "./persistence.ts";
+import { loadOfficeConfig, saveFile, type PersistedUsage } from "./persistence.ts";
 import {
   loadCronjobs,
   saveCronjobs,
   loadCronjobHistory,
   saveCronjobHistory,
+  loadCronjobsPrompt,
+  saveCronjobsPrompt,
+  migrateCronjobsPromptFromOfficeConfig,
   loadRuns,
   saveRuns,
   appendRun,
@@ -64,6 +68,10 @@ interface ActiveRun {
   lastAssistantText: string;      // for previewText computation
   trigger: CronjobRun["trigger"];
   killed: boolean;
+  // Buffer entries created before SDK init assigns a sessionId. Without this,
+  // pre-init errors (e.g. "Failed to send prompt") get broadcast to clients
+  // but never persisted to disk, so they vanish on reload.
+  pendingEntries: LogEntry[];
 }
 
 const activeRuns = new Map<string, ActiveRun>(); // runId -> ActiveRun
@@ -102,7 +110,10 @@ export function computeNextFire(schedule: Schedule, anchor: number, now: number 
     const intervalMs = Math.max(MIN_INTERVAL_MINUTES, schedule.minutes) * 60_000;
     if (now <= anchor) return anchor + intervalMs;
     const elapsed = now - anchor;
-    const periods = Math.ceil(elapsed / intervalMs);
+    // floor + 1 (not ceil): when elapsed lands exactly on a period boundary,
+    // ceil(N) = N gives nextFireAt == now and the scheduler fires immediately.
+    // floor(N) + 1 always returns the *next* future period.
+    const periods = Math.floor(elapsed / intervalMs) + 1;
     return anchor + periods * intervalMs;
   }
   if (schedule.type === "daily") {
@@ -157,9 +168,7 @@ export function getCronjobsPrompt(): string | null {
 export function setCronjobsPrompt(value: string | null) {
   const normalized = value && value.trim() ? value.trim() : null;
   cronjobsPrompt = normalized;
-  const cfg = loadOfficeConfig();
-  cfg.cronjobsPrompt = normalized;
-  saveOfficeConfig(cfg);
+  saveCronjobsPrompt(normalized);
   eventHandler({ type: "cronjobs_prompt_updated", value: normalized });
 }
 
@@ -221,7 +230,12 @@ export function updateCronjob(
   if (changes.enabled !== undefined) next.enabled = changes.enabled;
   if (changes.schedule !== undefined) {
     next.schedule = clampSchedule(changes.schedule);
-    next.nextFireAt = computeNextFire(next.schedule, next.createdAt, Date.now());
+    // Anchor to the most recent fire (or createdAt if never fired) so an
+    // edit can't surprise-fire immediately. The design doc originally said
+    // anchor to createdAt for "predictable cadence", but that produces
+    // immediate fires when the new period happens to align near `now`.
+    const anchor = next.lastFireAt ?? next.createdAt;
+    next.nextFireAt = computeNextFire(next.schedule, anchor, Date.now());
   }
   cronjobs[idx] = next;
   saveCronjobs(cronjobs);
@@ -306,19 +320,6 @@ How to answer questions about Isomux itself: the source lives at https://github.
 // Run lifecycle
 // ---------------------------------------------------------------------------
 
-function emitLogEntry(streamId: string, kind: LogEntry["kind"], content: string, metadata?: Record<string, unknown>): LogEntry {
-  const entry: LogEntry = {
-    id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    agentId: streamId,
-    timestamp: Date.now(),
-    kind,
-    content,
-    ...(metadata ? { metadata } : {}),
-  };
-  eventHandler({ type: "log_entry", entry });
-  return entry;
-}
-
 function processCronjobMessage(active: ActiveRun, msg: SDKMessage) {
   switch (msg.type) {
     case "system": {
@@ -336,6 +337,13 @@ function processCronjobMessage(active: ActiveRun, msg: SDKMessage) {
               eventHandler({ type: "cronjob_run_updated", run: updated });
             }
           }
+          // Flush any pre-init log entries (errors, etc.) to the now-known
+          // session's JSONL so they survive a reload.
+          for (const entry of active.pendingEntries) {
+            appendRunLog(active.jobId, active.runId, sessionId, entry);
+            active.lastWrittenEntryId = entry.id;
+          }
+          active.pendingEntries = [];
         }
       }
       break;
@@ -369,7 +377,30 @@ function processCronjobMessage(active: ActiveRun, msg: SDKMessage) {
                     .map((c: any) => c.text)
                     .join("\n")
                 : JSON.stringify(block.content);
-          writeLog(active, "tool_result", resultText.slice(0, 10000), { toolUseId: block.tool_use_id });
+          // Extract image attachments from tool_result blocks (e.g. from the
+          // Read tool reading an image). Files are saved under the cronjob run
+          // stream id so the existing /api/files/<agentId>/... route resolves
+          // them; this couples cronjob attachments to the agent storage tree
+          // (~/.isomux/logs/cronrun-<runId>/files/) — see follow-up task to
+          // plumb parseStreamId through file-route resolution.
+          let resultAttachments: Attachment[] | undefined;
+          if (Array.isArray(block.content)) {
+            const atts: Attachment[] = [];
+            for (const c of block.content as any[]) {
+              if (c.type === "image" && c.source?.type === "base64") {
+                const decoded = Buffer.from(c.source.data, "base64");
+                const att = saveFile(
+                  active.streamId,
+                  decoded,
+                  c.source.media_type,
+                  `image.${c.source.media_type.split("/")[1] ?? "png"}`,
+                );
+                if (att) atts.push(att);
+              }
+            }
+            if (atts.length > 0) resultAttachments = atts;
+          }
+          writeLog(active, "tool_result", resultText.slice(0, 10000), { toolUseId: block.tool_use_id }, resultAttachments);
         }
       }
       break;
@@ -405,7 +436,7 @@ function processCronjobMessage(active: ActiveRun, msg: SDKMessage) {
   }
 }
 
-function writeLog(active: ActiveRun, kind: LogEntry["kind"], content: string, metadata?: Record<string, unknown>) {
+function writeLog(active: ActiveRun, kind: LogEntry["kind"], content: string, metadata?: Record<string, unknown>, attachments?: Attachment[]) {
   const entry: LogEntry = {
     id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     agentId: active.streamId,
@@ -413,10 +444,14 @@ function writeLog(active: ActiveRun, kind: LogEntry["kind"], content: string, me
     kind,
     content,
     ...(metadata ? { metadata } : {}),
+    ...(attachments && attachments.length > 0 ? { attachments } : {}),
   };
   if (active.sessionId) {
     appendRunLog(active.jobId, active.runId, active.sessionId, entry);
     active.lastWrittenEntryId = entry.id;
+  } else {
+    // Pre-init: buffer until processCronjobMessage(system/init) flushes us.
+    active.pendingEntries.push(entry);
   }
   eventHandler({ type: "log_entry", entry });
 }
@@ -437,11 +472,32 @@ async function runConsumer(active: ActiveRun) {
 }
 
 function finalizeRun(active: ActiveRun, status: CronjobRun["status"], errorReason: string | null = null) {
+  // Idempotent: multiple paths can race to finalize (runConsumer's success
+  // branch when stream ends, the IIFE's catch when session.send() fails, the
+  // timeout handler). The first one wins; later calls no-op. Without this,
+  // a send-fail's finalizeRun(failed) gets clobbered by runConsumer reaching
+  // finalizeRun(completed) right after session.close() ends the stream.
+  if (!activeRuns.has(active.runId)) return;
+  activeRuns.delete(active.runId);
   if (active.hardTimeoutTimer) {
     clearTimeout(active.hardTimeoutTimer);
     active.hardTimeoutTimer = null;
   }
-  activeRuns.delete(active.runId);
+  // If init never arrived, the run row's rootSessionId is still the
+  // `pending-<runId>` placeholder. Flush any buffered pre-init entries to
+  // a JSONL named after that placeholder so loadRunLogWithAncestors finds
+  // them on reload (the canonical motivating example: "Failed to send
+  // prompt" surfaced before the SDK assigned a sessionId).
+  if (!active.sessionId && active.pendingEntries.length > 0) {
+    for (const entry of active.pendingEntries) {
+      appendRunLog(active.jobId, active.runId, active.rootSessionId, entry);
+    }
+    active.pendingEntries = [];
+  }
+  // Release the underlying Claude subprocess. The V2 SDK's stream() ends per
+  // turn (not per session), so a successful run reaches finalizeRun with the
+  // session still alive — without close() it would leak until process exit.
+  try { active.session.close(); } catch {}
   const previewText = (active.lastAssistantText || "").trim().replace(/\s+/g, " ").slice(0, 120);
   const updated = updateRun(active.jobId, active.runId, {
     status,
@@ -450,21 +506,12 @@ function finalizeRun(active: ActiveRun, status: CronjobRun["status"], errorReaso
     previewText,
   });
   if (updated) eventHandler({ type: "cronjob_run_updated", run: updated });
-  // Recompute next fire for the job after a successful or failed scheduled run.
-  if (active.trigger === "scheduled") {
-    const job = cronjobs.find((c) => c.id === active.jobId);
-    if (job) {
-      job.lastFireAt = active.session ? Date.now() : job.lastFireAt;
-      job.nextFireAt = computeNextFire(job.schedule, job.createdAt, Date.now());
-      saveCronjobs(cronjobs);
-      eventHandler({ type: "cronjob_updated", cronjob: job });
-    }
-  }
+  // tick() and the cwd-invalid branch in fire() already set lastFireAt and
+  // nextFireAt at fire time — no further schedule update needed here.
 }
 
-function fire(jobId: string, trigger: CronjobRun["trigger"]): CronjobRun | null {
-  const job = cronjobs.find((c) => c.id === jobId);
-  if (!job) return null;
+function fire(job: Cronjob, trigger: CronjobRun["trigger"]): CronjobRun | null {
+  const jobId = job.id;
 
   // Validate cwd before spawning so a moved directory surfaces as a failed
   // run rather than an opaque SDK exit.
@@ -504,7 +551,7 @@ function fire(jobId: string, trigger: CronjobRun["trigger"]): CronjobRun | null 
     // Update next fire for scheduled trigger so we don't loop.
     if (trigger === "scheduled") {
       job.lastFireAt = now;
-      job.nextFireAt = computeNextFire(job.schedule, job.createdAt, now);
+      job.nextFireAt = computeNextFire(job.schedule, now, now);
       saveCronjobs(cronjobs);
       eventHandler({ type: "cronjob_updated", cronjob: job });
     }
@@ -547,6 +594,7 @@ function fire(jobId: string, trigger: CronjobRun["trigger"]): CronjobRun | null 
     lastAssistantText: "",
     trigger,
     killed: false,
+    pendingEntries: [],
   };
   activeRuns.set(runId, active);
   active.consumerPromise = runConsumer(active);
@@ -578,6 +626,11 @@ function fire(jobId: string, trigger: CronjobRun["trigger"]): CronjobRun | null 
 function recordSkippedRun(job: Cronjob): CronjobRun {
   const runId = generateCronjobRunId();
   const now = Date.now();
+  // Skipped runs never open a session, so there's deliberately no
+  // <runId>/<sessionId>.jsonl on disk. The "skipped-<runId>" placeholder
+  // satisfies the type; CronjobRunView shows "This run was skipped" without
+  // attempting to render a transcript (loadRunLog returns [] for missing
+  // files, which is handled by the empty-state branch).
   const run: CronjobRun = {
     id: runId,
     cronjobId: job.id,
@@ -618,16 +671,16 @@ function tick() {
     if (now < job.nextFireAt) continue;
     if (hasInFlightScheduledRun(job.id)) {
       recordSkippedRun(job);
-      job.nextFireAt = computeNextFire(job.schedule, job.createdAt, now);
+      job.nextFireAt = computeNextFire(job.schedule, job.lastFireAt ?? job.createdAt, now);
       saveCronjobs(cronjobs);
       eventHandler({ type: "cronjob_updated", cronjob: job });
       continue;
     }
     job.lastFireAt = now;
-    job.nextFireAt = computeNextFire(job.schedule, job.createdAt, now);
+    job.nextFireAt = computeNextFire(job.schedule, job.lastFireAt, now);
     saveCronjobs(cronjobs);
     eventHandler({ type: "cronjob_updated", cronjob: job });
-    fire(job.id, "scheduled");
+    fire(job, "scheduled");
   }
 }
 
@@ -638,7 +691,7 @@ function tick() {
 export function runCronjobNow(id: string, _username: string, _device?: string): CronjobRun | null {
   const job = cronjobs.find((c) => c.id === id);
   if (!job) return null;
-  return fire(id, "manual");
+  return fire(job, "manual");
 }
 
 // ---------------------------------------------------------------------------
@@ -646,17 +699,19 @@ export function runCronjobNow(id: string, _username: string, _device?: string): 
 // ---------------------------------------------------------------------------
 
 export function startCronjobScheduler() {
-  // Load configs and cronjobsPrompt
+  // Load configs and cronjobsPrompt (with one-shot migration from the legacy
+  // location in office-config.json — see migrateCronjobsPromptFromOfficeConfig).
   cronjobs = loadCronjobs();
-  const cfg = loadOfficeConfig();
-  cronjobsPrompt = cfg.cronjobsPrompt;
+  migrateCronjobsPromptFromOfficeConfig();
+  cronjobsPrompt = loadCronjobsPrompt();
 
   // Recompute nextFireAt for every cronjob from current time forward.
   const now = Date.now();
   let dirty = false;
   for (const job of cronjobs) {
     const schedule = clampSchedule(job.schedule);
-    const next = computeNextFire(schedule, job.createdAt, now);
+    const anchor = job.lastFireAt ?? job.createdAt;
+    const next = computeNextFire(schedule, anchor, now);
     if (next !== job.nextFireAt) {
       job.nextFireAt = next;
       dirty = true;

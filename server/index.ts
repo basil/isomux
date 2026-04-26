@@ -309,16 +309,10 @@ async function handleCommand(cmd: ClientCommand, ws: ServerWebSocket<unknown>) {
       break;
     }
     case "load_cronjob_run": {
-      // The browser doesn't know which jobId a run belongs to until it has the
-      // run list. To resolve, scan all jobs.
-      const cronjobs = CronjobManager.listCronjobs();
-      let found: { jobId: string; runId: string } | null = null;
-      for (const job of cronjobs) {
-        const runs = CronjobManager.getRunsForCronjob(job.id);
-        if (runs.some((r) => r.id === cmd.runId)) { found = { jobId: job.id, runId: cmd.runId }; break; }
-      }
-      if (!found) break;
-      const { entries } = CronjobManager.getRunTranscript(found.jobId, found.runId);
+      // Client passes jobId from the run row it just clicked, so no scan
+      // needed. Works for runs from deleted cronjobs too: getRunTranscript
+      // reads from disk regardless of whether the cronjob config still exists.
+      const { entries } = CronjobManager.getRunTranscript(cmd.cronjobId, cmd.runId);
       for (const entry of entries) {
         ws.send(JSON.stringify({ type: "log_entry", entry } as ServerMessage));
       }

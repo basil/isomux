@@ -69,20 +69,18 @@ interface CronjobRun {
 
 `status: "skipped"` is recorded for the **overlap** case (a scheduled fire happened while a previous scheduled run was still executing). Missed fires due to server downtime do not produce skipped rows.
 
-### Office config addition
+### Cronjobs prompt
 
-```ts
-// added to existing office-config.json
-cronjobsPrompt: string | null;  // applied to every cronjob's system prompt
-```
+Stored at `~/.isomux/cronjobs/cronjobs-prompt.md` as raw text (empty file = null prompt). Owned by `cronjob-manager`; `agent-manager` does not touch it. Two managers writing the same JSON file from independent in-memory copies would silently clobber each other, which is why this lives in its own file rather than as a field on `office-config.json`.
 
 ## Storage Layout
 
 ```
 ~/.isomux/
-  office-config.json                   (existing; gains cronjobsPrompt field)
+  office-config.json                   (existing; unchanged)
   cronjobs/
     cronjobs.json                      (configs: Cronjob[])
+    cronjobs-prompt.md                 (raw text; system prompt appended to every cronjob)
     cronjob-history.json               (deleted cronjob name preservation: { id -> { lastName } })
     <jobId>/
       runs.json                        (run index: CronjobRun[])
@@ -122,7 +120,7 @@ Built when a session is created (root or fork). Layers, in order:
 
 1. **Cronjob baseline boilerplate** — "You are a scheduled cronjob named <name> running on schedule <schedule>. You don't have a desk or persistent identity. Each scheduled run starts fresh."
 2. **Office prompt** — same field already shared by all agents.
-3. **Cronjobs-wide prompt** — `office-config.json::cronjobsPrompt`. Edited from a "Cronjobs settings" button in the Cronjobs page header (mirror of the office-settings dialog). Optional.
+3. **Cronjobs-wide prompt** — `~/.isomux/cronjobs/cronjobs-prompt.md`. Edited from a "Cronjobs settings" button in the Cronjobs page header (mirror of the office-settings dialog). Optional.
 4. **Discovery hints** — same task-board curl docs and `~/.isomux/agents-summary.json` reference that regular agents get, plus a pointer to past run transcripts: "Past runs of this cronjob are at `~/.isomux/cronjobs/<jobId>/<runId>/`. Read them if you need continuity."
 
 The cronjob's own `prompt` field is **not** part of the system prompt — it is sent as the first user message at fire time.
@@ -154,13 +152,15 @@ Run rows are immortal: no `delete_run`, no edit. The user can resume any run's l
 HTTP endpoints (mirror `/tasks`):
 
 ```
-GET  /cronjobs                    list configs
-GET  /cronjobs/:id                single config + run summary
-GET  /cronjobs/:id/runs           paginated run list
-GET  /cronjobs/:id/runs/:runId    run metadata + transcript
+GET  /cronjobs                    list configs (Cronjob[])
+GET  /cronjobs/:id                single config (Cronjob)
+GET  /cronjobs/:id/runs           run list (CronjobRun[])
+GET  /cronjobs/:id/runs/:runId    { run, entries }
 ```
 
 DELETE blocked at HTTP level (WebSocket-only, mirroring tasks).
+
+v1 keeps these endpoints minimal (config + transcripts only). Richer responses (e.g. attaching a per-cronjob run summary, exposing `cronjobsPrompt` over HTTP) are deferred until there's a concrete consumer — the UI uses the WebSocket `cronjobs_state` event for everything today.
 
 ## UI
 
@@ -242,7 +242,7 @@ Same two tables, single-column on phone width. Tab switcher `[ Runs | Cronjobs ]
 - `server/index.ts` — start scheduler tick on boot; HTTP routes; WebSocket command handlers; startup reconciliation of `running` rows.
 - `server/agent-manager.ts` — extend `renderUsageReport()` with per-cronjob table; share fork-usage helpers.
 - `server/safety-hooks.ts` — no change (hooks reused as-is).
-- `server/persistence.ts` — gain `cronjobsPrompt` in `OfficeConfig` load/save.
+- `server/persistence.ts` — no change; cronjobsPrompt lives in its own file under `cronjobs/`.
 - `ui/App.tsx` — add `cronjobsOpen` + `cronjobsView` state; conditional render; deep-state tracking.
 - `ui/office/OfficeView.tsx` — add Cronjobs nav action with clock icon.
 - `ui/office/Floor.tsx` — make the decorative clock clickable.

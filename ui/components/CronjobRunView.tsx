@@ -37,19 +37,17 @@ export function CronjobRunView({
   const runs = cronjobRunsByJob.get(jobId) ?? [];
   const run = runs.find((r) => r.id === runId);
 
-  // Backfill: for completed/historical runs, the server hasn't broadcast log
-  // entries this session. Skip the load if entries are already cached (e.g.
-  // the user just watched the live stream). The reducer also dedupes by id
-  // as a defence in depth.
-  const cachedCount = (logs.get(streamId) ?? []).length;
+  // Always backfill the historical transcript on open. The previous
+  // optimization (skip if any live entries are cached) dropped pre-connect
+  // entries when the user clicked a run that had started before they opened
+  // the app. The reducer dedupes by id, so re-sending overlapping entries is
+  // harmless.
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
     if (loaded) return;
-    if (cachedCount === 0) {
-      send({ type: "load_cronjob_run", runId });
-    }
+    send({ type: "load_cronjob_run", cronjobId: jobId, runId });
     setLoaded(true);
-  }, [runId, loaded, cachedCount]);
+  }, [jobId, runId, loaded]);
 
   // ESC closes
   useEffect(() => {
@@ -60,7 +58,14 @@ export function CronjobRunView({
     return () => window.removeEventListener("keydown", handleKey, true);
   }, [onClose]);
 
-  const entries: LogEntry[] = logs.get(streamId) ?? [];
+  // Sort by server-assigned timestamp on render. Live entries (which arrive
+  // first while the user has the page open) may be appended to the store
+  // before the historical backfill arrives; without this sort the transcript
+  // would render [live..., backfill...] = out of order.
+  const entries: LogEntry[] = useMemo(() => {
+    const raw = logs.get(streamId) ?? [];
+    return [...raw].sort((a, b) => a.timestamp - b.timestamp);
+  }, [logs, streamId]);
   // Compute the user_message turn boundaries for LogEntryCard's grouping.
   const turnData = useMemo(() => {
     type T = { isLastInTurn: boolean; turnEntries: LogEntry[] };

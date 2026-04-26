@@ -6,7 +6,8 @@ import { getDefaultRoomId, getNotifRooms, shouldNotifyRoom } from "./device-sett
 
 export interface AppState {
   agents: AgentInfo[];
-  logs: Map<string, LogEntry[]>; // agentId → entries
+  logs: Map<string, LogEntry[]>; // streamId → entries (streamId = agentId or cronrun-<runId>)
+  logEntryIds: Map<string, Set<string>>; // streamId → set of seen entry ids (for O(1) dedupe)
   focusedAgentId: string | null;
   connected: boolean;
   isMobile: boolean;
@@ -92,6 +93,7 @@ function reducer(state: AppState, action: Action): AppState {
         rooms: action.rooms,
         currentRoom,
         logs: new Map(),
+        logEntryIds: new Map(),
         needsAttention: new Set(),
         slashCommands: new Map(),
         stateChangedAt: new Map(action.agents.filter((a) => a.state !== "idle" && a.state !== "stopped").map((a) => [a.id, Date.now()])),
@@ -102,12 +104,15 @@ function reducer(state: AppState, action: Action): AppState {
     case "agent_removed": {
       const logs = new Map(state.logs);
       logs.delete(action.agentId);
+      const logEntryIds = new Map(state.logEntryIds);
+      logEntryIds.delete(action.agentId);
       const needsAttention = new Set(state.needsAttention);
       needsAttention.delete(action.agentId);
       return {
         ...state,
         agents: state.agents.filter((a) => a.id !== action.agentId),
         logs,
+        logEntryIds,
         needsAttention,
         focusedAgentId: state.focusedAgentId === action.agentId ? null : state.focusedAgentId,
       };
@@ -142,14 +147,19 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, agents: newAgents, needsAttention, stateChangedAt };
     }
     case "log_entry": {
+      // Per-stream id Set for dedupe. Cloned (not mutated) so the reducer
+      // stays pure — future consumers comparing Set identity won't see
+      // stale references. Set.add returns the Set, so the chained form
+      // works for the new-Set case.
+      const streamId = action.entry.agentId;
+      const seen = state.logEntryIds.get(streamId);
+      if (seen?.has(action.entry.id)) return state;
       const logs = new Map(state.logs);
-      const entries = logs.get(action.entry.agentId) ?? [];
-      // Dedupe by id: cronjob run views re-request historical entries on open
-      // even when the same entries arrived live a moment earlier. Without this
-      // the same response shows up multiple times in the transcript.
-      if (entries.some((e) => e.id === action.entry.id)) return state;
-      logs.set(action.entry.agentId, [...entries, action.entry]);
-      return { ...state, logs };
+      const logEntryIds = new Map(state.logEntryIds);
+      logEntryIds.set(streamId, new Set(seen).add(action.entry.id));
+      const entries = logs.get(streamId) ?? [];
+      logs.set(streamId, [...entries, action.entry]);
+      return { ...state, logs, logEntryIds };
     }
     case "focus": {
       const needsAttention = new Set(state.needsAttention);
@@ -182,7 +192,9 @@ function reducer(state: AppState, action: Action): AppState {
     case "clear_logs": {
       const logs = new Map(state.logs);
       logs.set(action.agentId, []);
-      return { ...state, logs };
+      const logEntryIds = new Map(state.logEntryIds);
+      logEntryIds.set(action.agentId, new Set());
+      return { ...state, logs, logEntryIds };
     }
     case "set_mobile":
       return { ...state, isMobile: action.isMobile };
@@ -275,6 +287,7 @@ function reducer(state: AppState, action: Action): AppState {
 const initialState: AppState = {
   agents: [],
   logs: new Map(),
+  logEntryIds: new Map(),
   focusedAgentId: null,
   connected: false,
   isMobile: typeof window !== "undefined" ? window.innerWidth < 768 : false,

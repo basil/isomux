@@ -19,8 +19,46 @@ const ISOMUX_DIR = join(homedir(), ".isomux");
 const CRONJOBS_DIR = join(ISOMUX_DIR, "cronjobs");
 const CRONJOBS_FILE = join(CRONJOBS_DIR, "cronjobs.json");
 const CRONJOB_HISTORY_FILE = join(CRONJOBS_DIR, "cronjob-history.json");
+const CRONJOBS_PROMPT_FILE = join(CRONJOBS_DIR, "cronjobs-prompt.md");
 
 try { mkdirSync(CRONJOBS_DIR, { recursive: true }); } catch {}
+
+// Cronjobs system prompt — owned by cronjob-manager and stored in its own
+// file, not folded into office-config.json. Two managers writing the same
+// JSON with stale in-memory copies would silently clobber each other (one
+// of the v1 review blockers).
+export function loadCronjobsPrompt(): string | null {
+  try {
+    if (!existsSync(CRONJOBS_PROMPT_FILE)) return null;
+    const content = readFileSync(CRONJOBS_PROMPT_FILE, "utf-8");
+    return content.trim() ? content : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveCronjobsPrompt(value: string | null) {
+  try {
+    writeFileSync(CRONJOBS_PROMPT_FILE, value ?? "");
+  } catch (err) {
+    console.error("Failed to save cronjobs prompt:", err);
+  }
+}
+
+// One-shot migration on startup: if cronjobs-prompt.md doesn't exist yet,
+// look for a legacy `cronjobsPrompt` field in office-config.json (added
+// during v1 development) and copy it over. Idempotent across restarts.
+export function migrateCronjobsPromptFromOfficeConfig() {
+  if (existsSync(CRONJOBS_PROMPT_FILE)) return;
+  try {
+    const officePath = join(ISOMUX_DIR, "office-config.json");
+    if (!existsSync(officePath)) return;
+    const parsed = JSON.parse(readFileSync(officePath, "utf-8"));
+    if (typeof parsed.cronjobsPrompt === "string" && parsed.cronjobsPrompt.trim()) {
+      writeFileSync(CRONJOBS_PROMPT_FILE, parsed.cronjobsPrompt);
+    }
+  } catch {}
+}
 
 // ---------------------------------------------------------------------------
 // Cronjob configs
@@ -128,12 +166,15 @@ export function findRun(jobId: string, runId: string): CronjobRun | null {
 }
 
 // List every cronjobId that has a directory on disk, even if its config is
-// gone. Used by /usage and reconciliation.
+// gone. Used by /usage and reconciliation. Filtered to 8-char hex (the
+// generateHexId format) so stray dirs (editor swap files, future siblings
+// like `tmp/`) aren't mistaken for cronjob ids.
+const HEX8 = /^[a-f0-9]{8}$/;
 export function listAllCronjobIdsOnDisk(): string[] {
   try {
     if (!existsSync(CRONJOBS_DIR)) return [];
     return readdirSync(CRONJOBS_DIR, { withFileTypes: true })
-      .filter((d) => d.isDirectory())
+      .filter((d) => d.isDirectory() && HEX8.test(d.name))
       .map((d) => d.name);
   } catch {
     return [];

@@ -404,7 +404,7 @@ export type ClientCommand =
   | { type: "update_cronjobs_prompt"; requestId: string; value: string | null }
   | { type: "list_cronjob_runs"; cronjobId: string }
   | { type: "list_all_cronjob_runs" }
-  | { type: "load_cronjob_run"; runId: string }
+  | { type: "load_cronjob_run"; cronjobId: string; runId: string }
   | { type: "ping" };
 
 // Generate a stable 8-char hex room ID (used at room creation and during migration)
